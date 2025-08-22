@@ -18,7 +18,16 @@ export default {
 			}
 		},
 		extend: {
-			colors: {
+				utilities: {
+					'.scrollbar-none': {
+						'scrollbar-width': 'none',
+						'-ms-overflow-style': 'none',
+						'&::-webkit-scrollbar': {
+							'display': 'none'
+						}
+					}
+				},
+				colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',

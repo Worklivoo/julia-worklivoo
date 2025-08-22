@@ -1,20 +1,22 @@
-
 export interface Lead {
   id: string;
   opportunityName: string;
   leadName: string;
   email: string;
   phone: string;
-  stage: 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed-won' | 'closed-lost';
+  stage: 'entrada' | 'tentando-contato' | 'contato-realizado' | 'qualificada';
+  // Status mapeado do Supabase: 'Aberto' -> 'active', 'Perdido' -> 'lost', 'Ganho' -> 'won'
   status: 'active' | 'won' | 'lost';
-  value: number;
   createdAt: Date;
   updatedAt: Date;
   source: string;
-  lossReason?: string;
+  value: number;
   notes: Note[];
   priority: 'low' | 'medium' | 'high';
   expectedCloseDate?: Date;
+  lead_notas?: string;
+  thread_dify?: string;
+  ativo_ia?: string;
 }
 
 export interface Note {
@@ -25,19 +27,30 @@ export interface Note {
   author: string;
 }
 
+// Interface para anotações do Supabase
+export interface HistoricoNote {
+  historico_id: number;
+  created_at: string;
+  lead_id: number;
+  historico_lead: string;
+}
+
 export interface User {
-  id: string;
-  name: string;
+  id: string; // user_id
+  nome: string;
   email: string;
+  telefone?: string | null;
+  empresa?: string | null;
+  avatar?: string | null;
+  plano?: number | null;
+  id_instancia_zapi?: string | null;
+  token_instancia_zapi?: string | null;
 }
 
 export interface DashboardMetrics {
   totalLeads: number;
-  totalValue: number;
   conversionRate: number;
-  avgDealSize: number;
   leadsThisMonth: number;
   wonDeals: number;
   lostDeals: number;
-  pipelineValue: number;
 }

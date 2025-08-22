@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -36,6 +35,62 @@
     --radius: 0.5rem;
   }
 
+  [data-theme="light"] {
+    --background: 0 0% 100%; /* branco */
+    --foreground: 220 13% 9%; /* texto escuro */
+
+    --card: 0 0% 98%; /* #F6F6F6 */
+    --card-foreground: 220 13% 9%;
+
+    --popover: 0 0% 98%;
+    --popover-foreground: 220 13% 9%;
+
+    --primary: 56 97% 73%; /* #EBF57D amarelo */
+    --primary-foreground: 220 13% 9%;
+
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 220 13% 9%;
+
+    --muted: 0 0% 90%;
+    --muted-foreground: 220 13% 40%;
+
+    --accent: 56 97% 73%; /* #EBF57D amarelo */
+    --accent-foreground: 220 13% 9%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 56 97% 73%;
+
+    .light-title {
+      color: #111 !important;
+    }
+
+    .light-contact {
+      color: #111 !important;
+    }
+
+    .light-welcome-title {
+      background: none !important;
+      color: #111 !important;
+      -webkit-background-clip: unset !important;
+      background-clip: unset !important;
+    }
+
+    .light-text-black {
+      color: #111 !important;
+    }
+
+    .light-gradient-black {
+      background: none !important;
+      color: #111 !important;
+      -webkit-background-clip: unset !important;
+      background-clip: unset !important;
+    }
+  }
+
   * {
     @apply border-border;
   }
@@ -45,7 +100,39 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 
+  html {
+    overflow-x: hidden;
+  }
+
   .gradient-bg {
     background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
   }
+}
+
+/* Estilização customizada das barras de rolagem */
+body::-webkit-scrollbar {
+  width: 8px;
+}
+
+body::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+body::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+
+body::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--accent));
+}
+
+/* Scrollbar invisível para colunas do Kanban */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

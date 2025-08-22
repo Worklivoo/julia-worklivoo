@@ -1,19 +1,28 @@
-
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { Lead, Note, User, DashboardMetrics } from '@/types';
+import { supabase } from '@/lib/supabase';
+import {
+  getUserProfile,
+  createUserProfile,
+  updateUserProfile,
+} from '@/lib/supabase-utils';
+import { getLeadsByUser, addLead as addLeadToSupabase, updateLead as updateLeadSupabase, addHistorico, getHistoricoByLead, deleteLead as deleteLeadSupabase } from '@/lib/leads';
 
 interface CRMContextType {
   leads: Lead[];
   user: User | null;
   isAuthenticated: boolean;
-  addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'notes'>) => void;
+  loadingUser: boolean;
+  addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'notes'>) => Promise<{ success: boolean; error?: string }>;
   updateLead: (id: string, updates: Partial<Lead>) => void;
-  deleteLead: (id: string) => void;
-  addNote: (leadId: string, content: string) => void;
+  deleteLead: (id: string) => Promise<boolean>;
+  addNote: (leadId: string, content: string) => Promise<boolean>;
+  getNotesByLead: (leadId: string) => Promise<Note[]>;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, telefone?: string, empresa?: string) => Promise<boolean>;
   logout: () => void;
   getDashboardMetrics: () => DashboardMetrics;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 const CRMContext = createContext<CRMContextType | undefined>(undefined);
@@ -30,160 +39,502 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loadingUser, setLoadingUser] = useState(true);
 
-  // Initialize with sample data
+  // Persistência de sessão e carregamento do usuário
   useEffect(() => {
-    const sampleLeads: Lead[] = [
-      {
-        id: '1',
-        opportunityName: 'Software Enterprise - ABC Corp',
-        leadName: 'João Silva',
-        email: 'joao@abccorp.com',
-        phone: '(11) 99999-9999',
-        stage: 'qualified',
-        status: 'active',
-        value: 150000,
-        createdAt: new Date('2024-01-15'),
-        updatedAt: new Date('2024-01-20'),
-        source: 'Website',
-        priority: 'high',
-        expectedCloseDate: new Date('2024-02-15'),
-        notes: [
-          {
-            id: 'n1',
-            leadId: '1',
-            content: 'Cliente demonstrou interesse no produto Enterprise',
-            createdAt: new Date('2024-01-16'),
-            author: 'Admin'
-          }
-        ]
-      },
-      {
-        id: '2',
-        opportunityName: 'Consultoria Digital - TechStart',
-        leadName: 'Maria Santos',
-        email: 'maria@techstart.com',
-        phone: '(11) 88888-8888',
-        stage: 'proposal',
-        status: 'active',
-        value: 75000,
-        createdAt: new Date('2024-01-10'),
-        updatedAt: new Date('2024-01-18'),
-        source: 'LinkedIn',
-        priority: 'medium',
-        expectedCloseDate: new Date('2024-02-10'),
-        notes: []
-      },
-      {
-        id: '3',
-        opportunityName: 'Sistema CRM - StartupXYZ',
-        leadName: 'Pedro Costa',
-        email: 'pedro@startupxyz.com',
-        phone: '(11) 77777-7777',
-        stage: 'negotiation',
-        status: 'active',
-        value: 200000,
-        createdAt: new Date('2024-01-05'),
-        updatedAt: new Date('2024-01-22'),
-        source: 'Referência',
-        priority: 'high',
-        expectedCloseDate: new Date('2024-02-01'),
-        notes: []
+    let isInitialLoad = true;
+    const getSessionAndProfile = async (event?: string) => {
+      // Evita re-execuções desnecessárias em eventos de token refresh
+      if (!isInitialLoad && event === 'TOKEN_REFRESHED') {
+        return;
       }
-    ];
-    setLeads(sampleLeads);
+      
+      setLoadingUser(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const profile = await getUserProfile(session.user.id);
+        if (profile) {
+          const newUser = {
+            id: profile.user_id,
+            nome: profile.user_nome,
+            email: profile.user_email,
+            telefone: profile.user_telefone,
+            empresa: profile.user_empresa,
+            avatar: profile.user_avatar,
+            plano: profile.user_plano,
+            id_instancia_zapi: profile.id_instancia_zapi,
+            token_instancia_zapi: profile.token_instancia_zapi,
+          };
+          // Só atualiza se realmente mudou
+          setUser(prevUser => {
+            if (!prevUser || JSON.stringify(prevUser) !== JSON.stringify(newUser)) {
+              return newUser;
+            }
+            return prevUser;
+          });
+          setIsAuthenticated(true);
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+      setLoadingUser(false);
+      isInitialLoad = false;
+    };
+    getSessionAndProfile();
+    // Listener para mudanças de sessão
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      getSessionAndProfile(event);
+    });
+    return () => {
+      listener?.subscription.unsubscribe();
+    };
   }, []);
 
-  const addLead = (leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'notes'>) => {
-    const newLead: Lead = {
-      ...leadData,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      notes: []
+  // Carregar leads do usuário logado do Supabase
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLeads = async () => {
+      if (!user) {
+        if (isMounted) setLeads([]);
+        return;
+      }
+      
+      // Evita múltiplas chamadas simultâneas
+      if (loadingUser) {
+        return;
+      }
+      
+      // PRIMEIRO: Remover leads de teste se existirem
+      await supabase
+        .from('leads')
+        .delete()
+        .eq('user_id', user.id)
+        .like('lead_nome_pessoa', '%Teste%');
+      
+      const { data, error } = await getLeadsByUser(user.id);
+      
+      if (error || !data) {
+        if (isMounted) setLeads([]);
+        return;
+      }
+      
+      // Mapear os campos do Supabase para o tipo Lead do frontend
+      const mappedLeads: Lead[] = await Promise.all(data.map(async (lead: any) => {
+          // Buscar anotações para cada lead
+          const notes = await getNotesByLead(lead.lead_id?.toString() || '');
+          
+          
+          
+          const mappedLead = {
+          id: lead.lead_id?.toString(),
+          opportunityName: lead.lead_nome_oportunidade,
+          leadName: lead.lead_nome_pessoa,
+          email: lead.lead_email,
+          phone: lead.lead_telefone,
+          stage: mapLeadEtapaToStage(lead.lead_etapa),
+          status: mapLeadStatus(lead.lead_status),
+          createdAt: lead.created_at ? new Date(lead.created_at) : new Date(),
+          updatedAt: lead.updated_at ? new Date(lead.updated_at) : new Date(),
+          source: lead.lead_canal_origem,
+          value: 0, // Ajuste se houver campo de valor
+          notes: notes, // Carregar anotações do banco
+          priority: 'medium', // Ajuste se houver prioridade
+          expectedCloseDate: undefined,
+          lead_notas: lead.lead_notas,
+          thread_dify: lead.thread_dify,
+          ativo_ia: lead.ativo_ia,
+          };
+          
+          return mappedLead;
+      }));
+      
+
+      
+       if (isMounted) {
+         setLeads(mappedLeads);
+       }
     };
-    setLeads(prev => [...prev, newLead]);
-  };
-
-  const updateLead = (id: string, updates: Partial<Lead>) => {
-    setLeads(prev => prev.map(lead => 
-      lead.id === id 
-        ? { ...lead, ...updates, updatedAt: new Date() }
-        : lead
-    ));
-  };
-
-  const deleteLead = (id: string) => {
-    setLeads(prev => prev.filter(lead => lead.id !== id));
-  };
-
-  const addNote = (leadId: string, content: string) => {
-    const newNote: Note = {
-      id: Date.now().toString(),
-      leadId,
-      content,
-      createdAt: new Date(),
-      author: user?.name || 'Admin'
+    
+    fetchLeads();
+    
+    return () => {
+      isMounted = false;
     };
+  }, [user?.id, loadingUser]); // Só depende do ID do usuário e do estado de loading
 
-    setLeads(prev => prev.map(lead => 
-      lead.id === leadId 
-        ? { ...lead, notes: [...lead.notes, newNote] }
-        : lead
-    ));
-  };
+  // Funções auxiliares para mapear etapas e status
+  function mapLeadEtapaToStage(lead_etapa: string): Lead['stage'] {
+    switch (lead_etapa) {
+      case 'Entrada do Lead':
+        return 'entrada';
+      case 'Tentando contato':
+        return 'tentando-contato';
+      case 'Contato realizado':
+        return 'contato-realizado';
+      case 'Oportunidade qualificada':
+        return 'qualificada';
+      default:
+        return 'entrada';
+    }
+  }
+  function mapLeadStatus(lead_status: string): Lead['status'] {
+    switch (lead_status) {
+      case 'Aberto':
+        return 'active';
+      case 'Perdido':
+        return 'lost';
+      case 'Ganho':
+        return 'won';
+      default:
+        return 'active';
+    }
+  }
 
+  // Função de login
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate login
-    if (email && password) {
-      setUser({ id: '1', name: 'Admin', email });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.session) {
+      setUser(null);
+      setIsAuthenticated(false);
+      return false;
+    }
+    const profile = await getUserProfile(data.user.id);
+    if (profile) {
+      setUser({
+        id: profile.user_id,
+        nome: profile.user_nome,
+        email: profile.user_email,
+        telefone: profile.user_telefone,
+        empresa: profile.user_empresa,
+        avatar: profile.user_avatar,
+        plano: profile.user_plano,
+      });
       setIsAuthenticated(true);
       return true;
     }
+    setUser(null);
+    setIsAuthenticated(false);
     return false;
   };
 
-  const register = async (name: string, email: string, password: string): Promise<boolean> => {
-    // Simulate registration
-    if (name && email && password) {
-      setUser({ id: '1', name, email });
+  // Função de registro
+  const register = async (nome: string, email: string, password: string, telefone?: string, empresa?: string): Promise<boolean> => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    if (error || !data.user) {
+      setUser(null);
+      setIsAuthenticated(false);
+      return false;
+    }
+    // Cria perfil na tabela usuarios
+    const profile = await createUserProfile({
+      user_id: data.user.id,
+      user_nome: nome,
+      user_email: email,
+      user_telefone: telefone || null,
+      user_empresa: empresa || null,
+      user_avatar: null,
+    });
+    if (profile) {
+      setUser({
+        id: profile.user_id,
+        nome: profile.user_nome,
+        email: profile.user_email,
+        telefone: profile.user_telefone,
+        empresa: profile.user_empresa,
+        avatar: profile.user_avatar,
+        plano: profile.user_plano,
+      });
       setIsAuthenticated(true);
       return true;
     }
+    setUser(null);
+    setIsAuthenticated(false);
     return false;
   };
 
-  const logout = () => {
+  // Função de logout
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setIsAuthenticated(false);
   };
 
-  const getDashboardMetrics = (): DashboardMetrics => {
+  // Atualizar perfil do usuário
+  const updateUser = async (updates: Partial<User>) => {
+    if (!user) return;
+    const updated = await updateUserProfile(user.id, {
+      user_nome: updates.nome,
+      user_email: updates.email,
+      user_telefone: updates.telefone,
+      user_empresa: updates.empresa,
+      user_avatar: updates.avatar,
+      user_plano: updates.plano,
+    });
+    if (updated) {
+      setUser({
+        id: updated.user_id,
+        nome: updated.user_nome,
+        email: updated.user_email,
+        telefone: updated.user_telefone,
+        empresa: updated.user_empresa,
+        avatar: updated.user_avatar,
+        plano: updated.user_plano,
+      });
+    }
+  };
+
+  const addLead = async (leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'notes'>): Promise<{ success: boolean; error?: string }> => {
+    if (!user) {
+      return { success: false, error: 'Usuário não autenticado.' };
+    }
+
+    try {
+      // Mapear os dados do lead para o formato do Supabase
+      const supabaseLeadData = {
+        lead_etapa: 'Entrada do lead',
+        lead_status: 'Aberto',
+        lead_nome_pessoa: leadData.leadName,
+        lead_telefone: leadData.phone,
+        lead_email: leadData.email || '',
+        lead_canal_origem: leadData.source,
+        lead_notas: leadData.notes || '',
+        user_id: user.id,
+        lead_nome_oportunidade: leadData.opportunityName,
+      };
+
+      // Adicionar no Supabase
+      const { data, error } = await addLeadToSupabase(supabaseLeadData);
+      
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      // Recarregar os leads do Supabase para manter sincronização
+      const { data: updatedLeads, error: fetchError } = await getLeadsByUser(user.id);
+      
+      if (fetchError || !updatedLeads) {
+        return { success: false, error: 'Erro ao recarregar leads.' };
+      }
+
+      // Mapear os leads atualizados
+      const mappedLeads: Lead[] = await Promise.all(updatedLeads.map(async (lead: any) => {
+        const notes = await getNotesByLead(lead.lead_id?.toString() || '');
+        
+        return {
+          id: lead.lead_id?.toString(),
+          opportunityName: lead.lead_nome_oportunidade,
+          leadName: lead.lead_nome_pessoa,
+          email: lead.lead_email,
+          phone: lead.lead_telefone,
+          stage: mapLeadEtapaToStage(lead.lead_etapa),
+          status: mapLeadStatus(lead.lead_status),
+          createdAt: lead.created_at ? new Date(lead.created_at) : new Date(),
+          updatedAt: lead.updated_at ? new Date(lead.updated_at) : new Date(),
+          source: lead.lead_canal_origem,
+          value: 0,
+          notes: notes,
+          priority: 'medium',
+          expectedCloseDate: undefined,
+          company: lead.lead_empresa,
+        };
+      }));
+
+      setLeads(mappedLeads);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Erro interno ao adicionar lead.' };
+    }
+  };
+
+  // Função auxiliar para mapear status do frontend para Supabase
+  function mapStatusToLeadStatus(status: Lead['status']): string {
+    switch (status) {
+      case 'active':
+        return 'Aberto';
+      case 'lost':
+        return 'Perdido';
+      case 'won':
+        return 'Ganho';
+      default:
+        return 'Aberto';
+    }
+  }
+
+  const updateLead = async (id: string, updates: Partial<Lead>) => {
+    // Se o update for de etapa, atualizar no Supabase
+    let supabaseUpdates: any = {};
+    if (updates.stage) {
+      supabaseUpdates.lead_etapa = mapStageToLeadEtapa(updates.stage);
+    }
+    if (updates.status) {
+      if (updates.status === 'won') {
+        supabaseUpdates.lead_status = 'Ganho';
+      } else if (updates.status === 'lost') {
+        supabaseUpdates.lead_status = 'Perdido';
+      } else if (updates.status === 'active') {
+        supabaseUpdates.lead_status = 'Aberto';
+      }
+    }
+
+    if (updates.leadName) {
+      supabaseUpdates.lead_nome_pessoa = updates.leadName;
+    }
+    if (updates.email) {
+      supabaseUpdates.lead_email = updates.email;
+    }
+    if (updates.phone) {
+      supabaseUpdates.lead_telefone = updates.phone;
+    }
+    if (updates.opportunityName) {
+      supabaseUpdates.lead_nome_oportunidade = updates.opportunityName;
+    }
+    if (updates.source) {
+      supabaseUpdates.lead_canal_origem = updates.source;
+    }
+    if (updates.expectedCloseDate) {
+      supabaseUpdates.lead_data_fechamento_esperada = updates.expectedCloseDate instanceof Date ? updates.expectedCloseDate.toISOString() : updates.expectedCloseDate;
+    }
+    // Adicione outros campos se necessário
+    if (Object.keys(supabaseUpdates).length > 0) {
+      await updateLeadSupabase(id, supabaseUpdates);
+      // Atualizar localmente também
+      setLeads(prev => prev.map(lead => 
+        lead.id === id 
+          ? { ...lead, ...updates, updatedAt: new Date() }
+          : lead
+      ));
+    }
+  };
+
+  function mapStageToLeadEtapa(stage: Lead['stage']): string {
+    switch (stage) {
+      case 'entrada':
+        return 'Entrada do lead';
+      case 'tentando-contato':
+        return 'Tentando contato';
+      case 'contato-realizado':
+        return 'Contato realizado';
+      case 'qualificada':
+        return 'Oportunidade qualificada';
+      default:
+        return 'Entrada do lead';
+    }
+  }
+
+  const deleteLead = async (id: string): Promise<boolean> => {
+    try {
+      const { error } = await deleteLeadSupabase(id);
+      
+      if (error) {
+        console.error('Erro ao excluir lead:', error);
+        return false;
+      }
+      
+      // Atualizar o estado local removendo o lead
+      setLeads(prev => prev.filter(lead => lead.id !== id));
+      return true;
+    } catch (error) {
+      console.error('Erro ao excluir lead:', error);
+      return false;
+    }
+  };
+
+  const addNote = async (leadId: string, content: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    try {
+      const historicoData = {
+        lead_id: parseInt(leadId),
+        historico_lead: content
+      };
+      
+      const { error } = await addHistorico(historicoData);
+      
+      if (error) {
+        console.error('Erro ao adicionar anotação:', error);
+        return false;
+      }
+      
+      // Atualizar o estado local com a nova anotação
+      const newNote: Note = {
+        id: Date.now().toString(),
+        leadId,
+        content,
+        createdAt: new Date(),
+        author: user.nome || 'Admin'
+      };
+
+      setLeads(prev => prev.map(lead => 
+        lead.id === leadId 
+          ? { ...lead, notes: [...lead.notes, newNote] }
+          : lead
+      ));
+      
+      return true;
+    } catch (error) {
+      console.error('Erro ao adicionar anotação:', error);
+      return false;
+    }
+  };
+
+  const getNotesByLead = async (leadId: string): Promise<Note[]> => {
+    if (!user) return [];
+    
+    try {
+      const { data, error } = await getHistoricoByLead(parseInt(leadId));
+      
+      if (error) {
+        console.error('Erro ao buscar anotações:', error);
+        return [];
+      }
+      
+      // Converter dados do Supabase para o formato Note
+      const notes: Note[] = (data || []).map((historico: any) => ({
+        id: historico.historico_id.toString(),
+        leadId: leadId,
+        content: historico.historico_lead,
+        createdAt: new Date(historico.created_at),
+        author: user.nome || 'Admin'
+      }));
+      
+      return notes;
+    } catch (error) {
+      console.error('Erro ao buscar anotações:', error);
+      return [];
+    }
+  };
+
+  // Memoizar métricas do dashboard para evitar recálculos constantes
+  const dashboardMetrics = useMemo((): DashboardMetrics => {
     const totalLeads = leads.length;
-    const totalValue = leads.reduce((sum, lead) => sum + lead.value, 0);
     const wonDeals = leads.filter(lead => lead.status === 'won').length;
     const lostDeals = leads.filter(lead => lead.status === 'lost').length;
-    const activeLeads = leads.filter(lead => lead.status === 'active');
     const conversionRate = totalLeads > 0 ? (wonDeals / totalLeads) * 100 : 0;
-    const avgDealSize = activeLeads.length > 0 ? totalValue / activeLeads.length : 0;
+    const now = new Date();
     const leadsThisMonth = leads.filter(lead => {
-      const now = new Date();
       const leadDate = new Date(lead.createdAt);
       return leadDate.getMonth() === now.getMonth() && 
              leadDate.getFullYear() === now.getFullYear();
     }).length;
-    const pipelineValue = activeLeads.reduce((sum, lead) => sum + lead.value, 0);
-
     return {
       totalLeads,
-      totalValue,
       conversionRate,
-      avgDealSize,
       leadsThisMonth,
       wonDeals,
-      lostDeals,
-      pipelineValue
+      lostDeals
     };
+  }, [leads]);
+
+  const getDashboardMetrics = (): DashboardMetrics => {
+    return dashboardMetrics;
   };
 
   return (
@@ -191,14 +542,17 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       leads,
       user,
       isAuthenticated,
+      loadingUser,
       addLead,
       updateLead,
       deleteLead,
       addNote,
+      getNotesByLead,
       login,
       register,
       logout,
-      getDashboardMetrics
+      getDashboardMetrics,
+      updateUser,
     }}>
       {children}
     </CRMContext.Provider>
