@@ -21,7 +21,12 @@ const Sidebar = () => {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useCRM();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  // Recuperar estado do sidebar do localStorage na inicialização
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    const savedState = localStorage.getItem('sidebar-collapsed');
+    return savedState ? JSON.parse(savedState) : false;
+  });
   const [isMenuActive, setIsMenuActive] = useState(false);
 
   // Navegação principal do CRM
@@ -59,7 +64,10 @@ const Sidebar = () => {
 
   // Função para alternar o sidebar
   const toggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
+    const newState = !isCollapsed;
+    setIsCollapsed(newState);
+    // Salvar estado no localStorage
+    localStorage.setItem('sidebar-collapsed', JSON.stringify(newState));
   };
 
   // Função para alternar o menu mobile
@@ -101,9 +109,9 @@ const Sidebar = () => {
       <header className="sidebar-header">
         <div className="sidebar-logo">
           <img 
-            src="/logo-worklivoo-amarela.png" 
+            src="/logo-worklivoo-fundo-preto.png" 
             alt="Worklivoo" 
-            className="logo-image"
+            className="logo-image logo-rounded"
           />
         </div>
         <button className="toggler sidebar-toggler" onClick={toggleSidebar}>

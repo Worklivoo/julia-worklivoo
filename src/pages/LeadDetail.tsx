@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useCRM } from '@/contexts/CRMContext';
 import { useLeadOrigins } from '@/hooks/use-lead-origins';
 import { Note } from '@/types';
-import { ArrowLeft, Calendar, Mail, Phone, User, Edit, Check, X, Plus, UserPlus, PhoneCall, FileText, Handshake, CheckCircle, Trash2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Calendar, Mail, Phone, User, Edit, Check, X, Plus, UserPlus, PhoneCall, FileText, Handshake, CheckCircle, Trash2, AlertTriangle, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const LeadDetail = () => {
@@ -72,7 +72,7 @@ const LeadDetail = () => {
   const stages = [
     { id: 'entrada', name: 'Entrada do Lead', icon: UserPlus },
     { id: 'tentando-contato', name: 'Tentando Contato', icon: PhoneCall },
-    { id: 'contato-realizado', name: 'Contato Realizado', icon: Check },
+    { id: 'contato-realizado', name: 'Contato Realizado', icon: MessageCircle },
     { id: 'qualificada', name: 'Oportunidade Qualificada', icon: Handshake },
   ];
 

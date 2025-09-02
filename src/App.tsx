@@ -12,6 +12,7 @@ import WhatsApp from "./pages/WhatsApp";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
+import Console from "./pages/Console";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import Layout from "@/components/Layout";
 
@@ -69,6 +70,7 @@ const AppRoutes = () => {
       <Route path="/lead/:id" element={<ProtectedRoute><Layout><LeadDetail /></Layout></ProtectedRoute>} />
       <Route path="/whatsapp" element={<ProtectedRoute><Layout><WhatsApp /></Layout></ProtectedRoute>} />
       <Route path="/configuracoes" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
+      <Route path="/console" element={<ProtectedRoute><Layout><Console /></Layout></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

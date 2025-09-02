@@ -4,12 +4,15 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCRM } from '@/contexts/CRMContext';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Phone, Building, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, Building, ArrowLeft, HelpCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { usePersistentTab } from '@/hooks/use-persistent-state';
 
 const Auth = () => {
+  const [activeTab, setActiveTab] = usePersistentTab('auth', 'login');
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [registerData, setRegisterData] = useState({ name: '', email: '', password: '', telefone: '', empresa: '', authPassword: '' });
   const [resetEmail, setResetEmail] = useState('');
@@ -80,7 +83,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{backgroundColor: '#F6F6F6'}}>
       <div className="w-full max-w-md">
         {/* Logo e Header */}
         <div className="text-center mb-8">
@@ -91,16 +94,15 @@ const Auth = () => {
               className="h-16 w-auto rounded-xl shadow-lg"
             />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Bem-vindo de volta</h1>
-          <p className="text-slate-600 dark:text-slate-400">Acesse sua conta ou crie uma nova</p>
+
         </div>
 
-        <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-3xl">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-center text-2xl font-semibold text-slate-900 dark:text-white">
+            <CardTitle className="text-center text-2xl font-semibold text-slate-900">
               {showForgotPassword ? 'Recuperar senha' : 'Acesse sua conta'}
             </CardTitle>
-            <CardDescription className="text-center text-slate-600 dark:text-slate-400">
+            <CardDescription className="text-center text-slate-600">
               {showForgotPassword ? 'Digite seu email para receber o link de recuperação' : 'Entre com suas credenciais ou crie uma nova conta'}
             </CardDescription>
           </CardHeader>
@@ -115,16 +117,16 @@ const Auth = () => {
                       setResetError('');
                       setResetEmail('');
                     }}
-                    className="text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    className="text-slate-600 hover:text-slate-800 transition-colors"
                   >
                     <ArrowLeft className="h-4 w-4" />
                   </button>
-                  <span className="text-sm text-slate-600 dark:text-slate-400">Voltar ao login</span>
+                  <span className="text-sm text-slate-600">Voltar ao login</span>
                 </div>
                 
                 <form onSubmit={handleForgotPassword} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="reset-email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    <Label htmlFor="reset-email" className="text-sm font-medium text-slate-700">
                       E-mail
                     </Label>
                     <div className="relative">
@@ -135,63 +137,63 @@ const Auth = () => {
                         placeholder="seu@email.com"
                         value={resetEmail}
                         onChange={(e) => setResetEmail(e.target.value)}
-                        className="pl-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-yellow-500 dark:focus:border-yellow-400 focus:ring-yellow-500/20"
+                        className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
                         required
                       />
                     </div>
                   </div>
                   
                   {resetMessage && (
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <p className="text-sm text-green-700 dark:text-green-400">{resetMessage}</p>
-                    </div>
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-700">{resetMessage}</p>
+            </div>
                   )}
                   
                   {resetError && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                      <p className="text-sm text-red-700 dark:text-red-400">{resetError}</p>
-                    </div>
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">{resetError}</p>
+            </div>
                   )}
                   
                   <Button 
                     type="submit" 
-                    className="w-full h-11 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="w-full bg-black hover:bg-gray-800 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
                     disabled={isLoading}
                   >
                     {isLoading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                         Enviando...
                       </div>
                     ) : (
-                      'Enviar link de recuperação'
+                      "Enviar link de recuperação"
                     )}
                   </Button>
                 </form>
               </div>
             ) : (
-              <Tabs defaultValue="login" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 p-1 rounded-lg" style={{backgroundColor: 'rgba(235, 245, 125, 0.3)'}}>
                   <TabsTrigger 
                     value="login" 
-                    className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-white"
+                    className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
                   >
                     Entrar
                   </TabsTrigger>
                   <TabsTrigger 
-                    value="register"
-                    className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-white"
-                  >
-                    Criar conta
-                  </TabsTrigger>
+                      value="register" 
+                      className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
+                    >
+                      Registrar
+                    </TabsTrigger>
                 </TabsList>
 
               <TabsContent value="login" className="space-y-6 mt-6">
                 <form onSubmit={handleLogin} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      E-mail
-                    </Label>
+                    <Label htmlFor="email" className="text-sm font-medium text-slate-700">
+                        E-mail
+                      </Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                       <Input
@@ -200,15 +202,15 @@ const Auth = () => {
                         placeholder="seu@email.com"
                         value={loginData.email}
                         onChange={(e) => setLoginData({...loginData, email: e.target.value})}
-                        className="pl-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-yellow-500 dark:focus:border-yellow-400 focus:ring-yellow-500/20"
+                        className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
                         required
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Senha
-                    </Label>
+                    <Label htmlFor="password" className="text-sm font-medium text-slate-700">
+                        Senha
+                      </Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                       <Input
@@ -217,30 +219,21 @@ const Auth = () => {
                         placeholder="Digite sua senha"
                         value={loginData.password}
                         onChange={(e) => setLoginData({...loginData, password: e.target.value})}
-                        className="pl-10 pr-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-yellow-500 dark:focus:border-yellow-400 focus:ring-yellow-500/20"
+                        className="pl-10 pr-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
                   </div>
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setShowForgotPassword(true)}
-                      className="text-sm text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300 font-medium transition-colors"
-                    >
-                      Esqueci minha senha
-                    </button>
-                  </div>
                   <Button 
                     type="submit" 
-                    className="w-full h-11 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="w-full h-11 bg-black hover:bg-gray-800 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
                     disabled={isLoading}
                   >
                     {isLoading ? (
@@ -249,18 +242,27 @@ const Auth = () => {
                         Entrando...
                       </div>
                     ) : (
-                      'Entrar na conta'
+                      "Entrar na conta"
                     )}
                   </Button>
+                  <div className="flex justify-center mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPassword(true)}
+                      className="text-xs text-gray-400 hover:text-gray-500 transition-colors"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
                 </form>
               </TabsContent>
 
               <TabsContent value="register" className="space-y-6 mt-6">
                 <form onSubmit={handleRegister} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Nome completo
-                    </Label>
+                    <Label htmlFor="name" className="text-sm font-medium text-slate-700">
+                        Nome completo
+                      </Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                       <Input
@@ -269,15 +271,15 @@ const Auth = () => {
                         placeholder="Seu nome completo"
                         value={registerData.name}
                         onChange={(e) => setRegisterData({...registerData, name: e.target.value})}
-                        className="pl-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-yellow-500 dark:focus:border-yellow-400 focus:ring-yellow-500/20"
+                        className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
                         required
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      E-mail
-                    </Label>
+                    <Label htmlFor="register-email" className="text-sm font-medium text-slate-700">
+                        E-mail
+                      </Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                       <Input
@@ -286,13 +288,13 @@ const Auth = () => {
                         placeholder="seu@email.com"
                         value={registerData.email}
                         onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
-                        className="pl-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-yellow-500 dark:focus:border-yellow-400 focus:ring-yellow-500/20"
+                        className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
                         required
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    <Label htmlFor="register-password" className="text-sm font-medium text-slate-700">
                       Senha
                     </Label>
                     <div className="relative">
@@ -303,22 +305,34 @@ const Auth = () => {
                         placeholder="Crie uma senha segura"
                         value={registerData.password}
                         onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
-                        className="pl-10 pr-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-yellow-500 dark:focus:border-yellow-400 focus:ring-yellow-500/20"
+                        className="pl-10 pr-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
                       >
                         {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="auth-password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Senha de Autenticação <span className="text-red-500">*</span>
-                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="auth-password" className="text-sm font-medium text-slate-700">
+                        Senha de Autenticação <span className="text-red-500">*</span>
+                      </Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-4 w-4 text-slate-400 hover:text-slate-600 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Senha usada internamente pela equipe da Worklivoo, entre em contato conosco</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                       <Input
@@ -327,17 +341,17 @@ const Auth = () => {
                         placeholder="Digite a senha de autenticação"
                         value={registerData.authPassword}
                         onChange={(e) => setRegisterData({...registerData, authPassword: e.target.value})}
-                        className="pl-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-yellow-500 dark:focus:border-yellow-400 focus:ring-yellow-500/20"
+                        className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
                         required
                       />
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-slate-500">
                       Entre em contato com o administrador para obter a senha de autenticação
                     </p>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      <Label htmlFor="phone" className="text-sm font-medium text-slate-700">
                         Telefone <span className="text-slate-400">(opcional)</span>
                       </Label>
                       <div className="relative">
@@ -348,12 +362,12 @@ const Auth = () => {
                           placeholder="(11) 99999-9999"
                           value={registerData.telefone}
                           onChange={(e) => setRegisterData({...registerData, telefone: e.target.value})}
-                          className="pl-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-yellow-500 dark:focus:border-yellow-400 focus:ring-yellow-500/20"
+                          className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
                         />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="company" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      <Label htmlFor="company" className="text-sm font-medium text-slate-700">
                         Empresa <span className="text-slate-400">(opcional)</span>
                       </Label>
                       <div className="relative">
@@ -364,14 +378,14 @@ const Auth = () => {
                           placeholder="Nome da empresa"
                           value={registerData.empresa}
                           onChange={(e) => setRegisterData({...registerData, empresa: e.target.value})}
-                          className="pl-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-yellow-500 dark:focus:border-yellow-400 focus:ring-yellow-500/20"
+                          className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
                         />
                       </div>
                     </div>
                   </div>
                   <Button 
                     type="submit" 
-                    className="w-full h-11 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 mt-6"
+                    className="w-full h-11 bg-black hover:bg-gray-800 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 mt-6 transform hover:scale-[1.02]"
                     disabled={isLoading}
                   >
                     {isLoading ? (
@@ -392,7 +406,7 @@ const Auth = () => {
         
         {/* Footer */}
         <div className="text-center mt-8 space-y-2">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-slate-500">
             © 2024 Worklivoo. Todos os direitos reservados.
           </p>
 

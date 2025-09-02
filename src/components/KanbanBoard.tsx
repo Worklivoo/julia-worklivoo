@@ -5,14 +5,14 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useCRM } from '@/contexts/CRMContext';
 import { Lead } from '@/types';
 import { useNavigate } from 'react-router-dom';
-import { User, Phone, Mail, Star } from 'lucide-react';
+import { User, Phone, Mail, Star, MessageCircle } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const stages = [
   { id: 'entrada', name: 'Entrada do Lead', icon: User },
   { id: 'tentando-contato', name: 'Tentando Contato', icon: Phone },
-  { id: 'contato-realizado', name: 'Contato Realizado', icon: Mail },
+  { id: 'contato-realizado', name: 'Contato Realizado', icon: MessageCircle },
   { id: 'qualificada', name: 'Oportunidade Qualificada', icon: Star },
 ];
 

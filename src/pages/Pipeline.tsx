@@ -6,7 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DateRange, DateRangePicker } from "@/components/DateRangePicker";
+import { startOfMonth, endOfMonth } from "date-fns";
 import { useCRM } from '@/contexts/CRMContext';
+import { usePersistentDateRange } from '@/hooks/use-persistent-state';
 import { useLeadOrigins } from '@/hooks/use-lead-origins';
 import { useIsMobile } from '@/hooks/use-mobile';
 import KanbanBoard from '@/components/KanbanBoard';
@@ -18,7 +21,13 @@ const Pipeline = () => {
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('open');
-  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [dateRange, setDateRange] = usePersistentDateRange(
+    'pipeline-date-range',
+    {
+      from: startOfMonth(new Date()),
+      to: endOfMonth(new Date())
+    }
+  );
   const [showNewLeadDialog, setShowNewLeadDialog] = useState(false);
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [addLeadLoading, setAddLeadLoading] = useState(false);
@@ -53,19 +62,18 @@ const Pipeline = () => {
                          (statusFilter === 'open' && lead.status === 'active') ||
                          (statusFilter === 'lost' && lead.status === 'lost') ||
                          (statusFilter === 'won' && lead.status === 'won');
+    
+    // Filtro por período usando DateRange
     let matchesDate = true;
-    if (dateFilter !== 'all') {
-      const now = new Date();
+    if (dateRange.from && dateRange.to) {
       const createdAt = new Date(lead.createdAt);
-      let days = 0;
-      if (dateFilter === '3') days = 3;
-      if (dateFilter === '7') days = 7;
-      if (dateFilter === '30') days = 30;
-      if (dateFilter === '60') days = 60;
-      const diffTime = Math.abs(now.getTime() - createdAt.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      matchesDate = diffDays <= days;
+      const fromDate = new Date(dateRange.from);
+      const toDate = new Date(dateRange.to);
+      // Ajustar para incluir o dia inteiro
+      toDate.setHours(23, 59, 59, 999);
+      matchesDate = createdAt >= fromDate && createdAt <= toDate;
     }
+    
     return matchesSearch && matchesStatus && matchesDate;
   });
 
@@ -131,7 +139,7 @@ const Pipeline = () => {
               
               <Dialog open={showNewLeadDialog} onOpenChange={setShowNewLeadDialog}>
                 <DialogTrigger asChild>
-                  <Button className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300">
+                  <Button className="w-full shadow-lg hover:shadow-xl transition-all duration-300" style={{backgroundColor: '#EBF57D', color: '#000000'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d4e06a'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EBF57D'}>
                     <Plus className="w-4 h-4 mr-2" />
                     Novo Lead
                   </Button>
@@ -261,7 +269,7 @@ const Pipeline = () => {
                     <Button 
                       onClick={handleAddLead} 
                       disabled={addLeadLoading}
-                      className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                      style={{backgroundColor: '#EBF57D', color: '#000000'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d4e06a'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EBF57D'}
                     >
                       {addLeadLoading ? 'Adicionando...' : 'Adicionar Lead'}
                     </Button>
@@ -283,7 +291,7 @@ const Pipeline = () => {
               
               <Dialog open={showNewLeadDialog} onOpenChange={setShowNewLeadDialog}>
                 <DialogTrigger asChild>
-                  <Button className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300">
+                  <Button className="shadow-lg hover:shadow-xl transition-all duration-300" style={{backgroundColor: '#EBF57D', color: '#000000'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d4e06a'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EBF57D'}>
                     <Plus className="w-4 h-4 mr-2" />
                     Novo Lead
                   </Button>
@@ -413,7 +421,7 @@ const Pipeline = () => {
                     <Button 
                       onClick={handleAddLead} 
                       disabled={addLeadLoading}
-                      className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                      style={{backgroundColor: '#EBF57D', color: '#000000'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d4e06a'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EBF57D'}
                     >
                       {addLeadLoading ? 'Adicionando...' : 'Adicionar Lead'}
                     </Button>
@@ -441,30 +449,25 @@ const Pipeline = () => {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="open">Abertos</SelectItem>
-                <SelectItem value="won">Ganhos</SelectItem>
-                <SelectItem value="lost">Perdidos</SelectItem>
+                <SelectItem value="all" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Todos os Status</SelectItem>
+                <SelectItem value="open" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Abertos</SelectItem>
+                <SelectItem value="won" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Ganhos</SelectItem>
+                <SelectItem value="lost" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Perdidos</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="w-full sm:w-[180px] bg-background/50 border-border/50">
-                <SelectValue placeholder="Período" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Períodos</SelectItem>
-                <SelectItem value="3">Últimos 3 dias</SelectItem>
-                <SelectItem value="7">Últimos 7 dias</SelectItem>
-                <SelectItem value="30">Últimos 30 dias</SelectItem>
-                <SelectItem value="60">Últimos 60 dias</SelectItem>
-              </SelectContent>
-            </Select>
-            {(searchTerm || statusFilter !== 'open' || dateFilter !== 'all') && (
+            <DateRangePicker
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+            />
+            {(searchTerm || statusFilter !== 'open' || (dateRange.from && dateRange.to && (dateRange.from.getTime() !== startOfMonth(new Date()).getTime() || dateRange.to.getTime() !== endOfMonth(new Date()).getTime()))) && (
               <Button variant="outline" size="sm" 
                 onClick={() => {
                   setSearchTerm('');
                   setStatusFilter('open');
-                  setDateFilter('all');
+                  setDateRange({
+                    from: startOfMonth(new Date()),
+                    to: endOfMonth(new Date())
+                  });
                 }}
                 className="bg-background/50 border-border/50 hover:bg-muted/50"
               >

@@ -371,9 +371,33 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateLead = async (id: string, updates: Partial<Lead>) => {
     // Se o update for de etapa, atualizar no Supabase
     let supabaseUpdates: any = {};
+    
+    // Verificar se a etapa está sendo alterada para adicionar ao histórico
     if (updates.stage) {
+      // Encontrar o lead atual para obter a etapa anterior
+      const currentLead = leads.find(lead => lead.id === id);
+      if (currentLead && currentLead.stage !== updates.stage) {
+        // Mapear as etapas para nomes legíveis
+        const etapaAnterior = mapStageToLeadEtapa(currentLead.stage);
+        const novaEtapa = mapStageToLeadEtapa(updates.stage);
+        
+        // Criar mensagem do histórico
+        const historicoMessage = `Etapa atualizada: ${etapaAnterior} -> ${novaEtapa}`;
+        
+        // Adicionar ao histórico
+        try {
+          await addHistorico({
+            lead_id: parseInt(id),
+            historico_lead: historicoMessage
+          });
+        } catch (error) {
+          console.error('Erro ao adicionar histórico:', error);
+        }
+      }
+      
       supabaseUpdates.lead_etapa = mapStageToLeadEtapa(updates.stage);
     }
+    
     if (updates.status) {
       if (updates.status === 'won') {
         supabaseUpdates.lead_status = 'Ganho';

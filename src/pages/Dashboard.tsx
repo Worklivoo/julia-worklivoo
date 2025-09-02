@@ -1,10 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { DateRange } from "@/components/DateRangePicker";
+import { startOfMonth, endOfMonth } from "date-fns";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { usePersistentDateRange } from '@/hooks/use-persistent-state';
 
 import { useCRM } from '@/contexts/CRMContext';
 import { useLeadOrigins } from '@/hooks/use-lead-origins';
@@ -18,19 +22,56 @@ const Dashboard = () => {
   const isMobile = useIsMobile();
   const metrics = getDashboardMetrics();
 
+  // Define o mês atual como padrão para o filtro de data
+  const getCurrentMonthRange = (): DateRange => {
+    const today = new Date()
+    return {
+      from: startOfMonth(today),
+      to: endOfMonth(today)
+    }
+  }
+
+  const [dateRange, setDateRange] = usePersistentDateRange(
+    'dashboard-date-range',
+    getCurrentMonthRange()
+  )
+
   // Memoizar data atual para evitar recálculos constantes
   const now = useMemo(() => new Date(), []);
 
+  // Filtrar leads baseado no período selecionado
+  const filteredLeads = useMemo(() => {
+    if (!dateRange?.from || !dateRange?.to) {
+      return leads;
+    }
+    
+    return leads.filter(lead => {
+      const leadDate = new Date(lead.createdAt);
+      return leadDate >= dateRange.from! && leadDate <= dateRange.to!;
+    });
+  }, [leads, dateRange]);
+
   // Memoizar dados dos gráficos para evitar recálculos desnecessários
   const stageData = useMemo(() => [
-    { name: 'Entrada Lead', value: leads.filter(l => l.stage === 'entrada').length },
-    { name: 'Tentando Contato', value: leads.filter(l => l.stage === 'tentando-contato').length },
-    { name: 'Contato Realizado', value: leads.filter(l => l.stage === 'contato-realizado').length },
-    { name: 'Oport. Qualificada', value: leads.filter(l => l.stage === 'qualificada').length },
-  ], [leads]);
+    { name: 'Entrada Lead', value: filteredLeads.filter(l => l.stage === 'entrada').length },
+    { name: 'Tentando Contato', value: filteredLeads.filter(l => l.stage === 'tentando-contato').length },
+    { name: 'Contato Realizado', value: filteredLeads.filter(l => l.stage === 'contato-realizado').length },
+    { name: 'Oport. Qualificada', value: filteredLeads.filter(l => l.stage === 'qualificada').length },
+  ], [filteredLeads]);
 
-  // Memoizar origens dos leads
-  const topOrigins = useMemo(() => getTopOrigins(5), [getTopOrigins]);
+  // Memoizar origens dos leads filtrados
+  const topOrigins = useMemo(() => {
+    const origins = filteredLeads.reduce((acc, lead) => {
+      const source = lead.source || 'Sem origem definida';
+      acc[source] = (acc[source] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return Object.entries(origins)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [filteredLeads]);
   
   // Memoizar dados de origem
   const sourceData = useMemo(() => {
@@ -40,27 +81,24 @@ const Dashboard = () => {
           value: origin.count
         }))
       : [
-          { name: 'Sem origem definida', value: leads.filter(l => !l.source || l.source.trim() === '').length }
+          { name: 'Sem origem definida', value: filteredLeads.filter(l => !l.source || l.source.trim() === '').length }
         ];
-  }, [topOrigins, leads]);
+  }, [topOrigins, filteredLeads]);
 
-  // Memoizar cálculos de leads do mês
-  const leadsDoMes = useMemo(() => {
-    const leadsNoMes = leads.filter(l => {
-      const d = new Date(l.createdAt);
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    });
-    const leadsAbertosNoMes = leadsNoMes.filter(l => l.status === 'active');
-    const leadsQualificadosNoMes = leadsNoMes.filter(l => l.stage === 'qualificada');
-    const taxaConversaoQualificados = leadsNoMes.length > 0 ? (leadsQualificadosNoMes.length / leadsNoMes.length) * 100 : 0;
+  // Memoizar cálculos de leads do período selecionado
+  const leadsDoPeriodo = useMemo(() => {
+    const leadsNoPeriodo = filteredLeads;
+    const leadsAbertosNoPeriodo = leadsNoPeriodo.filter(l => l.status === 'active');
+    const leadsQualificadosNoPeriodo = leadsNoPeriodo.filter(l => l.stage === 'qualificada');
+    const taxaConversaoQualificados = leadsNoPeriodo.length > 0 ? (leadsQualificadosNoPeriodo.length / leadsNoPeriodo.length) * 100 : 0;
 
     return {
-      leadsNoMes,
-      leadsAbertosNoMes,
-      leadsQualificadosNoMes,
+      leadsNoPeriodo,
+      leadsAbertosNoPeriodo,
+      leadsQualificadosNoPeriodo,
       taxaConversaoQualificados
     };
-  }, [leads, now]);
+  }, [filteredLeads]);
 
   // Memoizar conversão por etapa
   const conversaoPorEtapa = useMemo(() => {
@@ -69,7 +107,7 @@ const Dashboard = () => {
       { id: 'contato-realizado', nome: 'Contato Realizado' },
       { id: 'qualificada', nome: 'Oport. Qualificada' },
     ];
-    const totalPorEtapa = etapas.map(etapa => leadsDoMes.leadsNoMes.filter(l => l.stage === etapa.id).length);
+    const totalPorEtapa = etapas.map(etapa => leadsDoPeriodo.leadsNoPeriodo.filter(l => l.stage === etapa.id).length);
     return etapas.map((etapa, idx) => {
       if (idx === 0) return { etapa: etapa.nome, conversao: 100 };
       const anterior = totalPorEtapa[idx - 1];
@@ -79,7 +117,7 @@ const Dashboard = () => {
         conversao: anterior > 0 ? (atual / anterior) * 100 : 0
       };
     });
-  }, [leadsDoMes]);
+  }, [leadsDoPeriodo]);
 
   const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00'];
 
@@ -94,7 +132,7 @@ const Dashboard = () => {
     <TooltipProvider>
       <div className="space-y-8 p-6">
         {/* Header com Avatar e Informações */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent light-welcome-title">
               Bem-vindo, {user?.nome || 'Usuário'}!
@@ -105,9 +143,12 @@ const Dashboard = () => {
               Dashboard Atualizado
             </Badge>
           </div>
-          <div className="text-right hidden md:block">
-            <p className="text-sm text-muted-foreground">Última atualização</p>
-            <p className="text-lg font-semibold">{new Date().toLocaleDateString('pt-BR')}</p>
+          <div className="flex justify-end">
+            <DateRangePicker
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+              placeholder="Selecione o período"
+            />
           </div>
         </div>
         
@@ -125,8 +166,8 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
-                    {leadsDoMes.leadsNoMes.length}/{user?.plano || 500}
-                    {leadsDoMes.leadsNoMes.length <= (user?.plano || 500) ? 
+                    {leadsDoPeriodo.leadsNoPeriodo.length}/{user?.plano || 500}
+                    {leadsDoPeriodo.leadsNoPeriodo.length <= (user?.plano || 500) ? 
                       <ArrowUpRight className="w-4 h-4 text-green-500" /> : 
                       <ArrowDownRight className="w-4 h-4 text-red-500" />
                     }
@@ -135,16 +176,16 @@ const Dashboard = () => {
                 <CardContent>
                   <div className="space-y-2">
                     <Progress 
-                      value={Math.min((leadsDoMes.leadsNoMes.length / (user?.plano || 500)) * 100, 100)} 
+                      value={Math.min((leadsDoPeriodo.leadsNoPeriodo.length / (user?.plano || 500)) * 100, 100)} 
                       className="h-2"
                     />
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{Math.round((leadsDoMes.leadsNoMes.length / (user?.plano || 500)) * 100)}% usado</span>
-                      <span>{Math.max(0, (user?.plano || 500) - leadsDoMes.leadsNoMes.length)} restantes</span>
+                      <span>{Math.round((leadsDoPeriodo.leadsNoPeriodo.length / (user?.plano || 500)) * 100)}% usado</span>
+                      <span>{Math.max(0, (user?.plano || 500) - leadsDoPeriodo.leadsNoPeriodo.length)} restantes</span>
                     </div>
-                    {leadsDoMes.leadsNoMes.length > (user?.plano || 500) && (
+                    {leadsDoPeriodo.leadsNoPeriodo.length > (user?.plano || 500) && (
                       <Badge variant="destructive" className="rounded-full text-xs">
-                        +{leadsDoMes.leadsNoMes.length - (user?.plano || 500)} excedentes
+                        +{leadsDoPeriodo.leadsNoPeriodo.length - (user?.plano || 500)} excedentes
                       </Badge>
                     )}
                   </div>
@@ -160,14 +201,14 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <CardTitle className="text-4xl font-bold text-foreground flex items-center gap-2">
-                    {leadsDoMes.leadsAbertosNoMes.length}
+                    {leadsDoPeriodo.leadsAbertosNoPeriodo.length}
                     <ArrowUpRight className="w-5 h-5 text-green-500" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="rounded-full text-xs">
-                      +{leadsDoMes.leadsAbertosNoMes.length} este mês
+                      +{leadsDoPeriodo.leadsAbertosNoPeriodo.length} este período
                     </Badge>
                   </div>
                 </CardContent>
@@ -182,14 +223,14 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <CardTitle className="text-4xl font-bold text-foreground flex items-center gap-2">
-                    {leadsDoMes.leadsQualificadosNoMes.length}
+                    {leadsDoPeriodo.leadsQualificadosNoPeriodo.length}
                     <TrendingUp className="w-5 h-5 text-foreground" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="rounded-full text-xs">
-                      {leadsDoMes.leadsNoMes.length} leads no mês
+                      {leadsDoPeriodo.leadsNoPeriodo.length} leads no período
                     </Badge>
                   </div>
                 </CardContent>
@@ -204,15 +245,15 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <CardTitle className="text-4xl font-bold text-foreground flex items-center gap-2">
-                    {leadsDoMes.taxaConversaoQualificados.toFixed(1)}%
-                    {leadsDoMes.taxaConversaoQualificados > 20 ? 
+                    {leadsDoPeriodo.taxaConversaoQualificados.toFixed(1)}%
+                    {leadsDoPeriodo.taxaConversaoQualificados > 20 ? 
                       <ArrowUpRight className="w-5 h-5 text-green-500" /> : 
                       <ArrowDownRight className="w-5 h-5 text-red-500" />
                     }
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Progress value={leadsDoMes.taxaConversaoQualificados} className="h-3 rounded-full" />
+                  <Progress value={leadsDoPeriodo.taxaConversaoQualificados} className="h-3 rounded-full" />
                 </CardContent>
               </Card>
 
@@ -298,7 +339,7 @@ const Dashboard = () => {
                               <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
                                 <p className="font-medium text-popover-foreground">{label}</p>
                                 <p className="text-sm text-muted-foreground">
-                                  <span className="font-bold text-primary">{payload[0].value}</span> leads
+                                  <span className="font-bold text-black">{payload[0].value}</span> leads
                                 </p>
                               </div>
                             );
@@ -404,7 +445,7 @@ const Dashboard = () => {
                               <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
                                 <p className="font-medium text-popover-foreground">{label}</p>
                                 <p className="text-sm text-muted-foreground">
-                                  <span className="font-bold text-primary">{payload[0].value}</span> leads
+                                  <span className="font-bold text-black">{payload[0].value}</span> leads
                                 </p>
                               </div>
                             );
@@ -435,13 +476,13 @@ const Dashboard = () => {
               </div>
               <div>
                 <CardTitle className="text-xl font-bold">Leads Recentes</CardTitle>
-                <CardDescription className="text-sm">Últimas oportunidades criadas no sistema</CardDescription>
+                <CardDescription className="text-sm">Últimas oportunidades do período selecionado</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {leadsDoMes.leadsAbertosNoMes
+              {leadsDoPeriodo.leadsAbertosNoPeriodo
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                 .slice(0, 5)
                 .map((lead, index) => {
@@ -500,11 +541,11 @@ const Dashboard = () => {
                   );
                 })}
               
-              {leadsDoMes.leadsAbertosNoMes.length === 0 && (
+              {leadsDoPeriodo.leadsAbertosNoPeriodo.length === 0 && (
                 <div className="text-center py-8">
                   <div className="p-4 bg-muted/30 rounded-xl">
                     <Users className="w-12 h-12 text-foreground mx-auto mb-3" />
-                    <p className="text-muted-foreground">Nenhum lead encontrado este mês</p>
+                    <p className="text-muted-foreground">Nenhum lead encontrado neste período</p>
                     <p className="text-sm text-muted-foreground mt-1">Novos leads aparecerão aqui quando criados</p>
                   </div>
                 </div>
