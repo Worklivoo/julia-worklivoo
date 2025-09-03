@@ -11,7 +11,7 @@ const WhatsApp = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
+
 
   const connectWhatsApp = async () => {
     if (!user?.id_instancia_zapi || !user?.token_instancia_zapi) {
@@ -130,11 +130,28 @@ const WhatsApp = () => {
   // Verificação automática de status ao carregar o componente
   useEffect(() => {
     const verifyInitialStatus = async () => {
-      const connected = await checkConnectionStatus();
-      if (connected) {
-        setIsConnected(true);
-        setQrCode(null);
-        setError(null);
+      if (!user?.id_instancia_zapi || !user?.token_instancia_zapi) {
+        setError('Dados de instância do WhatsApp não configurados. Entre em contato com o suporte.');
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const connected = await checkConnectionStatus();
+        setIsConnected(connected);
+        
+        if (!connected) {
+          // Se não estiver conectado, não mostra erro, apenas deixa pronto para conectar
+          setQrCode(null);
+        }
+      } catch (err) {
+        console.error('Erro ao verificar status inicial:', err);
+        // Em caso de erro na verificação, assume como desconectado
+        setIsConnected(false);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -164,12 +181,7 @@ const WhatsApp = () => {
     };
   }, [qrCode, isConnected, error]);
 
-  const handleVerifyStatus = async () => {
-    setIsVerifying(true);
-    const connected = await checkConnectionStatus();
-    setIsConnected(connected);
-    setIsVerifying(false);
-  };
+
 
   const handleRetry = () => {
     setError(null);
@@ -245,20 +257,6 @@ const WhatsApp = () => {
             }`}>
               WhatsApp Conectado
             </p>
-            <Button 
-              onClick={handleVerifyStatus}
-              disabled={isVerifying}
-              className="px-6 py-2 bg-[hsl(0,0%,12%)] hover:bg-[hsl(0,0%,18%)] border border-[hsl(0,0%,25%)] text-white rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isVerifying ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Verificando...
-                </>
-              ) : (
-                'Verificar Status'
-              )}
-            </Button>
           </div>
         )}
 

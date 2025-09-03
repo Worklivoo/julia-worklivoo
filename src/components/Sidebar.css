@@ -22,7 +22,7 @@
 
 /* Modo Dark - Cores específicas */
 [data-theme="dark"] .sidebar {
-  background: #F6F6F6;
+  background: #EBF57D;
   border: none;
 }
 
@@ -108,7 +108,7 @@
 [data-theme="dark"] .sidebar-header .toggler {
   color: #1a1a1a;
   background: #ffffff;
-  border: 1px solid #e5e5e5;
+  border: 1px solid #d4e06a;
 }
 
 .sidebar-header .sidebar-toggler {
@@ -135,7 +135,7 @@
 
 /* Modo Dark - Toggler hover */
 [data-theme="dark"] .sidebar-header .toggler:hover {
-  background: #e8e8e8;
+  background: #f0f8a0;
 }
 
 .sidebar-header .toggler svg {
@@ -218,7 +218,7 @@
 /* Modo Dark - Nav Link hover */
 [data-theme="dark"] .sidebar-nav .nav-link:hover {
   color: #1a1a1a;
-  background: #e8e8e8;
+  background: #f0f8a0;
 }
 
 .sidebar-nav .nav-link.active {
@@ -235,7 +235,7 @@
 /* Modo Dark - Nav Link active */
 [data-theme="dark"] .sidebar-nav .nav-link.active {
   color: #1a1a1a;
-  background: #d4d4d4;
+  background: #F6F6F6;
 }
 
 .sidebar-nav .nav-item {
@@ -273,7 +273,7 @@
 [data-theme="dark"] .sidebar-nav .nav-tooltip {
   color: #1a1a1a;
   background: #ffffff;
-  border: 1px solid #e5e5e5;
+  border: 1px solid #d4e06a;
 }
 
 .sidebar.collapsed .sidebar-nav .nav-tooltip {
@@ -389,7 +389,7 @@
 
 /* Modo Dark - Header mobile */
 [data-theme="dark"] .sidebar .sidebar-header {
-  background: #F6F6F6;
+  background: #EBF57D;
 }
 
   .sidebar-header .header-logo img,

@@ -91,6 +91,28 @@
     }
   }
 
+  [data-theme="dark"] {
+    --background: 0 0% 5%; /* preto quase total */
+    --foreground: 0 0% 95%; /* texto branco */
+    --card: 0 0% 8%; /* cards cinza muito escuro */
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 56 97% 73%; /* #EBF57D amarelo padrão */
+    --primary-foreground: 0 0% 0%; /* texto preto no amarelo */
+    --secondary: 0 0% 12%; /* cinza escuro */
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 15%; /* cinza escuro muted */
+    --muted-foreground: 0 0% 70%;
+    --accent: 56 97% 73%; /* amarelo para accent também */
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 0 0% 18%; /* bordas cinza escuro */
+    --input: 0 0% 12%; /* inputs cinza escuro */
+    --ring: 56 97% 73%; /* ring amarelo */
+  }
+
   * {
     @apply border-border;
   }

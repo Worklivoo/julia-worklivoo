@@ -14,8 +14,17 @@ import {
   X,
   Sun,
   Moon,
-  LogOut
+  LogOut,
+  Smartphone
 } from 'lucide-react';
+
+interface NavigationItem {
+  name: string;
+  path: string;
+  icon: React.ComponentType<any>;
+  tooltip: string;
+  external?: boolean;
+}
 
 const Sidebar = () => {
   const location = useLocation();
@@ -48,6 +57,13 @@ const Sidebar = () => {
       path: '/whatsapp',
       icon: MessageCircle,
       tooltip: 'WhatsApp'
+    },
+    {
+      name: 'Console',
+      path: user ? `https://console.worklivoo.com/${user.id}` : '#',
+      icon: Smartphone,
+      tooltip: 'Console',
+      external: true
     },
     {
       name: 'Configurações',
@@ -130,13 +146,25 @@ const Sidebar = () => {
             const IconComponent = item.icon;
             return (
               <li key={item.name} className="nav-item">
-                <Link
-                  to={item.path}
-                  className={`nav-link ${isActiveLink(item.path) ? 'active' : ''}`}
-                >
-                  <IconComponent className="nav-icon material-symbols-rounded" />
-                  <span className="nav-label">{item.name}</span>
-                </Link>
+                {item.external ? (
+                  <a
+                    href={item.path}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="nav-link"
+                  >
+                    <IconComponent className="nav-icon material-symbols-rounded" />
+                    <span className="nav-label">{item.name}</span>
+                  </a>
+                ) : (
+                  <Link
+                    to={item.path}
+                    className={`nav-link ${isActiveLink(item.path) ? 'active' : ''}`}
+                  >
+                    <IconComponent className="nav-icon material-symbols-rounded" />
+                    <span className="nav-label">{item.name}</span>
+                  </Link>
+                )}
                 <span className="nav-tooltip">{item.tooltip}</span>
               </li>
             );

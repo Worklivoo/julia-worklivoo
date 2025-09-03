@@ -34,12 +34,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ leads }) => {
 
   const getCardBackground = (lead: Lead) => {
     if (lead.status === 'lost') {
-      return 'bg-gradient-to-br from-red-50 to-red-100 border-red-200 dark:from-red-950/50 dark:to-red-900/30 dark:border-red-800/50';
+      return 'bg-gradient-to-br from-red-50 to-red-100 border-red-200 dark:from-red-950/70 dark:to-red-900/50 dark:border-red-800/70';
     }
     if (lead.status === 'won') {
-      return 'bg-gradient-to-br from-green-50 to-green-100 border-green-200 dark:from-green-950/50 dark:to-green-900/30 dark:border-green-800/50';
+      return 'bg-gradient-to-br from-green-50 to-green-100 border-green-200 dark:from-green-950/70 dark:to-green-900/50 dark:border-green-800/70';
     }
-    return 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700';
+    return 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800';
   };
 
   if (isMobile) {
@@ -58,7 +58,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ leads }) => {
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     className={`rounded-lg p-4 h-[70vh] flex flex-col min-w-[300px] max-w-[300px] w-[300px] flex-shrink-0 ${
-                      snapshot.isDraggingOver ? 'bg-[#F6F6F6] dark:bg-gray-800' : 'bg-[#F6F6F6] dark:bg-gray-900'
+                      snapshot.isDraggingOver ? 'bg-gray-100 dark:bg-gray-800' : 'bg-gray-50 dark:bg-black'
                     }`}
                   >
                     {/* Header da coluna */}
@@ -138,7 +138,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ leads }) => {
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                   className={`rounded-lg p-4 h-[600px] flex flex-col ${
-                    snapshot.isDraggingOver ? 'bg-[#F6F6F6] dark:bg-gray-800' : 'bg-[#F6F6F6] dark:bg-gray-900'
+                    snapshot.isDraggingOver ? 'bg-gray-100 dark:bg-gray-800' : 'bg-gray-50 dark:bg-black'
                   }`}
                 >
                   {/* Header da coluna */}

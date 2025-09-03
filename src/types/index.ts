@@ -54,18 +54,3 @@ export interface DashboardMetrics {
   wonDeals: number;
   lostDeals: number;
 }
-
-// Interface para clientes da tabela console
-export interface ConsoleClient {
-  id: string;
-  nome: string;
-  url: string;
-  senha: string;
-  webhook_url: string;
-  dify_token: string;
-  user_id: string;
-  cliente_ativo: boolean;
-  mensagem_inicial?: string;
-  created_at: string;
-  updated_at: string;
-}
