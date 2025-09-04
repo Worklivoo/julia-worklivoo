@@ -339,7 +339,7 @@ const Dashboard = () => {
                               <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
                                 <p className="font-medium text-popover-foreground">{label}</p>
                                 <p className="text-sm text-muted-foreground">
-                                  <span className="font-bold text-black">{payload[0].value}</span> leads
+                                  <span className="font-bold text-[#EBF57D]">{payload[0].value}</span> leads
                                 </p>
                               </div>
                             );
@@ -445,7 +445,7 @@ const Dashboard = () => {
                               <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
                                 <p className="font-medium text-popover-foreground">{label}</p>
                                 <p className="text-sm text-muted-foreground">
-                                  <span className="font-bold text-black">{payload[0].value}</span> leads
+                                  <span className="font-bold text-[#EBF57D]">{payload[0].value}</span> leads
                                 </p>
                               </div>
                             );
@@ -508,12 +508,12 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
                             <Avatar className="h-10 w-10 flex-shrink-0">
-                              <AvatarFallback className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 text-sm font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
+                              <AvatarFallback className="text-sm font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
                                 {lead.leadName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
-                              <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                              <h4 className="font-semibold text-foreground dark:group-hover:text-[#EBF57D] group-hover:text-[#333333] transition-colors">
                                 {lead.opportunityName}
                               </h4>
                               <div className="flex items-center gap-2 mt-1">

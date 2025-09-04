@@ -267,7 +267,7 @@ const LeadDetail = () => {
   return (
     <div className="space-y-6">
       {/* Header com gradiente e avatar */}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-slate-100/90 via-white to-slate-100/90 p-6 border border-border/50 shadow-lg">
+      <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-slate-100/90 via-white to-slate-100/90 dark:from-[hsl(0_0%_6%)] dark:via-[hsl(0_0%_8%)] dark:to-[hsl(0_0%_6%)] p-6 border border-border/50 shadow-lg">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5"></div>
         
         {isMobile ? (
@@ -275,12 +275,12 @@ const LeadDetail = () => {
           <div className="relative space-y-4">
             <div className="flex items-center gap-4">
               <Avatar className="h-12 w-12 border-2 border-primary/20">
-                <AvatarFallback className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
+                <AvatarFallback className="font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
                   {lead.leadName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-800">{lead.opportunityName}</h1>
+                <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-200">{lead.opportunityName}</h1>
                 <p className="text-sm text-muted-foreground mt-1">{lead.leadName}</p>
               </div>
             </div>
@@ -349,7 +349,7 @@ const LeadDetail = () => {
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-800">{lead.opportunityName}</h1>
+                <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-200">{lead.opportunityName}</h1>
                 <p className="text-sm text-muted-foreground mt-1">{lead.leadName}</p>
               </div>
             </div>
@@ -668,10 +668,10 @@ const LeadDetail = () => {
           </Card>
 
           {/* Seção de Exclusão de Lead */}
-          <Card className="bg-gradient-to-br from-red-50 via-red-50/50 to-red-100/30 border-red-200/50 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-red-100/50 via-transparent to-red-100/50">
-              <CardTitle className="flex items-center gap-2 text-red-700">
-                <AlertTriangle size={20} className="text-red-600" />
+          <Card className="bg-gradient-to-br from-card via-card to-card/95 border-border/50 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-primary/5 via-transparent to-primary/5">
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle size={20} className="text-foreground" />
                 Zona de Risco
               </CardTitle>
             </CardHeader>

@@ -92,7 +92,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ leads }) => {
                                  <div className="flex flex-col space-y-3">
                                    <div className="flex items-center gap-3">
                                      <Avatar className="h-12 w-12 flex-shrink-0">
-                                        <AvatarFallback className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 text-base font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
+                                        <AvatarFallback className="text-base font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
                                           {lead.leadName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                         </AvatarFallback>
                                       </Avatar>
@@ -172,7 +172,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ leads }) => {
                                <div className="flex flex-col space-y-3">
                                  <div className="flex items-center gap-3">
                                    <Avatar className="h-10 w-10 flex-shrink-0">
-                                      <AvatarFallback className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 text-sm font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
+                                      <AvatarFallback className="text-sm font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
                                         {lead.leadName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                       </AvatarFallback>
                                     </Avatar>
