@@ -281,6 +281,7 @@ const LeadDetail = () => {
               </Avatar>
               <div className="flex-1">
                 <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">{lead.opportunityName}</h1>
+>>>>>>> bf15deecebe0aa5c5c56c2e97279a53ddab02c85
                 <p className="text-sm text-muted-foreground mt-1">{lead.leadName}</p>
               </div>
             </div>
@@ -349,7 +350,9 @@ const LeadDetail = () => {
                 </AvatarFallback>
               </Avatar>
               <div>
+<<<<<<< HEAD
                 <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">{lead.opportunityName}</h1>
+
                 <p className="text-sm text-muted-foreground mt-1">{lead.leadName}</p>
               </div>
             </div>
@@ -668,10 +671,10 @@ const LeadDetail = () => {
           </Card>
 
           {/* Seção de Exclusão de Lead */}
-          <Card className="bg-gradient-to-br from-red-50 via-red-50/50 to-red-100/30 border-red-200/50 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-red-100/50 via-transparent to-red-100/50">
-              <CardTitle className="flex items-center gap-2 text-red-700">
-                <AlertTriangle size={20} className="text-red-600" />
+          <Card className="bg-gradient-to-br from-card via-card to-card/95 border-border/50 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-primary/5 via-transparent to-primary/5">
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle size={20} className="text-foreground" />
                 Zona de Risco
               </CardTitle>
             </CardHeader>
