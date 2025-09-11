@@ -45,6 +45,21 @@ export interface User {
   plano?: number | null;
   id_instancia_zapi?: string | null;
   token_instancia_zapi?: string | null;
+  // Campos específicos para membros
+  isMembro?: boolean;
+  membroId?: number;
+  membro_cargo?: 'Administrador' | 'Corretor' | 'Usuario';
+  user_id_empresa?: string; // ID do usuário principal da empresa (para membros)
+}
+
+export interface Membro {
+  membro_id: number;
+  user_id: string;
+  membro_nome: string;
+  membro_email: string;
+  membro_cargo: 'Administrador' | 'Corretor' | 'Usuario';
+  membro_status: 'Ativo' | 'Desativado';
+  created_at?: string;
 }
 
 export interface DashboardMetrics {

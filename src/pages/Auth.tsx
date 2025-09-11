@@ -407,7 +407,7 @@ const Auth = () => {
         {/* Footer */}
         <div className="text-center mt-8 space-y-2">
           <p className="text-sm text-slate-500">
-            © 2024 Worklivoo. Todos os direitos reservados.
+            © 2025 Worklivoo. Todos os direitos reservados.
           </p>
 
         </div>

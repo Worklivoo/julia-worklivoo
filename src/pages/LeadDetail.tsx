@@ -267,7 +267,7 @@ const LeadDetail = () => {
   return (
     <div className="space-y-6">
       {/* Header com gradiente e avatar */}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-slate-100/90 via-white to-slate-100/90 p-6 border border-border/50 shadow-lg">
+      <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-slate-100/90 via-white to-slate-100/90 dark:from-[#141414]/90 dark:via-[#141414] dark:to-[#141414]/90 p-6 border border-border/50 shadow-lg">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5"></div>
         
         {isMobile ? (
@@ -275,12 +275,12 @@ const LeadDetail = () => {
           <div className="relative space-y-4">
             <div className="flex items-center gap-4">
               <Avatar className="h-12 w-12 border-2 border-primary/20">
-                <AvatarFallback className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
+                <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
                   {lead.leadName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-800">{lead.opportunityName}</h1>
+                <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">{lead.opportunityName}</h1>
                 <p className="text-sm text-muted-foreground mt-1">{lead.leadName}</p>
               </div>
             </div>
@@ -344,12 +344,12 @@ const LeadDetail = () => {
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Avatar className="h-12 w-12 border-2 border-primary/20">
-                <AvatarFallback className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
+                <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
                   {lead.leadName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-800">{lead.opportunityName}</h1>
+                <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">{lead.opportunityName}</h1>
                 <p className="text-sm text-muted-foreground mt-1">{lead.leadName}</p>
               </div>
             </div>

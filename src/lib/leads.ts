@@ -17,6 +17,7 @@ export type LeadInput = {
   ativo_fluxo_cadencia?: string;
   etapa_fluxo_followup?: string;
   ativo_ia?: string;
+  membro_id?: number; // ID do membro responsável pelo lead
 };
 
 // Tipagem para inserção de anotação no histórico
@@ -34,12 +35,19 @@ export async function addLead(lead: LeadInput) {
 }
 
 // Função para buscar todos os leads de um usuário específico
-export async function getLeadsByUser(user_id: string) {
-  const { data, error } = await supabase
+// Se membro_id for fornecido, filtra apenas os leads desse membro
+export async function getLeadsByUser(user_id: string, membro_id?: number) {
+  let query = supabase
     .from('leads')
     .select('*')
-    .eq('user_id', user_id)
-    .order('created_at', { ascending: false });
+    .eq('user_id', user_id);
+  
+  // Se membro_id for fornecido, adiciona filtro por membro_id
+  if (membro_id) {
+    query = query.eq('membro_id', membro_id);
+  }
+  
+  const { data, error } = await query.order('created_at', { ascending: false });
   return { data, error };
 }
 

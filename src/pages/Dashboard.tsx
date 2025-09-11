@@ -285,11 +285,11 @@ const Dashboard = () => {
                       'Contato Realizado': 'Realizado',
                       'Oport. Qualificada': 'Qualificada'
                     };
-                    const colors = ['bg-primary', 'bg-muted', 'bg-accent', 'bg-secondary'];
+                    const colors = ['bg-[#EBF57D]', 'bg-muted', 'bg-accent', 'bg-secondary'];
                     return (
                       <div key={stage.name} className="bg-muted/30 rounded-xl p-4 text-center">
                         <div className={`w-12 h-12 ${colors[index]} rounded-full flex items-center justify-center mx-auto mb-2`}>
-                           <span className="text-primary-foreground font-bold text-lg">{stage.value}</span>
+                           <span className="font-bold text-lg" style={{color: index === 0 ? '#000000' : ''}}>{stage.value}</span>
                          </div>
                         <p className="text-sm font-medium text-foreground">{stageNames[stage.name] || stage.name}</p>
                         <p className="text-xs text-muted-foreground">leads</p>
@@ -339,7 +339,7 @@ const Dashboard = () => {
                               <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
                                 <p className="font-medium text-popover-foreground">{label}</p>
                                 <p className="text-sm text-muted-foreground">
-                                  <span className="font-bold text-black">{payload[0].value}</span> leads
+                                  <span className="font-bold dark:text-[#EBF57D] text-black">{payload[0].value}</span> leads
                                 </p>
                               </div>
                             );
@@ -445,7 +445,7 @@ const Dashboard = () => {
                               <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
                                 <p className="font-medium text-popover-foreground">{label}</p>
                                 <p className="text-sm text-muted-foreground">
-                                  <span className="font-bold text-black">{payload[0].value}</span> leads
+                                  <span className="font-bold dark:text-[#EBF57D] text-black">{payload[0].value}</span> leads
                                 </p>
                               </div>
                             );
@@ -488,7 +488,7 @@ const Dashboard = () => {
                 .map((lead, index) => {
                   
                   return (
-                    <div key={lead.id} className={`group ${isMobile ? 'p-3' : 'p-4'} bg-muted/30 border border-border/50 rounded-xl hover:bg-muted/50 hover:border-primary/20 transition-all duration-300 hover:shadow-md`}>
+                    <div key={lead.id} className={`group ${isMobile ? 'p-3' : 'p-4'} bg-muted/30 border border-border/50 rounded-xl hover:bg-muted/50 hover:border-[#EBF57D]/20 transition-all duration-300 hover:shadow-md`}>
                       {isMobile ? (
                          // Versão Mobile Simplificada
                          <div className="flex items-center gap-3">
@@ -508,12 +508,12 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
                             <Avatar className="h-10 w-10 flex-shrink-0">
-                              <AvatarFallback className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 text-sm font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
+                              <AvatarFallback className="text-sm font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
                                 {lead.leadName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
-                              <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                              <h4 className="font-semibold text-foreground dark:group-hover:text-[#EBF57D] group-hover:text-primary-foreground transition-colors">
                                 {lead.opportunityName}
                               </h4>
                               <div className="flex items-center gap-2 mt-1">

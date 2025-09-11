@@ -94,7 +94,7 @@ const ResetPassword = () => {
           <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
               <p className="text-center text-slate-600 dark:text-slate-400 mt-4">Verificando link de recuperação...</p>
             </CardContent>
@@ -158,7 +158,7 @@ const ResetPassword = () => {
                       placeholder="Digite sua nova senha"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-yellow-500 dark:focus:border-yellow-400 focus:ring-yellow-500/20"
+                      className="pl-10 pr-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-primary dark:focus:border-primary focus:ring-primary/20"
                       required
                       minLength={6}
                     />
@@ -184,7 +184,7 @@ const ResetPassword = () => {
                       placeholder="Confirme sua nova senha"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="pl-10 pr-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-yellow-500 dark:focus:border-yellow-400 focus:ring-yellow-500/20"
+                      className="pl-10 pr-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 focus:border-primary dark:focus:border-primary focus:ring-primary/20"
                       required
                       minLength={6}
                     />
@@ -200,7 +200,7 @@ const ResetPassword = () => {
 
                 <Button 
                   type="submit" 
-                  className="w-full h-11 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-lg hover:shadow-xl transition-all duration-200"
                   disabled={isLoading}
                 >
                   {isLoading ? (

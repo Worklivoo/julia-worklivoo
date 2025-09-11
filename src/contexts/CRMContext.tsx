@@ -7,6 +7,7 @@ import {
   updateUserProfile,
 } from '@/lib/supabase-utils';
 import { getLeadsByUser, addLead as addLeadToSupabase, updateLead as updateLeadSupabase, addHistorico, getHistoricoByLead, deleteLead as deleteLeadSupabase } from '@/lib/leads';
+import { getMembroByEmail } from '@/lib/membros';
 
 interface CRMContextType {
   leads: Lead[];
@@ -41,6 +42,50 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loadingUser, setLoadingUser] = useState(true);
 
+  // Função auxiliar para buscar perfil do usuário (usuarios ou membros)
+  const getCompleteUserProfile = async (userId: string, userEmail?: string) => {
+    // Primeiro tenta buscar na tabela usuarios
+    const profile = await getUserProfile(userId);
+    if (profile) {
+      return {
+        id: profile.user_id,
+        nome: profile.user_nome,
+        email: profile.user_email,
+        telefone: profile.user_telefone,
+        empresa: profile.user_empresa,
+        avatar: profile.user_avatar,
+        plano: profile.user_plano,
+        id_instancia_zapi: profile.id_instancia_zapi,
+        token_instancia_zapi: profile.token_instancia_zapi,
+        isMembro: false
+      };
+    }
+    
+    // Se não encontrou na tabela usuarios e tem email, busca na tabela membros
+    if (userEmail) {
+      const { data: membro } = await getMembroByEmail(userEmail);
+      if (membro) {
+        return {
+          id: userId,
+          nome: membro.membro_nome,
+          email: membro.membro_email,
+          telefone: null,
+          empresa: null,
+          avatar: null,
+          plano: null,
+          id_instancia_zapi: null,
+          token_instancia_zapi: null,
+          isMembro: true,
+          membroId: membro.membro_id,
+          membro_cargo: membro.membro_cargo,
+          user_id_empresa: membro.user_id // ID do usuário principal da empresa
+        };
+      }
+    }
+    
+    return null;
+  };
+
   // Persistência de sessão e carregamento do usuário
   useEffect(() => {
     let isInitialLoad = true;
@@ -53,23 +98,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLoadingUser(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        const profile = await getUserProfile(session.user.id);
-        if (profile) {
-          const newUser = {
-            id: profile.user_id,
-            nome: profile.user_nome,
-            email: profile.user_email,
-            telefone: profile.user_telefone,
-            empresa: profile.user_empresa,
-            avatar: profile.user_avatar,
-            plano: profile.user_plano,
-            id_instancia_zapi: profile.id_instancia_zapi,
-            token_instancia_zapi: profile.token_instancia_zapi,
-          };
+        const userProfile = await getCompleteUserProfile(session.user.id, session.user.email);
+        if (userProfile) {
           // Só atualiza se realmente mudou
           setUser(prevUser => {
-            if (!prevUser || JSON.stringify(prevUser) !== JSON.stringify(newUser)) {
-              return newUser;
+            if (!prevUser || JSON.stringify(prevUser) !== JSON.stringify(userProfile)) {
+              return userProfile;
             }
             return prevUser;
           });
@@ -109,14 +143,30 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
       
+      // Determina qual user_id usar para buscar os leads
+      // Se for membro, usa o user_id_empresa, senão usa o próprio id
+      const userIdForLeads = user.isMembro ? user.user_id_empresa : user.id;
+      
+      if (!userIdForLeads) {
+        if (isMounted) setLeads([]);
+        return;
+      }
+      
       // PRIMEIRO: Remover leads de teste se existirem
       await supabase
         .from('leads')
         .delete()
-        .eq('user_id', user.id)
+        .eq('user_id', userIdForLeads)
         .like('lead_nome_pessoa', '%Teste%');
       
-      const { data, error } = await getLeadsByUser(user.id);
+      // Determinar se deve aplicar filtro por membro_id
+      // Se for membro com cargo 'Usuario', filtra apenas os leads dele
+      let membroIdFilter: number | undefined;
+      if (user.isMembro && user.membro_cargo === 'Usuario') {
+        membroIdFilter = user.membroId;
+      }
+      
+      const { data, error } = await getLeadsByUser(userIdForLeads, membroIdFilter);
       
       if (error || !data) {
         if (isMounted) setLeads([]);
@@ -203,20 +253,14 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsAuthenticated(false);
       return false;
     }
-    const profile = await getUserProfile(data.user.id);
-    if (profile) {
-      setUser({
-        id: profile.user_id,
-        nome: profile.user_nome,
-        email: profile.user_email,
-        telefone: profile.user_telefone,
-        empresa: profile.user_empresa,
-        avatar: profile.user_avatar,
-        plano: profile.user_plano,
-      });
+    
+    const userProfile = await getCompleteUserProfile(data.user.id, data.user.email);
+    if (userProfile) {
+      setUser(userProfile);
       setIsAuthenticated(true);
       return true;
     }
+    
     setUser(null);
     setIsAuthenticated(false);
     return false;
@@ -296,19 +340,33 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Usuário não autenticado.' };
     }
 
+    // Determina qual user_id usar para criar o lead
+    // Se for membro, usa o user_id_empresa, senão usa o próprio id
+    const userIdForLead = user.isMembro ? user.user_id_empresa : user.id;
+    
+    if (!userIdForLead) {
+      return { success: false, error: 'Erro ao identificar usuário da empresa.' };
+    }
+
     try {
       // Mapear os dados do lead para o formato do Supabase
-      const supabaseLeadData = {
+      const supabaseLeadData: any = {
         lead_etapa: 'Entrada do lead',
         lead_status: 'Aberto',
         lead_nome_pessoa: leadData.leadName,
+        lead_empresa: leadData.company || '',
         lead_telefone: leadData.phone,
         lead_email: leadData.email || '',
         lead_canal_origem: leadData.source,
         lead_notas: leadData.notes || '',
-        user_id: user.id,
+        user_id: userIdForLead,
         lead_nome_oportunidade: leadData.opportunityName,
       };
+      
+      // Se for membro com cargo 'Usuario', adiciona o membro_id
+      if (user.isMembro && user.membro_cargo === 'Usuario' && user.membroId) {
+        supabaseLeadData.membro_id = user.membroId;
+      }
 
       // Adicionar no Supabase
       const { data, error } = await addLeadToSupabase(supabaseLeadData);
@@ -318,7 +376,13 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // Recarregar os leads do Supabase para manter sincronização
-      const { data: updatedLeads, error: fetchError } = await getLeadsByUser(user.id);
+      // Aplicar o mesmo filtro por membro_id se necessário
+      let membroIdFilter: number | undefined;
+      if (user.isMembro && user.membro_cargo === 'Usuario') {
+        membroIdFilter = user.membroId;
+      }
+      
+      const { data: updatedLeads, error: fetchError } = await getLeadsByUser(userIdForLead, membroIdFilter);
       
       if (fetchError || !updatedLeads) {
         return { success: false, error: 'Erro ao recarregar leads.' };

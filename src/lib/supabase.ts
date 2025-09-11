@@ -24,6 +24,35 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export interface Database {
   public: {
     Tables: {
+      membros: {
+        Row: {
+          membro_id: number
+          user_id: string
+          created_at: string
+          membro_nome: string
+          membro_email: string
+          membro_cargo: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_status: 'Ativo' | 'Desativado'
+        }
+        Insert: {
+          membro_id?: number
+          user_id: string
+          created_at?: string
+          membro_nome: string
+          membro_email: string
+          membro_cargo: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_status: 'Ativo' | 'Desativado'
+        }
+        Update: {
+          membro_id?: number
+          user_id?: string
+          created_at?: string
+          membro_nome?: string
+          membro_email?: string
+          membro_cargo?: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_status?: 'Ativo' | 'Desativado'
+        }
+      }
       usuarios: {
         Row: {
           user_id: string
@@ -55,6 +84,35 @@ export interface Database {
           user_avatar?: string | null
           user_plano?: number | null
         }
+      },
+      membros: {
+        Row: {
+          membro_id: number
+          user_id: string
+          created_at: string
+          membro_nome: string
+          membro_email: string
+          membro_cargo: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_status: 'Ativo' | 'Desativado'
+        }
+        Insert: {
+          membro_id?: number
+          user_id: string
+          created_at?: string
+          membro_nome: string
+          membro_email: string
+          membro_cargo: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_status: 'Ativo' | 'Desativado'
+        }
+        Update: {
+          membro_id?: number
+          user_id?: string
+          created_at?: string
+          membro_nome?: string
+          membro_email?: string
+          membro_cargo?: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_status?: 'Ativo' | 'Desativado'
+        }
       }
       leads: {
         Row: {
@@ -75,6 +133,7 @@ export interface Database {
           ativo_fluxo_cadencia: string | null
           etapa_fluxo_followup: string | null
           ativo_ia: string | null
+          membro_id: number | null
         }
         Insert: {
           lead_id?: number
@@ -94,6 +153,7 @@ export interface Database {
           ativo_fluxo_cadencia?: string | null
           etapa_fluxo_followup?: string | null
           ativo_ia?: string | null
+          membro_id?: number | null
         }
         Update: {
           lead_id?: number
@@ -113,6 +173,7 @@ export interface Database {
           ativo_fluxo_cadencia?: string | null
           etapa_fluxo_followup?: string | null
           ativo_ia?: string | null
+          membro_id?: number | null
         }
       }
       leads_historico: {

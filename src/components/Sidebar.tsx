@@ -15,7 +15,8 @@ import {
   Sun,
   Moon,
   LogOut,
-  Smartphone
+  Smartphone,
+  UsersRound
 } from 'lucide-react';
 
 interface NavigationItem {
@@ -59,8 +60,14 @@ const Sidebar = () => {
       tooltip: 'WhatsApp'
     },
     {
+      name: 'Membros',
+      path: '/membros',
+      icon: UsersRound,
+      tooltip: 'Membros'
+    },
+    {
       name: 'Console',
-      path: user ? `https://console.worklivoo.com/${user.id}` : '#',
+      path: user ? `https://console.worklivoo.com/${user.isMembro ? user.user_id_empresa : user.id}` : '#',
       icon: Smartphone,
       tooltip: 'Console',
       external: true
