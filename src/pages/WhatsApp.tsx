@@ -6,10 +6,12 @@ import { Loader2, Check, AlertTriangle, RefreshCw, Clock, QrCode, Smartphone } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useSecureStorage } from '@/hooks/use-secure-storage';
 
 const WhatsApp = () => {
   const { user } = useCRM();
   const { theme } = useTheme();
+  const { setSecureItem, getSecureItem, removeSecureItem } = useSecureStorage();
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [phoneCode, setPhoneCode] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>('');
@@ -171,28 +173,29 @@ const WhatsApp = () => {
     }
   };
 
-  // Função para salvar o estado atual no localStorage
+  // Função para salvar o estado atual no localStorage com segurança
   const saveStateToStorage = () => {
     try {
-      // Salva o estado atual
-      if (qrCode) localStorage.setItem(STORAGE_KEYS.QR_CODE, qrCode);
-      else localStorage.removeItem(STORAGE_KEYS.QR_CODE);
+      // Salva dados sensíveis com criptografia (QR codes e phone codes)
+      if (qrCode) setSecureItem(STORAGE_KEYS.QR_CODE, qrCode, true);
+      else removeSecureItem(STORAGE_KEYS.QR_CODE);
       
-      if (phoneCode) localStorage.setItem(STORAGE_KEYS.PHONE_CODE, phoneCode);
-      else localStorage.removeItem(STORAGE_KEYS.PHONE_CODE);
+      if (phoneCode) setSecureItem(STORAGE_KEYS.PHONE_CODE, phoneCode, true);
+      else removeSecureItem(STORAGE_KEYS.PHONE_CODE);
       
-      localStorage.setItem(STORAGE_KEYS.PHONE_NUMBER, phoneNumber);
-      localStorage.setItem(STORAGE_KEYS.IS_CONNECTED, JSON.stringify(isConnected));
+      // Dados menos sensíveis podem ser salvos sem criptografia
+      setSecureItem(STORAGE_KEYS.PHONE_NUMBER, phoneNumber, false);
+      setSecureItem(STORAGE_KEYS.IS_CONNECTED, JSON.stringify(isConnected), false);
       
-      if (error) localStorage.setItem(STORAGE_KEYS.ERROR, error);
-      else localStorage.removeItem(STORAGE_KEYS.ERROR);
+      if (error) setSecureItem(STORAGE_KEYS.ERROR, error, false);
+      else removeSecureItem(STORAGE_KEYS.ERROR);
       
-      localStorage.setItem(STORAGE_KEYS.QR_CODE_TIMER, qrCodeTimer.toString());
-      localStorage.setItem(STORAGE_KEYS.COOLDOWN_TIMER, cooldownTimer.toString());
-      localStorage.setItem(STORAGE_KEYS.CONNECTION_METHOD, connectionMethod);
-      localStorage.setItem(STORAGE_KEYS.TIMESTAMP, Date.now().toString());
+      setSecureItem(STORAGE_KEYS.QR_CODE_TIMER, qrCodeTimer.toString(), false);
+      setSecureItem(STORAGE_KEYS.COOLDOWN_TIMER, cooldownTimer.toString(), false);
+      setSecureItem(STORAGE_KEYS.CONNECTION_METHOD, connectionMethod, false);
+      setSecureItem(STORAGE_KEYS.TIMESTAMP, Date.now().toString(), false);
       
-      console.log('Estado salvo no localStorage');
+      console.log('Estado salvo no localStorage com segurança');
     } catch (err) {
       console.error('Erro ao salvar estado no localStorage:', err);
     }
@@ -202,7 +205,7 @@ const WhatsApp = () => {
   const clearStoredState = () => {
     try {
       Object.values(STORAGE_KEYS).forEach(key => {
-        localStorage.removeItem(key);
+        removeSecureItem(key);
       });
       console.log('Estado do localStorage limpo');
     } catch (err) {
@@ -213,22 +216,22 @@ const WhatsApp = () => {
   // Função para restaurar o estado do localStorage
   const restoreStateFromStorage = () => {
     try {
-      const storedTimestamp = localStorage.getItem(STORAGE_KEYS.TIMESTAMP);
+      const storedTimestamp = getSecureItem(STORAGE_KEYS.TIMESTAMP, 30 * 60 * 1000); // 30 minutos
       
       // Se não houver timestamp ou se passaram mais de 30 minutos, limpa o localStorage e não restaura
-      if (!storedTimestamp || Date.now() - parseInt(storedTimestamp) > 30 * 60 * 1000) {
+      if (!storedTimestamp) {
         clearStoredState();
         return false;
       }
       
-      const storedQrCode = localStorage.getItem(STORAGE_KEYS.QR_CODE);
-      const storedPhoneCode = localStorage.getItem(STORAGE_KEYS.PHONE_CODE);
-      const storedPhoneNumber = localStorage.getItem(STORAGE_KEYS.PHONE_NUMBER);
+      const storedQrCode = getSecureItem(STORAGE_KEYS.QR_CODE, 30 * 60 * 1000);
+      const storedPhoneCode = getSecureItem(STORAGE_KEYS.PHONE_CODE, 30 * 60 * 1000);
+      const storedPhoneNumber = getSecureItem(STORAGE_KEYS.PHONE_NUMBER, 30 * 60 * 1000);
       // Não restauramos o status de conexão do localStorage, pois já foi verificado pela API
-      const storedError = localStorage.getItem(STORAGE_KEYS.ERROR);
-      const storedQrCodeTimer = localStorage.getItem(STORAGE_KEYS.QR_CODE_TIMER);
-      const storedCooldownTimer = localStorage.getItem(STORAGE_KEYS.COOLDOWN_TIMER);
-      const storedConnectionMethod = localStorage.getItem(STORAGE_KEYS.CONNECTION_METHOD) as 'qrcode' | 'phone';
+      const storedError = getSecureItem(STORAGE_KEYS.ERROR, 30 * 60 * 1000);
+      const storedQrCodeTimer = getSecureItem(STORAGE_KEYS.QR_CODE_TIMER, 30 * 60 * 1000);
+      const storedCooldownTimer = getSecureItem(STORAGE_KEYS.COOLDOWN_TIMER, 30 * 60 * 1000);
+      const storedConnectionMethod = getSecureItem(STORAGE_KEYS.CONNECTION_METHOD, 30 * 60 * 1000) as 'qrcode' | 'phone';
       
       console.log('Restaurando estado do localStorage');
       
@@ -309,8 +312,8 @@ const WhatsApp = () => {
           setPhoneCode(null);
           setError(null);
           // Salva apenas o estado de conexão
-          localStorage.setItem(STORAGE_KEYS.IS_CONNECTED, JSON.stringify(true));
-          localStorage.setItem(STORAGE_KEYS.TIMESTAMP, Date.now().toString());
+          setSecureItem(STORAGE_KEYS.IS_CONNECTED, JSON.stringify(true), false);
+          setSecureItem(STORAGE_KEYS.TIMESTAMP, Date.now().toString(), false);
           return;
         }
       } catch (err) {
@@ -473,8 +476,8 @@ const WhatsApp = () => {
           clearStoredState();
           
           // Salva apenas o estado de conexão
-          localStorage.setItem(STORAGE_KEYS.IS_CONNECTED, JSON.stringify(true));
-          localStorage.setItem(STORAGE_KEYS.TIMESTAMP, Date.now().toString());
+          setSecureItem(STORAGE_KEYS.IS_CONNECTED, JSON.stringify(true), false);
+          setSecureItem(STORAGE_KEYS.TIMESTAMP, Date.now().toString(), false);
         }
         // Se o status mudou para desconectado
         else if (!connected && isConnected) {

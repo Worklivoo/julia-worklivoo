@@ -10,11 +10,12 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, Phone, Building, ArrowLeft, HelpCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { usePersistentTab } from '@/hooks/use-persistent-state';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { loginSchema, registerSchema, LoginFormData, RegisterFormData } from '@/schemas/auth';
 
 const Auth = () => {
   const [activeTab, setActiveTab] = usePersistentTab('auth', 'login');
-  const [loginData, setLoginData] = useState({ email: '', password: '' });
-  const [registerData, setRegisterData] = useState({ name: '', email: '', password: '', telefone: '', empresa: '', authPassword: '' });
   const [resetEmail, setResetEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -25,32 +26,52 @@ const Auth = () => {
   const { login, register } = useCRM();
   const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Configuração do formulário de login com validação
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: ''
+    }
+  });
+
+  const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
-    const success = await login(loginData.email, loginData.password);
+    const success = await login(data.email, data.password);
     if (success) {
       navigate('/inicio');
     }
     setIsLoading(false);
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  // Configuração do formulário de registro com validação
+  const registerForm = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      telefone: '',
+      empresa: ''
+    }
+  });
+
+  const handleRegister = async (data: RegisterFormData) => {
     // Verificar senha de autenticação
-    if (registerData.authPassword !== 'W0rkliv0o!2025') {
+    const authPassword = import.meta.env.VITE_AUTH_PASSWORD;
+    const authPasswordInput = (document.getElementById('auth-password') as HTMLInputElement)?.value;
+    if (authPasswordInput !== authPassword) {
       alert('Senha de autenticação inválida. Entre em contato com o administrador.');
       return;
     }
     
     setIsLoading(true);
     const success = await register(
-      registerData.name,
-      registerData.email,
-      registerData.password,
-      registerData.telefone,
-      registerData.empresa
+      data.name,
+      data.email,
+      data.password,
+      data.telefone,
+      data.empresa
     );
     if (success) {
       navigate('/inicio');
@@ -189,7 +210,7 @@ const Auth = () => {
                 </TabsList>
 
               <TabsContent value="login" className="space-y-6 mt-6">
-                <form onSubmit={handleLogin} className="space-y-5">
+                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5">
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-medium text-slate-700">
                         E-mail
@@ -200,12 +221,15 @@ const Auth = () => {
                         id="email"
                         type="email"
                         placeholder="seu@email.com"
-                        value={loginData.email}
-                        onChange={(e) => setLoginData({...loginData, email: e.target.value})}
-                        className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
-                        required
+                        {...loginForm.register('email')}
+                        className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${
+                          loginForm.formState.errors.email ? 'border-red-500' : ''
+                        }`}
                       />
                     </div>
+                    {loginForm.formState.errors.email && (
+                      <p className="text-sm text-red-600">{loginForm.formState.errors.email.message}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password" className="text-sm font-medium text-slate-700">
@@ -217,10 +241,10 @@ const Auth = () => {
                         id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Digite sua senha"
-                        value={loginData.password}
-                        onChange={(e) => setLoginData({...loginData, password: e.target.value})}
-                        className="pl-10 pr-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
-                        required
+                        {...loginForm.register('password')}
+                        className={`pl-10 pr-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${
+                          loginForm.formState.errors.password ? 'border-red-500' : ''
+                        }`}
                       />
                       <button
                         type="button"
@@ -230,6 +254,9 @@ const Auth = () => {
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
+                    {loginForm.formState.errors.password && (
+                      <p className="text-sm text-red-600">{loginForm.formState.errors.password.message}</p>
+                    )}
                   </div>
                   <Button 
                     type="submit" 
@@ -258,7 +285,7 @@ const Auth = () => {
               </TabsContent>
 
               <TabsContent value="register" className="space-y-6 mt-6">
-                <form onSubmit={handleRegister} className="space-y-4">
+                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name" className="text-sm font-medium text-slate-700">
                         Nome completo
@@ -269,12 +296,15 @@ const Auth = () => {
                         id="name"
                         type="text"
                         placeholder="Seu nome completo"
-                        value={registerData.name}
-                        onChange={(e) => setRegisterData({...registerData, name: e.target.value})}
-                        className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
-                        required
+                        {...registerForm.register('name')}
+                        className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${
+                          registerForm.formState.errors.name ? 'border-red-500' : ''
+                        }`}
                       />
                     </div>
+                    {registerForm.formState.errors.name && (
+                      <p className="text-sm text-red-600">{registerForm.formState.errors.name.message}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-email" className="text-sm font-medium text-slate-700">
@@ -286,12 +316,15 @@ const Auth = () => {
                         id="register-email"
                         type="email"
                         placeholder="seu@email.com"
-                        value={registerData.email}
-                        onChange={(e) => setRegisterData({...registerData, email: e.target.value})}
-                        className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
-                        required
+                        {...registerForm.register('email')}
+                        className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${
+                          registerForm.formState.errors.email ? 'border-red-500' : ''
+                        }`}
                       />
                     </div>
+                    {registerForm.formState.errors.email && (
+                      <p className="text-sm text-red-600">{registerForm.formState.errors.email.message}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-password" className="text-sm font-medium text-slate-700">
@@ -303,10 +336,10 @@ const Auth = () => {
                         id="register-password"
                         type={showRegisterPassword ? "text" : "password"}
                         placeholder="Crie uma senha segura"
-                        value={registerData.password}
-                        onChange={(e) => setRegisterData({...registerData, password: e.target.value})}
-                        className="pl-10 pr-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
-                        required
+                        {...registerForm.register('password')}
+                        className={`pl-10 pr-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${
+                          registerForm.formState.errors.password ? 'border-red-500' : ''
+                        }`}
                       />
                       <button
                         type="button"
@@ -316,6 +349,9 @@ const Auth = () => {
                         {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
+                    {registerForm.formState.errors.password && (
+                      <p className="text-sm text-red-600">{registerForm.formState.errors.password.message}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -336,14 +372,12 @@ const Auth = () => {
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                       <Input
-                        id="auth-password"
-                        type="password"
-                        placeholder="Digite a senha de autenticação"
-                        value={registerData.authPassword}
-                        onChange={(e) => setRegisterData({...registerData, authPassword: e.target.value})}
-                        className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
-                        required
-                      />
+                          id="auth-password"
+                          type="password"
+                          placeholder="Digite a senha de autenticação"
+                          className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
+                          required
+                        />
                     </div>
                     <p className="text-xs text-slate-500">
                       Entre em contato com o administrador para obter a senha de autenticação
@@ -360,11 +394,15 @@ const Auth = () => {
                           id="phone"
                           type="text"
                           placeholder="(11) 99999-9999"
-                          value={registerData.telefone}
-                          onChange={(e) => setRegisterData({...registerData, telefone: e.target.value})}
-                          className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
+                          {...registerForm.register('telefone')}
+                          className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${
+                            registerForm.formState.errors.telefone ? 'border-red-500' : ''
+                          }`}
                         />
                       </div>
+                      {registerForm.formState.errors.telefone && (
+                        <p className="text-sm text-red-600">{registerForm.formState.errors.telefone.message}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="company" className="text-sm font-medium text-slate-700">
@@ -376,11 +414,15 @@ const Auth = () => {
                           id="company"
                           type="text"
                           placeholder="Nome da empresa"
-                          value={registerData.empresa}
-                          onChange={(e) => setRegisterData({...registerData, empresa: e.target.value})}
-                          className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
+                          {...registerForm.register('empresa')}
+                          className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${
+                            registerForm.formState.errors.empresa ? 'border-red-500' : ''
+                          }`}
                         />
                       </div>
+                      {registerForm.formState.errors.empresa && (
+                        <p className="text-sm text-red-600">{registerForm.formState.errors.empresa.message}</p>
+                      )}
                     </div>
                   </div>
                   <Button 
