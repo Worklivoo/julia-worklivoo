@@ -17,7 +17,7 @@ export type LeadInput = {
   ativo_fluxo_cadencia?: string;
   etapa_fluxo_followup?: string;
   ativo_ia?: string;
-  membro_id?: number; // ID do membro responsável pelo lead
+  membro_id?: string; // ID do membro responsável pelo lead
 };
 
 // Tipagem para inserção de anotação no histórico
@@ -36,7 +36,7 @@ export async function addLead(lead: LeadInput) {
 
 // Função para buscar todos os leads de um usuário específico
 // Se membro_id for fornecido, filtra apenas os leads desse membro
-export async function getLeadsByUser(user_id: string, membro_id?: number) {
+export async function getLeadsByUser(user_id: string, membro_id?: string) {
   let query = supabase
     .from('leads')
     .select('*')

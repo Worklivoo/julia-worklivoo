@@ -2,11 +2,11 @@ import { supabase } from './supabase';
 
 // Interface para a tabela de membros
 export interface Membro {
-  membro_id: number;
+  membro_id: string;
   user_id: string;
   membro_nome: string;
   membro_email: string;
-  membro_cargo: 'Administrador' | 'Corretor';
+  membro_cargo: 'Administrador' | 'Usuario';
   membro_status: 'Ativo' | 'Desativado';
   created_at?: string;
 }
@@ -54,41 +54,98 @@ export const createUserAndAddMembro = async (
   email: string,
   password: string,
   nome: string,
-  cargo: 'Administrador' | 'Corretor',
+  cargo: 'Administrador' | 'Usuario',
   status: 'Ativo' | 'Desativado',
   userId: string // ID do usuário principal que está adicionando o membro
 ) => {
   try {
-    // 1. Criar conta no Supabase Auth
+    console.log('Iniciando criação de usuário e membro...');
+    console.log('Dados recebidos:', { email, nome, cargo, status, userId });
+
+    // 1. Salvar a sessão atual do usuário
+    console.log('Salvando sessão atual do usuário...');
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    console.log('Sessão atual salva:', currentSession?.user?.id);
+
+    // 2. Criar conta no Supabase Auth
+    console.log('Criando usuário no Supabase Auth...');
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
     });
 
-    if (authError || !authData.user) {
+    console.log('Resultado do Auth:', { authData, authError });
+
+    if (authError) {
       console.error('Erro ao criar conta no Supabase Auth:', authError);
-      return { data: null, error: authError || new Error('Falha ao criar usuário') };
+      return { data: null, error: authError };
     }
 
-    // 2. Adicionar como membro (sem criar perfil na tabela usuarios)
+    if (!authData.user) {
+      console.error('Usuário não foi criado no Auth');
+      return { data: null, error: new Error('Falha ao criar usuário no Auth') };
+    }
+
+    console.log('Usuário criado no Auth com sucesso:', authData.user.id);
+
+    // 3. Restaurar a sessão original do usuário
+    if (currentSession) {
+      console.log('Restaurando sessão original do usuário...');
+      await supabase.auth.setSession({
+        access_token: currentSession.access_token,
+        refresh_token: currentSession.refresh_token
+      });
+      console.log('Sessão original restaurada');
+    }
+
+    // 4. Verificar se o userId principal existe na tabela usuarios
+    console.log('Verificando se userId principal existe na tabela usuarios:', userId);
+    const { data: userExists, error: userCheckError } = await supabase
+      .from('usuarios')
+      .select('user_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (userCheckError || !userExists) {
+      console.error('Usuário principal não encontrado na tabela usuarios:', userCheckError);
+      return { data: null, error: new Error('Usuário principal não encontrado na tabela usuarios') };
+    }
+
+    console.log('Usuário principal encontrado:', userExists);
+
+    // 5. Adicionar como membro (usando Auth User ID como membro_id)
     const newMembro = {
-      user_id: userId, // ID do usuário principal
+      membro_id: authData.user.id, // ID do usuário criado no Supabase Auth
+      user_id: userId, // ID do usuário principal da empresa
       membro_nome: nome,
       membro_email: email,
       membro_cargo: cargo,
       membro_status: status
     };
 
+    console.log('Auth User ID sendo usado como membro_id:', authData.user.id);
+
+    console.log('Inserindo membro na tabela:', newMembro);
+
     const { data, error } = await supabase
       .from('membros')
       .insert(newMembro)
       .select();
 
+    console.log('Resultado da inserção na tabela membros:', { data, error });
+
     if (error) {
-      console.error('Erro ao adicionar membro:', error);
+      console.error('Erro detalhado ao adicionar membro:', {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
       return { data: null, error };
     }
 
+    console.log('Membro adicionado com sucesso:', data);
     return { data, error: null, authUser: authData.user };
   } catch (error) {
     console.error('Exceção ao criar usuário e adicionar membro:', error);
@@ -97,7 +154,7 @@ export const createUserAndAddMembro = async (
 };
 
 // Função para atualizar um membro existente
-export const updateMembro = async (membroId: number, updates: Partial<Omit<Membro, 'membro_id' | 'user_id'>>) => {
+export const updateMembro = async (membroId: string, updates: Partial<Omit<Membro, 'membro_id' | 'user_id'>>) => {
   try {
     const { data, error } = await supabase
       .from('membros')
@@ -135,7 +192,7 @@ export const getMembroByEmail = async (email: string) => {
 };
 
 // Função para excluir um membro
-export const deleteMembro = async (membroId: number) => {
+export const deleteMembro = async (membroId: string) => {
   try {
     const { error } = await supabase
       .from('membros')

@@ -161,7 +161,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       // Determinar se deve aplicar filtro por membro_id
       // Se for membro com cargo 'Usuario', filtra apenas os leads dele
-      let membroIdFilter: number | undefined;
+      let membroIdFilter: string | undefined;
       if (user.isMembro && user.membro_cargo === 'Usuario') {
         membroIdFilter = user.membroId;
       }
@@ -377,7 +377,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Recarregar os leads do Supabase para manter sincronização
       // Aplicar o mesmo filtro por membro_id se necessário
-      let membroIdFilter: number | undefined;
+      let membroIdFilter: string | undefined;
       if (user.isMembro && user.membro_cargo === 'Usuario') {
         membroIdFilter = user.membroId;
       }

@@ -47,17 +47,17 @@ export interface User {
   token_instancia_zapi?: string | null;
   // Campos específicos para membros
   isMembro?: boolean;
-  membroId?: number;
-  membro_cargo?: 'Administrador' | 'Corretor' | 'Usuario';
+  membroId?: string;
+  membro_cargo?: 'Administrador' | 'Usuario';
   user_id_empresa?: string; // ID do usuário principal da empresa (para membros)
 }
 
 export interface Membro {
-  membro_id: number;
+  membro_id: string;
   user_id: string;
   membro_nome: string;
   membro_email: string;
-  membro_cargo: 'Administrador' | 'Corretor' | 'Usuario';
+  membro_cargo: 'Administrador' | 'Usuario';
   membro_status: 'Ativo' | 'Desativado';
   created_at?: string;
 }

@@ -26,30 +26,30 @@ export interface Database {
     Tables: {
       membros: {
         Row: {
-          membro_id: number
+          membro_id: string
           user_id: string
           created_at: string
           membro_nome: string
           membro_email: string
-          membro_cargo: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_cargo: 'Administrador' | 'Usuario'
           membro_status: 'Ativo' | 'Desativado'
         }
         Insert: {
-          membro_id?: number
+          membro_id?: string
           user_id: string
           created_at?: string
           membro_nome: string
           membro_email: string
-          membro_cargo: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_cargo: 'Administrador' | 'Usuario'
           membro_status: 'Ativo' | 'Desativado'
         }
         Update: {
-          membro_id?: number
+          membro_id?: string
           user_id?: string
           created_at?: string
           membro_nome?: string
           membro_email?: string
-          membro_cargo?: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_cargo?: 'Administrador' | 'Usuario'
           membro_status?: 'Ativo' | 'Desativado'
         }
       }
@@ -87,30 +87,30 @@ export interface Database {
       },
       membros: {
         Row: {
-          membro_id: number
+          membro_id: string
           user_id: string
           created_at: string
           membro_nome: string
           membro_email: string
-          membro_cargo: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_cargo: 'Administrador' | 'Usuario'
           membro_status: 'Ativo' | 'Desativado'
         }
         Insert: {
-          membro_id?: number
+          membro_id?: string
           user_id: string
           created_at?: string
           membro_nome: string
           membro_email: string
-          membro_cargo: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_cargo: 'Administrador' | 'Usuario'
           membro_status: 'Ativo' | 'Desativado'
         }
         Update: {
-          membro_id?: number
+          membro_id?: string
           user_id?: string
           created_at?: string
           membro_nome?: string
           membro_email?: string
-          membro_cargo?: 'Administrador' | 'Corretor' | 'Usuario'
+          membro_cargo?: 'Administrador' | 'Usuario'
           membro_status?: 'Ativo' | 'Desativado'
         }
       }
@@ -133,7 +133,7 @@ export interface Database {
           ativo_fluxo_cadencia: string | null
           etapa_fluxo_followup: string | null
           ativo_ia: string | null
-          membro_id: number | null
+          membro_id: string | null
         }
         Insert: {
           lead_id?: number
@@ -153,7 +153,7 @@ export interface Database {
           ativo_fluxo_cadencia?: string | null
           etapa_fluxo_followup?: string | null
           ativo_ia?: string | null
-          membro_id?: number | null
+          membro_id?: string | null
         }
         Update: {
           lead_id?: number
@@ -173,7 +173,7 @@ export interface Database {
           ativo_fluxo_cadencia?: string | null
           etapa_fluxo_followup?: string | null
           ativo_ia?: string | null
-          membro_id?: number | null
+          membro_id?: string | null
         }
       }
       leads_historico: {

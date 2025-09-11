@@ -12,7 +12,7 @@ import {
   AdditionalInfoCard,
   NotesCard,
   DeleteCard
-} from '@/components/lead-detail';
+} from '@/components/pagina-lead';
 
 import { useLeadDetail } from '@/hooks/use-lead-detail';
 import { useNotes } from '@/hooks/use-notes';

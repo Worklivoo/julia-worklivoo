@@ -1,15 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/contexts/CRMContext';
-import { Membro, getMembrosByUser } from '@/lib/membros';
+import { Membro, getMembrosByUser, createUserAndAddMembro } from '@/lib/membros';
 // Importando os componentes de UI
 import { Card, CardContent } from '@/components/ui/card';
-import { UserCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { UserCircle, Plus } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 function Membros() {
   const { user } = useCRM();
   const [membros, setMembros] = useState<Membro[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [formData, setFormData] = useState({
+    nome: '',
+    email: '',
+    senha: '',
+    cargo: '' as 'Administrador' | 'Usuario' | ''
+  });
 
   // Carregar membros
   useEffect(() => {
@@ -72,14 +99,122 @@ function Membros() {
     return colors[index];
   };
 
+  // Função para verificar se o usuário pode adicionar membros
+  const canAddMembers = () => {
+    if (!user) return false;
+    // Usuário não é membro (está na página de "usuarios") OU é membro com cargo de "Administrador"
+    return !user.isMembro || (user.isMembro && user.membro_cargo === 'Administrador');
+  };
+
+  // Função para lidar com mudanças no formulário
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Função para resetar o formulário
+  const resetForm = () => {
+    setFormData({
+      nome: '',
+      email: '',
+      senha: '',
+      cargo: ''
+    });
+  };
+
+  // Função para lidar com o envio do formulário
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validação básica
+    if (!formData.nome || !formData.email || !formData.senha || !formData.cargo) {
+      setMessage({ type: 'error', text: 'Todos os campos são obrigatórios' });
+      return;
+    }
+
+    if (formData.senha.length < 6) {
+      setMessage({ type: 'error', text: 'A senha deve ter pelo menos 6 caracteres' });
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const representedUserId = getRepresentedUserId();
+      console.log('Dados sendo enviados:', {
+        email: formData.email,
+        nome: formData.nome,
+        cargo: formData.cargo,
+        representedUserId
+      });
+      
+      const result = await createUserAndAddMembro(
+        formData.email,
+        formData.senha,
+        formData.nome,
+        formData.cargo as 'Administrador' | 'Usuario',
+        'Ativo',
+        representedUserId
+      );
+
+      console.log('Resultado completo:', result);
+
+      if (result.error) {
+        console.error('Erro detalhado:', result.error);
+        setMessage({ type: 'error', text: 'Erro ao criar membro: ' + (result.error.message || JSON.stringify(result.error)) });
+      } else {
+        console.log('Membro criado com sucesso:', result.data);
+        setMessage({ type: 'success', text: 'Membro criado com sucesso' });
+        setTimeout(() => {
+          setIsDialogOpen(false);
+          resetForm();
+          setMessage({ type: '', text: '' });
+          // Recarregar a lista de membros
+          window.location.reload();
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Exceção capturada:', error);
+      setMessage({ type: 'error', text: 'Erro inesperado ao criar membro: ' + (error instanceof Error ? error.message : 'Erro desconhecido') });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Função para obter o user_id que está sendo representado
+  const getRepresentedUserId = () => {
+    if (!user) return null;
+    // Se for membro, usa o user_id_empresa, senão usa o próprio id
+    return user.isMembro ? user.user_id_empresa : user.id;
+  };
+
+  // Função para abrir o modal
+  const handleAddMember = () => {
+    setIsDialogOpen(true);
+  };
+
   return (
     <div className="container mx-auto py-6">
       <div className="mb-6">
-        <div>
-          <h1 className="text-4xl font-bold dark:bg-gradient-to-r dark:from-primary dark:to-primary/80 dark:bg-clip-text dark:text-transparent">
-            Membros da {user?.empresa || "Empresa"}
-          </h1>
-          <p className="text-muted-foreground mt-1">Gerencie os membros da sua equipe</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-4xl font-bold dark:bg-gradient-to-r dark:from-primary dark:to-primary/80 dark:bg-clip-text dark:text-transparent">
+              Membros da {user?.empresa || "Empresa"}
+            </h1>
+            <p className="text-muted-foreground mt-1">Gerencie os membros da sua equipe</p>
+          </div>
+          {canAddMembers() && (
+            <Button 
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              onClick={handleAddMember}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Membro
+            </Button>
+          )}
         </div>
       </div>
       
@@ -112,6 +247,99 @@ function Membros() {
           ))}
         </div>
       )}
+
+      {/* Modal de Adicionar Membro */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+             <DialogTitle>Adicionar Novo Membro</DialogTitle>
+             <DialogDescription>
+               Preencha os dados do novo membro da equipe.
+               <br />
+               <span className="text-xs text-muted-foreground mt-2 block">
+                 Empresa: <span className="font-mono font-medium">{getRepresentedUserId()}</span>
+               </span>
+               {message.text && (
+                 <div className={`mt-3 p-3 rounded-md text-sm ${
+                   message.type === 'success' 
+                     ? 'bg-green-50 text-green-700 border border-green-200' 
+                     : 'bg-red-50 text-red-700 border border-red-200'
+                 }`}>
+                   {message.text}
+                 </div>
+               )}
+             </DialogDescription>
+           </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="nome">Nome</Label>
+                <Input
+                  id="nome"
+                  type="text"
+                  placeholder="Digite o nome completo"
+                  value={formData.nome}
+                  onChange={(e) => handleInputChange('nome', e.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Digite o e-mail"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="senha">Senha</Label>
+                <Input
+                  id="senha"
+                  type="password"
+                  placeholder="Digite a senha"
+                  value={formData.senha}
+                  onChange={(e) => handleInputChange('senha', e.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="cargo">Cargo</Label>
+                <Select
+                  value={formData.cargo}
+                  onValueChange={(value) => handleInputChange('cargo', value)}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cargo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Administrador">Administrador</SelectItem>
+                    <SelectItem value="Usuario">Usuário</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsDialogOpen(false);
+                  resetForm();
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Criando...' : 'Adicionar Membro'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
