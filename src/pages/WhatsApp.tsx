@@ -502,17 +502,44 @@ const WhatsApp = () => {
 
 
 
-  const handleRetry = () => {
+  const handleRetry = async () => {
     // Só permite tentar novamente se não estiver em cooldown
     if (cooldownTimer === 0) {
       setError(null);
       setQrCode(null);
       setPhoneCode(null);
+      setIsLoading(true);
       
-      if (connectionMethod === 'qrcode') {
-        connectWhatsAppQR();
-      } else {
-        connectWhatsAppPhone();
+      // Primeiro verifica se os dados da instância estão configurados
+      if (!user?.id_instancia_zapi || !user?.token_instancia_zapi) {
+        setError('Dados de instância do WhatsApp não configurados. Entre em contato com o suporte.');
+        setIsLoading(false);
+        return;
+      }
+      
+      try {
+        // Verifica o status atual da instância antes de tentar conectar
+        console.log('Verificando status da instância antes de tentar novamente...');
+        const connected = await checkConnectionStatus();
+        
+        if (connected) {
+          // Se já estiver conectado, atualiza o estado
+          setIsConnected(true);
+          setError(null);
+          setIsLoading(false);
+          return;
+        }
+        
+        // Se não estiver conectado, tenta conectar novamente
+        if (connectionMethod === 'qrcode') {
+          connectWhatsAppQR();
+        } else {
+          connectWhatsAppPhone();
+        }
+      } catch (err) {
+        console.error('Erro ao verificar status durante retry:', err);
+        setError('Erro ao verificar status da instância. Verifique sua conexão e tente novamente.');
+        setIsLoading(false);
       }
       
       // Salva o estado atualizado

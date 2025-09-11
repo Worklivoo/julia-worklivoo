@@ -16,7 +16,8 @@ import {
   Moon,
   LogOut,
   Smartphone,
-  UsersRound
+  UsersRound,
+  Contact
 } from 'lucide-react';
 
 interface NavigationItem {
@@ -50,7 +51,7 @@ const Sidebar = () => {
     {
       name: 'Leads',
       path: '/leads',
-      icon: Users,
+      icon: Contact,
       tooltip: 'Funil de Leads'
     },
     {

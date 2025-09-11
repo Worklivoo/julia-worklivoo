@@ -281,7 +281,6 @@ const LeadDetail = () => {
               </Avatar>
               <div className="flex-1">
                 <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">{lead.opportunityName}</h1>
->>>>>>> bf15deecebe0aa5c5c56c2e97279a53ddab02c85
                 <p className="text-sm text-muted-foreground mt-1">{lead.leadName}</p>
               </div>
             </div>
@@ -350,9 +349,7 @@ const LeadDetail = () => {
                 </AvatarFallback>
               </Avatar>
               <div>
-<<<<<<< HEAD
                 <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">{lead.opportunityName}</h1>
-
                 <p className="text-sm text-muted-foreground mt-1">{lead.leadName}</p>
               </div>
             </div>
