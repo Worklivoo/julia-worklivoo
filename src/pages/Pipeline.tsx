@@ -91,6 +91,7 @@ const Pipeline = () => {
         email: newLead.email,
         company: newLead.company,
         source: newLead.source,
+        notes: newLead.notes,
         stage: 'entrada' as const,
         status: 'active' as const,
         value: 0,
@@ -296,135 +297,214 @@ const Pipeline = () => {
                     Novo Lead
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Adicionar Novo Lead</DialogTitle>
-                    <DialogDescription>
-                      Preencha as informações do novo lead para adicionar ao funil.
-                    </DialogDescription>
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader className="pb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: '#EBF57D'}}>
+                        <Plus className="w-5 h-5 text-black" />
+                      </div>
+                      <div>
+                        <DialogTitle className="text-xl font-semibold text-gray-900">Novo Lead</DialogTitle>
+                        <DialogDescription className="text-gray-600 mt-1">
+                          Preencha as informações para adicionar um novo lead ao pipeline
+                        </DialogDescription>
+                      </div>
+                    </div>
                   </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <label htmlFor="opportunityName" className="text-right text-sm font-medium">
-                        Oportunidade *
-                      </label>
-                      <Input
-                        id="opportunityName"
-                        value={newLead.opportunityName}
-                        onChange={(e) => setNewLead({...newLead, opportunityName: e.target.value})}
-                        className="col-span-3"
-                        placeholder="Nome da oportunidade"
-                      />
+                  
+                  <div className="space-y-6">
+                    {/* Seção Principal */}
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide border-b border-gray-200 pb-2">Informações Principais</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label htmlFor="opportunityName" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                            Oportunidade
+                            <span className="text-red-500">*</span>
+                          </label>
+                          <Input
+                            id="opportunityName"
+                            value={newLead.opportunityName}
+                            onChange={(e) => setNewLead({...newLead, opportunityName: e.target.value})}
+                            className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-400"
+                            placeholder="Nome da oportunidade"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label htmlFor="leadName" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                            Nome do Lead
+                            <span className="text-red-500">*</span>
+                          </label>
+                          <Input
+                            id="leadName"
+                            value={newLead.leadName}
+                            onChange={(e) => setNewLead({...newLead, leadName: e.target.value})}
+                            className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-400"
+                            placeholder="Nome completo"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <label htmlFor="leadName" className="text-right text-sm font-medium">
-                        Nome *
-                      </label>
-                      <Input
-                        id="leadName"
-                        value={newLead.leadName}
-                        onChange={(e) => setNewLead({...newLead, leadName: e.target.value})}
-                        className="col-span-3"
-                        placeholder="Nome do lead"
-                      />
+
+                    {/* Seção de Contato */}
+                     <div className="bg-yellow-50 rounded-lg p-4 space-y-4">
+                       <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide border-b border-yellow-200 pb-2">Informações de Contato</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label htmlFor="phone" className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                            Telefone
+                            <span className="text-red-500">*</span>
+                          </label>
+                          <Input
+                            id="phone"
+                            value={newLead.phone}
+                            onChange={(e) => setNewLead({...newLead, phone: e.target.value})}
+                            className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-400"
+                            placeholder="(11) 99999-9999"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label htmlFor="email" className="text-sm font-medium text-gray-700">
+                            E-mail
+                          </label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={newLead.email}
+                            onChange={(e) => setNewLead({...newLead, email: e.target.value})}
+                            className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-400"
+                            placeholder="email@exemplo.com"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <label htmlFor="phone" className="text-right text-sm font-medium">
-                        Telefone *
-                      </label>
-                      <Input
-                        id="phone"
-                        value={newLead.phone}
-                        onChange={(e) => setNewLead({...newLead, phone: e.target.value})}
-                        className="col-span-3"
-                        placeholder="(11) 99999-9999"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <label htmlFor="company" className="text-right text-sm font-medium">
-                        Empresa
-                      </label>
-                      <Input
-                        id="company"
-                        value={newLead.company}
-                        onChange={(e) => setNewLead({...newLead, company: e.target.value})}
-                        className="col-span-3"
-                        placeholder="Nome da empresa"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4 relative">
-                      <label htmlFor="source" className="text-right text-sm font-medium">
-                        Origem
-                      </label>
-                      <div className="col-span-3 relative">
-                        <Input
-                          id="source"
-                          value={newLead.source}
-                          onChange={(e) => {
-                            setNewLead({...newLead, source: e.target.value});
-                            setShowOriginSuggestions(e.target.value.length > 0);
-                          }}
-                          placeholder="Ex: Google Ads, Facebook, Indicação"
-                        />
-                        {showOriginSuggestions && filteredOrigins.length > 0 && (
-                          <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
-                            {filteredOrigins.map((origin, index) => (
-                              <div
-                                key={index}
-                                className="px-3 py-2 hover:bg-muted cursor-pointer text-sm"
-                                onClick={() => handleOriginSelect(origin)}
-                              >
-                                {origin}
+
+                    {/* Seção Empresarial */}
+                     <div className="bg-yellow-50 rounded-lg p-4 space-y-4">
+                       <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide border-b border-yellow-200 pb-2">Informações Empresariais</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label htmlFor="company" className="text-sm font-medium text-gray-700">
+                            Empresa
+                          </label>
+                          <Input
+                            id="company"
+                            value={newLead.company}
+                            onChange={(e) => setNewLead({...newLead, company: e.target.value})}
+                            className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-400"
+                            placeholder="Nome da empresa"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2 relative">
+                          <label htmlFor="source" className="text-sm font-medium text-gray-700">
+                            Origem
+                          </label>
+                          <div className="relative">
+                            <Input
+                              id="source"
+                              value={newLead.source}
+                              onChange={(e) => {
+                                setNewLead({...newLead, source: e.target.value});
+                                setShowOriginSuggestions(e.target.value.length > 0);
+                              }}
+                              className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-400"
+                              placeholder="Ex: Google Ads, Facebook, Indicação"
+                            />
+                            {showOriginSuggestions && filteredOrigins.length > 0 && (
+                              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-40 overflow-y-auto">
+                                {filteredOrigins.map((origin, index) => (
+                                  <div
+                                    key={index}
+                                    className="px-3 py-2 hover:bg-yellow-50 cursor-pointer text-sm border-b border-gray-100 last:border-b-0"
+                                    onClick={() => handleOriginSelect(origin)}
+                                  >
+                                    {origin}
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Seção de Observações */}
+                    <div className="bg-purple-50 rounded-lg p-4 space-y-4">
+                      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide border-b border-purple-200 pb-2">Observações Adicionais</h3>
+                      
+                      <div className="space-y-2">
+                        <label htmlFor="notes" className="text-sm font-medium text-gray-700">
+                          Observações
+                        </label>
+                        <textarea
+                          id="notes"
+                          value={newLead.notes}
+                          onChange={(e) => setNewLead({...newLead, notes: e.target.value})}
+                          className="w-full min-h-[80px] px-3 py-2 border border-gray-300 rounded-md focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 resize-none"
+                          placeholder="Informações adicionais sobre o lead..."
+                        />
+                      </div>
+                    </div>
+
+                    {/* Mensagens de Feedback */}
+                    {(addLeadError || addLeadSuccess) && (
+                      <div className="rounded-lg p-4" style={{backgroundColor: addLeadError ? '#fef2f2' : '#f0fdf4'}}>
+                        {addLeadError && (
+                          <div className="flex items-center gap-2 text-red-700">
+                            <div className="w-4 h-4 rounded-full bg-red-500 flex-shrink-0"></div>
+                            <span className="text-sm font-medium">{addLeadError}</span>
+                          </div>
+                        )}
+                        {addLeadSuccess && (
+                          <div className="flex items-center gap-2 text-green-700">
+                            <div className="w-4 h-4 rounded-full bg-green-500 flex-shrink-0"></div>
+                            <span className="text-sm font-medium">{addLeadSuccess}</span>
                           </div>
                         )}
                       </div>
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <label htmlFor="email" className="text-right text-sm font-medium">
-                        E-mail
-                      </label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={newLead.email}
-                        onChange={(e) => setNewLead({...newLead, email: e.target.value})}
-                        className="col-span-3"
-                        placeholder="email@exemplo.com"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <label htmlFor="notes" className="text-right text-sm font-medium">
-                        Observações
-                      </label>
-                      <Input
-                        id="notes"
-                        value={newLead.notes}
-                        onChange={(e) => setNewLead({...newLead, notes: e.target.value})}
-                        className="col-span-3"
-                        placeholder="Observações adicionais"
-                      />
-                    </div>
-                    {addLeadError && (
-                      <div className="text-red-500 text-sm mt-2">
-                        {addLeadError}
-                      </div>
-                    )}
-                    {addLeadSuccess && (
-                      <div className="text-green-500 text-sm mt-2">
-                        {addLeadSuccess}
-                      </div>
                     )}
                   </div>
-                  <div className="flex justify-end">
-                    <Button 
-                      onClick={handleAddLead} 
-                      disabled={addLeadLoading}
-                      style={{backgroundColor: '#EBF57D', color: '#000000'}} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d4e06a'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EBF57D'}
-                    >
-                      {addLeadLoading ? 'Adicionando...' : 'Adicionar Lead'}
-                    </Button>
+
+                  {/* Footer com Botões */}
+                  <div className="flex justify-between items-center pt-6 border-t border-gray-200">
+                    <div className="text-xs text-gray-500">
+                      <span className="text-red-500">*</span> Campos obrigatórios
+                    </div>
+                    <div className="flex gap-3">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setShowNewLeadDialog(false)}
+                        className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button 
+                        onClick={handleAddLead} 
+                        disabled={addLeadLoading}
+                        className="shadow-lg hover:shadow-xl transition-all duration-300 min-w-[120px]"
+                        style={{backgroundColor: '#EBF57D', color: '#000000'}} 
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d4e06a'} 
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EBF57D'}
+                      >
+                        {addLeadLoading ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                            Salvando...
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Adicionar Lead
+                          </div>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </DialogContent>
               </Dialog>

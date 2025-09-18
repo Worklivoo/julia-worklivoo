@@ -60,66 +60,37 @@ export interface Database {
         }
       }
       usuarios: {
-        Row: {
-          user_id: string
-          created_at: string
-          user_nome: string
-          user_email: string
-          user_telefone: string | null
-          user_empresa: string | null
-          user_avatar: string | null
-          user_plano: number | null
-        }
-        Insert: {
-          user_id?: string
-          created_at?: string
-          user_nome: string
-          user_email: string
-          user_telefone?: string | null
-          user_empresa?: string | null
-          user_avatar?: string | null
-          user_plano?: number | null
-        }
-        Update: {
-          user_id?: string
-          created_at?: string
-          user_nome?: string
-          user_email?: string
-          user_telefone?: string | null
-          user_empresa?: string | null
-          user_avatar?: string | null
-          user_plano?: number | null
-        }
+          Row: {
+            user_id: string
+            user_nome: string
+            user_email: string
+            user_telefone: string | null
+            user_empresa: string | null
+            user_plano: string | null
+            id_instancia_zapi: string | null
+            token_instancia_zapi: string | null
+          }
+          Insert: {
+            user_id: string
+            user_nome: string
+            user_email: string
+            user_telefone?: string | null
+            user_empresa?: string | null
+            user_plano?: string | null
+            id_instancia_zapi?: string | null
+            token_instancia_zapi?: string | null
+          }
+          Update: {
+            user_id?: string
+            user_nome?: string
+            user_email?: string
+            user_telefone?: string | null
+            user_empresa?: string | null
+            user_plano?: string | null
+            id_instancia_zapi?: string | null
+            token_instancia_zapi?: string | null
+          }
       },
-      membros: {
-        Row: {
-          membro_id: string
-          user_id: string
-          created_at: string
-          membro_nome: string
-          membro_email: string
-          membro_cargo: 'Administrador' | 'Usuario'
-          membro_status: 'Ativo' | 'Desativado'
-        }
-        Insert: {
-          membro_id?: string
-          user_id: string
-          created_at?: string
-          membro_nome: string
-          membro_email: string
-          membro_cargo: 'Administrador' | 'Usuario'
-          membro_status: 'Ativo' | 'Desativado'
-        }
-        Update: {
-          membro_id?: string
-          user_id?: string
-          created_at?: string
-          membro_nome?: string
-          membro_email?: string
-          membro_cargo?: 'Administrador' | 'Usuario'
-          membro_status?: 'Ativo' | 'Desativado'
-        }
-      }
       leads: {
         Row: {
           lead_id: number

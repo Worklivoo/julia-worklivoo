@@ -53,7 +53,6 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         email: profile.user_email,
         telefone: profile.user_telefone,
         empresa: profile.user_empresa,
-        avatar: profile.user_avatar,
         plano: profile.user_plano,
         id_instancia_zapi: profile.id_instancia_zapi,
         token_instancia_zapi: profile.token_instancia_zapi,
@@ -71,7 +70,6 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           email: membro.membro_email,
           telefone: null,
           empresa: null,
-          avatar: null,
           plano: null,
           id_instancia_zapi: null,
           token_instancia_zapi: null,
@@ -268,40 +266,44 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Função de registro
   const register = async (nome: string, email: string, password: string, telefone?: string, empresa?: string): Promise<boolean> => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    if (error || !data.user) {
-      setUser(null);
-      setIsAuthenticated(false);
+    try {
+      // 1. Criar usuário no Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      
+      if (error || !data.user) {
+        console.error('Erro ao criar usuário:', error);
+        return false;
+      }
+
+      // 2. Criar perfil na tabela usuarios e aguardar conclusão
+      const profile = await createUserProfile({
+        user_id: data.user.id,
+        user_nome: nome,
+        user_email: email,
+        user_telefone: telefone || null,
+        user_empresa: empresa || null,
+      });
+
+      if (!profile) {
+        console.error('Erro ao criar perfil do usuário');
+        return false;
+      }
+
+      // 3. NÃO definir usuário como autenticado após registro
+      // O usuário deve fazer login após o registro
+      console.log('Usuário registrado com sucesso. Redirecionando para login...');
+      
+      // 4. Fazer logout para garantir que o usuário não fique logado automaticamente
+      await supabase.auth.signOut();
+      
+      return true;
+    } catch (error) {
+      console.error('Erro durante o registro:', error);
       return false;
     }
-    // Cria perfil na tabela usuarios
-    const profile = await createUserProfile({
-      user_id: data.user.id,
-      user_nome: nome,
-      user_email: email,
-      user_telefone: telefone || null,
-      user_empresa: empresa || null,
-      user_avatar: null,
-    });
-    if (profile) {
-      setUser({
-        id: profile.user_id,
-        nome: profile.user_nome,
-        email: profile.user_email,
-        telefone: profile.user_telefone,
-        empresa: profile.user_empresa,
-        avatar: profile.user_avatar,
-        plano: profile.user_plano,
-      });
-      setIsAuthenticated(true);
-      return true;
-    }
-    setUser(null);
-    setIsAuthenticated(false);
-    return false;
   };
 
   // Função de logout
@@ -319,7 +321,6 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       user_email: updates.email,
       user_telefone: updates.telefone,
       user_empresa: updates.empresa,
-      user_avatar: updates.avatar,
       user_plano: updates.plano,
     });
     if (updated) {
@@ -329,7 +330,6 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         email: updated.user_email,
         telefone: updated.user_telefone,
         empresa: updated.user_empresa,
-        avatar: updated.user_avatar,
         plano: updated.user_plano,
       });
     }

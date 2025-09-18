@@ -41,8 +41,7 @@ export interface User {
   email: string;
   telefone?: string | null;
   empresa?: string | null;
-  avatar?: string | null;
-  plano?: number | null;
+  plano?: string | null;
   id_instancia_zapi?: string | null;
   token_instancia_zapi?: string | null;
   // Campos específicos para membros

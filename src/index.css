@@ -13,8 +13,8 @@
     --popover: 220 13% 11%;
     --popover-foreground: 220 9% 95%;
 
-    --primary: 220 9% 95%;
-    --primary-foreground: 220 13% 9%;
+    --primary: 56 97% 73%; /* #EBF57D */
+    --primary-foreground: 0 0% 0%;
 
     --secondary: 220 13% 15%;
     --secondary-foreground: 220 9% 95%;
@@ -45,8 +45,8 @@
     --popover: 0 0% 98%;
     --popover-foreground: 220 13% 9%;
 
-    --primary: 56 97% 73%; /* #EBF57D amarelo */
-    --primary-foreground: 220 13% 9%;
+    --primary: 56 97% 73%; /* #EBF57D */
+    --primary-foreground: 0 0% 0%;
 
     --secondary: 0 0% 95%;
     --secondary-foreground: 220 13% 9%;
@@ -98,8 +98,8 @@
     --card-foreground: 0 0% 95%;
     --popover: 0 0% 5%;
     --popover-foreground: 0 0% 95%;
-    --primary: 56 97% 73%; /* #EBF57D amarelo padrão */
-    --primary-foreground: 0 0% 0%; /* texto preto no amarelo */
+    --primary: 56 97% 73%; /* #EBF57D */
+    --primary-foreground: 0 0% 0%;
     --secondary: 0 0% 12%; /* cinza escuro */
     --secondary-foreground: 0 0% 95%;
     --muted: 0 0% 15%; /* cinza escuro muted */

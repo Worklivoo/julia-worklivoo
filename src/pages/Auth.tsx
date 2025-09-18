@@ -74,7 +74,12 @@ const Auth = () => {
       data.empresa
     );
     if (success) {
-      navigate('/inicio');
+      // Após registro bem-sucedido, redirecionar para login
+      alert('Usuário registrado com sucesso! Faça login para continuar.');
+      setActiveTab('login'); // Muda para a aba de login
+      registerForm.reset(); // Limpa o formulário de registro
+    } else {
+      alert('Erro ao registrar usuário. Tente novamente.');
     }
     setIsLoading(false);
   };

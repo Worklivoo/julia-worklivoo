@@ -54,7 +54,7 @@ const Settings = () => {
             {/* Avatar e Nome */}
             <div className="flex items-center space-x-4">
               <Avatar className="h-16 w-16">
-                 <AvatarImage src={user.avatar || undefined} alt={user.nome} />
+                 <AvatarImage src={undefined} alt={user.nome} />
                  <AvatarFallback className="text-lg font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
                    {getInitials(user.nome)}
                  </AvatarFallback>
