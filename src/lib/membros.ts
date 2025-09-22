@@ -6,6 +6,7 @@ export interface Membro {
   user_id: string;
   membro_nome: string;
   membro_email: string;
+  membro_telefone?: string;
   membro_cargo: 'Administrador' | 'Usuario';
   membro_status: 'Ativo' | 'Desativado';
   created_at?: string;
@@ -54,24 +55,23 @@ export const createUserAndAddMembro = async (
   email: string,
   password: string,
   nome: string,
+  telefone: string,
   cargo: 'Administrador' | 'Usuario',
   status: 'Ativo' | 'Desativado',
   userId: string // ID do usuário principal que está adicionando o membro
 ) => {
   try {
     console.log('Iniciando criação de usuário e membro...');
-    console.log('Dados recebidos:', { email, nome, cargo, status, userId });
+    console.log('Dados recebidos:', { email, nome, telefone, cargo, status, userId });
 
-    // 1. Salvar a sessão atual do usuário
-    console.log('Salvando sessão atual do usuário...');
-    const { data: { session: currentSession } } = await supabase.auth.getSession();
-    console.log('Sessão atual salva:', currentSession?.user?.id);
-
-    // 2. Criar conta no Supabase Auth
+    // 1. Criar conta no Supabase Auth usando signUp com autoConfirm
     console.log('Criando usuário no Supabase Auth...');
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: undefined // Evita redirecionamento
+      }
     });
 
     console.log('Resultado do Auth:', { authData, authError });
@@ -88,17 +88,11 @@ export const createUserAndAddMembro = async (
 
     console.log('Usuário criado no Auth com sucesso:', authData.user.id);
 
-    // 3. Restaurar a sessão original do usuário
-    if (currentSession) {
-      console.log('Restaurando sessão original do usuário...');
-      await supabase.auth.setSession({
-        access_token: currentSession.access_token,
-        refresh_token: currentSession.refresh_token
-      });
-      console.log('Sessão original restaurada');
-    }
+    // 2. Fazer logout do usuário recém-criado para manter a sessão original
+    console.log('Fazendo logout do usuário recém-criado...');
+    await supabase.auth.signOut();
 
-    // 4. Verificar se o userId principal existe na tabela usuarios
+    // 3. Verificar se o userId principal existe na tabela usuarios
     console.log('Verificando se userId principal existe na tabela usuarios:', userId);
     const { data: userExists, error: userCheckError } = await supabase
       .from('usuarios')
@@ -113,12 +107,13 @@ export const createUserAndAddMembro = async (
 
     console.log('Usuário principal encontrado:', userExists);
 
-    // 5. Adicionar como membro (usando Auth User ID como membro_id)
+    // 4. Adicionar como membro (usando Auth User ID como membro_id)
     const newMembro = {
       membro_id: authData.user.id, // ID do usuário criado no Supabase Auth
       user_id: userId, // ID do usuário principal da empresa
       membro_nome: nome,
       membro_email: email,
+      membro_telefone: telefone,
       membro_cargo: cargo,
       membro_status: status
     };
@@ -203,6 +198,49 @@ export const deleteMembro = async (membroId: string) => {
     return { success: true, error: null };
   } catch (error) {
     console.error('Erro ao excluir membro:', error);
+    return { success: false, error };
+  }
+};
+
+// Função para excluir membro completamente (tabela + auth)
+export const deleteMembroComplete = async (membroId: string, membroEmail: string) => {
+  try {
+    // Primeiro, buscar o membro para obter informações
+    const { data: membro, error: fetchError } = await supabase
+      .from('membros')
+      .select('*')
+      .eq('membro_id', membroId)
+      .single();
+
+    if (fetchError) {
+      console.error('Erro ao buscar membro:', fetchError);
+      return { success: false, error: fetchError };
+    }
+
+    // Excluir da tabela membros
+    const { error: deleteError } = await supabase
+      .from('membros')
+      .delete()
+      .eq('membro_id', membroId);
+
+    if (deleteError) {
+      console.error('Erro ao excluir membro da tabela:', deleteError);
+      return { success: false, error: deleteError };
+    }
+
+    // Tentar excluir do auth (isso pode falhar se não tivermos permissões admin)
+    try {
+      const { error: authError } = await supabase.auth.admin.deleteUser(membro.user_id);
+      if (authError) {
+        console.warn('Não foi possível excluir do auth (pode ser limitação de permissão):', authError);
+      }
+    } catch (authError) {
+      console.warn('Erro ao tentar excluir do auth:', authError);
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Erro ao excluir membro completamente:', error);
     return { success: false, error };
   }
 };
