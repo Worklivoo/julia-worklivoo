@@ -53,7 +53,7 @@ function Membros() {
     email: '',
     telefone: '',
     senha: '',
-    cargo: '' as 'Administrador' | 'Usuario' | ''
+    cargo: 'Usuario' as 'Usuario'
   });
 
   // Estados para confirmações
@@ -177,7 +177,7 @@ function Membros() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.nome || !formData.email || !formData.telefone || !formData.senha || !formData.cargo) {
+    if (!formData.nome || !formData.email || !formData.telefone || !formData.senha) {
       setMessage({ type: 'error', text: 'Todos os campos são obrigatórios' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
       return;
@@ -204,7 +204,7 @@ function Membros() {
 
       if (result.success) {
         setMessage({ type: 'success', text: 'Membro adicionado com sucesso!' });
-        setFormData({ nome: '', email: '', telefone: '', senha: '', cargo: '' });
+        setFormData({ nome: '', email: '', telefone: '', senha: '', cargo: 'Usuario' });
         setIsDialogOpen(false);
         loadMembros(); // Recarregar a lista
         setTimeout(() => setMessage({ type: '', text: '' }), 3000);
@@ -276,6 +276,7 @@ function Membros() {
           <Button 
             onClick={() => setIsDialogOpen(true)}
             className="flex items-center gap-2"
+            style={{ backgroundColor: '#EBF57D', color: '#000000' }}
           >
             <Plus className="h-4 w-4" />
             Adicionar Membro
@@ -300,7 +301,10 @@ function Membros() {
           <h3 className="text-xl font-semibold text-foreground mb-2">Nenhum membro encontrado</h3>
           <p className="text-muted-foreground mb-6">Comece adicionando o primeiro membro da sua equipe</p>
           {canAddMembers() && (
-            <Button onClick={() => setIsDialogOpen(true)}>
+            <Button 
+              onClick={() => setIsDialogOpen(true)}
+              style={{ backgroundColor: '#EBF57D', color: '#000000' }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Adicionar Primeiro Membro
             </Button>
@@ -315,48 +319,18 @@ function Membros() {
                 membro.membro_status === 'Desativado' ? 'opacity-60' : ''
               }`}
             >
-              {/* Botão de ações */}
+              {/* Botão de excluir */}
               {canAddMembers() && (
                 <div className="absolute top-2 right-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 hover:bg-background/80"
-                        disabled={actionLoading?.includes(membro.membro_id)}
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {membro.membro_status === 'Ativo' ? (
-                        <DropdownMenuItem
-                          onClick={() => setDeactivateAlert({ open: true, membro })}
-                          className="text-orange-600 focus:text-orange-600"
-                        >
-                          <UserX className="h-4 w-4 mr-2" />
-                          Desativar
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem
-                          onClick={() => handleReactivateMembro(membro)}
-                          className="text-green-600 focus:text-green-600"
-                          disabled={actionLoading === `reactivate-${membro.membro_id}`}
-                        >
-                          <User className="h-4 w-4 mr-2" />
-                          Reativar
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem
-                        onClick={() => setDeleteAlert({ open: true, membro })}
-                        className="text-red-600 focus:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 hover:bg-[#EBF57D] hover:text-black text-red-600"
+                    onClick={() => setDeleteAlert({ open: true, membro })}
+                    disabled={actionLoading?.includes(membro.membro_id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               )}
 
@@ -377,21 +351,12 @@ function Membros() {
                     </div>
                     
                     <div className="flex flex-col gap-2">
-                      <Badge 
-                        variant={membro.membro_cargo === 'Administrador' ? 'default' : 'secondary'}
-                        className={`flex items-center gap-1 ${
-                          membro.membro_cargo === 'Administrador' 
-                            ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200 dark:bg-primary/10 dark:text-primary dark:border-primary/20 dark:hover:bg-primary/20' 
-                            : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200 dark:bg-muted dark:text-muted-foreground dark:border-muted'
-                        }`}
-                      >
-                        {membro.membro_cargo === 'Administrador' ? (
-                          <Crown className="h-3 w-3" />
-                        ) : (
-                          <User className="h-3 w-3" />
-                        )}
-                        {membro.membro_cargo}
-                      </Badge>
+                      <div className="flex items-center justify-center gap-1.5 px-2 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-full border border-blue-200 dark:border-blue-800">
+                        <User className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                          Usuário
+                        </span>
+                      </div>
                       
                       {membro.membro_status === 'Desativado' && (
                         <Badge variant="destructive" className="text-xs">
@@ -464,24 +429,6 @@ function Membros() {
                 placeholder="Digite a senha"
                 required
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cargo">Cargo</Label>
-              <Select 
-                value={formData.cargo} 
-                onValueChange={(value: 'Administrador' | 'Usuario') => 
-                  setFormData(prev => ({ ...prev, cargo: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o cargo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Administrador">Administrador</SelectItem>
-                  <SelectItem value="Usuario">Usuário</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <DialogFooter>

@@ -60,7 +60,7 @@ const ClientPage = () => {
               </svg>
             </div>
             <h1 className="text-2xl font-bold text-foreground mb-2">
-              Página não encontrada
+              A sua página infelizmente não foi encontrada!
             </h1>
             <p className="text-muted-foreground mb-6">
               O cliente solicitado não foi encontrado ou não está ativo.

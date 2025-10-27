@@ -7,7 +7,7 @@ export interface Membro {
   membro_nome: string;
   membro_email: string;
   membro_telefone?: string;
-  membro_cargo: 'Administrador' | 'Usuario';
+  membro_cargo: 'Usuario';
   membro_status: 'Ativo' | 'Desativado';
   created_at?: string;
 }
@@ -56,13 +56,17 @@ export const createUserAndAddMembro = async (
   password: string,
   nome: string,
   telefone: string,
-  cargo: 'Administrador' | 'Usuario',
+  cargo: 'Usuario',
   status: 'Ativo' | 'Desativado',
   userId: string // ID do usuário principal que está adicionando o membro
 ) => {
   try {
     console.log('Iniciando criação de usuário e membro...');
     console.log('Dados recebidos:', { email, nome, telefone, cargo, status, userId });
+
+    // Salvar a sessão atual do administrador antes de criar o novo usuário
+    const { data: currentSession } = await supabase.auth.getSession();
+    console.log('Sessão atual salva:', currentSession?.session?.user?.id);
 
     // 1. Criar conta no Supabase Auth usando signUp com autoConfirm
     console.log('Criando usuário no Supabase Auth...');
@@ -88,9 +92,14 @@ export const createUserAndAddMembro = async (
 
     console.log('Usuário criado no Auth com sucesso:', authData.user.id);
 
-    // 2. Fazer logout do usuário recém-criado para manter a sessão original
-    console.log('Fazendo logout do usuário recém-criado...');
-    await supabase.auth.signOut();
+    // 2. Restaurar a sessão do administrador se ela foi alterada
+    if (currentSession?.session) {
+      console.log('Restaurando sessão do administrador...');
+      await supabase.auth.setSession({
+        access_token: currentSession.session.access_token,
+        refresh_token: currentSession.session.refresh_token
+      });
+    }
 
     // 3. Verificar se o userId principal existe na tabela usuarios
     console.log('Verificando se userId principal existe na tabela usuarios:', userId);
@@ -205,6 +214,8 @@ export const deleteMembro = async (membroId: string) => {
 // Função para excluir membro completamente (tabela + auth)
 export const deleteMembroComplete = async (membroId: string, membroEmail: string) => {
   try {
+    console.log('Iniciando exclusão completa do membro:', { membroId, membroEmail });
+
     // Primeiro, buscar o membro para obter informações
     const { data: membro, error: fetchError } = await supabase
       .from('membros')
@@ -217,7 +228,10 @@ export const deleteMembroComplete = async (membroId: string, membroEmail: string
       return { success: false, error: fetchError };
     }
 
-    // Excluir da tabela membros
+    console.log('Membro encontrado:', membro);
+
+    // Excluir da tabela membros primeiro
+    console.log('Excluindo membro da tabela membros...');
     const { error: deleteError } = await supabase
       .from('membros')
       .delete()
@@ -228,16 +242,35 @@ export const deleteMembroComplete = async (membroId: string, membroEmail: string
       return { success: false, error: deleteError };
     }
 
-    // Tentar excluir do auth (isso pode falhar se não tivermos permissões admin)
+    console.log('Membro excluído da tabela com sucesso');
+
+    // Excluir do Supabase Auth usando o membro_id (que é o ID do Auth)
+    console.log('Excluindo usuário do Supabase Auth com ID:', membroId);
     try {
-      const { error: authError } = await supabase.auth.admin.deleteUser(membro.user_id);
+      const { error: authError } = await supabase.auth.admin.deleteUser(membroId);
+      
       if (authError) {
-        console.warn('Não foi possível excluir do auth (pode ser limitação de permissão):', authError);
+        console.error('Erro ao excluir do Supabase Auth:', authError);
+        // Se falhar na exclusão do Auth, ainda consideramos sucesso parcial
+        // pois o membro já foi removido da tabela
+        return { 
+          success: true, 
+          error: null, 
+          warning: 'Membro excluído da tabela, mas houve erro ao excluir do Auth: ' + authError.message 
+        };
       }
+      
+      console.log('Usuário excluído do Supabase Auth com sucesso');
     } catch (authError) {
-      console.warn('Erro ao tentar excluir do auth:', authError);
+      console.error('Exceção ao tentar excluir do auth:', authError);
+      return { 
+        success: true, 
+        error: null, 
+        warning: 'Membro excluído da tabela, mas houve exceção ao excluir do Auth: ' + authError 
+      };
     }
 
+    console.log('Exclusão completa realizada com sucesso');
     return { success: true, error: null };
   } catch (error) {
     console.error('Erro ao excluir membro completamente:', error);
