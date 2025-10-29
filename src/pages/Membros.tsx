@@ -319,18 +319,50 @@ function Membros() {
                 membro.membro_status === 'Desativado' ? 'opacity-60' : ''
               }`}
             >
-              {/* Botão de excluir */}
+              {/* Menu de ações */}
               {canAddMembers() && (
                 <div className="absolute top-2 right-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 hover:bg-[#EBF57D] hover:text-black text-red-600"
-                    onClick={() => setDeleteAlert({ open: true, membro })}
-                    disabled={actionLoading?.includes(membro.membro_id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 hover:bg-[#EBF57D] hover:text-black"
+                        disabled={actionLoading?.includes(membro.membro_id)}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      {membro.membro_status === 'Ativo' ? (
+                        <DropdownMenuItem
+                          onClick={() => setDeactivateAlert({ open: true, membro })}
+                          className="text-orange-600 focus:text-orange-600"
+                          disabled={actionLoading?.includes(membro.membro_id)}
+                        >
+                          <UserX className="h-4 w-4 mr-2" />
+                          Desativar Membro
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem
+                          onClick={() => handleReactivateMembro(membro)}
+                          className="text-green-600 focus:text-green-600"
+                          disabled={actionLoading?.includes(membro.membro_id)}
+                        >
+                          <User className="h-4 w-4 mr-2" />
+                          Reativar Membro
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
+                        onClick={() => setDeleteAlert({ open: true, membro })}
+                        className="text-red-600 focus:text-red-600"
+                        disabled={actionLoading?.includes(membro.membro_id)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Excluir Membro
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               )}
 
@@ -384,7 +416,7 @@ function Membros() {
           
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="nome">Nome Completo</Label>
+              <Label htmlFor="nome">Nome completo do novo membro</Label>
               <Input
                 id="nome"
                 type="text"
@@ -396,7 +428,7 @@ function Membros() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="email">E-mail do novo membro</Label>
               <Input
                 id="email"
                 type="email"
@@ -408,7 +440,7 @@ function Membros() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="telefone">Telefone</Label>
+              <Label htmlFor="telefone">Telefone do novo membro</Label>
               <Input
                 id="telefone"
                 type="tel"
@@ -420,7 +452,7 @@ function Membros() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="senha">Senha</Label>
+              <Label htmlFor="senha">Senha de acesso para o novo membro</Label>
               <Input
                 id="senha"
                 type="password"
@@ -440,7 +472,11 @@ function Membros() {
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isLoading}>
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+                style={{ backgroundColor: '#EBF57D', color: '#000000' }}
+              >
                 {isLoading ? 'Adicionando...' : 'Adicionar Membro'}
               </Button>
             </DialogFooter>

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { createClient } from '@supabase/supabase-js';
 
 // Interface para a tabela de membros
 export interface Membro {
@@ -64,17 +65,32 @@ export const createUserAndAddMembro = async (
     console.log('Iniciando criação de usuário e membro...');
     console.log('Dados recebidos:', { email, nome, telefone, cargo, status, userId });
 
-    // Salvar a sessão atual do administrador antes de criar o novo usuário
-    const { data: currentSession } = await supabase.auth.getSession();
-    console.log('Sessão atual salva:', currentSession?.session?.user?.id);
+    // 1. Criar uma instância isolada do Supabase para criação de usuários
+    // Isso evita interferir na sessão atual do admin
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    const isolatedSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+        flowType: 'pkce'
+      }
+    });
 
-    // 1. Criar conta no Supabase Auth usando signUp com autoConfirm
+    // 2. Criar conta no Supabase Auth usando a instância isolada
     console.log('Criando usuário no Supabase Auth...');
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await isolatedSupabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: undefined // Evita redirecionamento
+        emailRedirectTo: undefined, // Evita redirecionamento
+        data: {
+          // Metadados opcionais do usuário
+          nome: nome,
+          cargo: cargo
+        }
       }
     });
 
@@ -82,26 +98,20 @@ export const createUserAndAddMembro = async (
 
     if (authError) {
       console.error('Erro ao criar conta no Supabase Auth:', authError);
-      return { data: null, error: authError };
+      return { success: false, data: null, error: authError };
     }
 
     if (!authData.user) {
       console.error('Usuário não foi criado no Auth');
-      return { data: null, error: new Error('Falha ao criar usuário no Auth') };
+      return { success: false, data: null, error: new Error('Falha ao criar usuário no Auth') };
     }
 
     console.log('Usuário criado no Auth com sucesso:', authData.user.id);
 
-    // 2. Restaurar a sessão do administrador se ela foi alterada
-    if (currentSession?.session) {
-      console.log('Restaurando sessão do administrador...');
-      await supabase.auth.setSession({
-        access_token: currentSession.session.access_token,
-        refresh_token: currentSession.session.refresh_token
-      });
-    }
+    // 3. A instância isolada não afeta a sessão principal do admin
+    // Não é necessário fazer logout ou manipular sessões
 
-    // 3. Verificar se o userId principal existe na tabela usuarios
+    // 4. Verificar se o userId principal existe na tabela usuarios
     console.log('Verificando se userId principal existe na tabela usuarios:', userId);
     const { data: userExists, error: userCheckError } = await supabase
       .from('usuarios')
@@ -111,12 +121,12 @@ export const createUserAndAddMembro = async (
 
     if (userCheckError || !userExists) {
       console.error('Usuário principal não encontrado na tabela usuarios:', userCheckError);
-      return { data: null, error: new Error('Usuário principal não encontrado na tabela usuarios') };
+      return { success: false, data: null, error: new Error('Usuário principal não encontrado na tabela usuarios') };
     }
 
     console.log('Usuário principal encontrado:', userExists);
 
-    // 4. Adicionar como membro (usando Auth User ID como membro_id)
+    // 5. Adicionar como membro (usando Auth User ID como membro_id)
     const newMembro = {
       membro_id: authData.user.id, // ID do usuário criado no Supabase Auth
       user_id: userId, // ID do usuário principal da empresa
@@ -146,14 +156,14 @@ export const createUserAndAddMembro = async (
         details: error.details,
         hint: error.hint
       });
-      return { data: null, error };
+      return { success: false, data: null, error };
     }
 
     console.log('Membro adicionado com sucesso:', data);
-    return { data, error: null, authUser: authData.user };
+    return { success: true, data, error: null, authUser: authData.user };
   } catch (error) {
     console.error('Exceção ao criar usuário e adicionar membro:', error);
-    return { data: null, error };
+    return { success: false, data: null, error };
   }
 };
 
