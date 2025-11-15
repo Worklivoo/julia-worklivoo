@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { addFonteDados, getFontesDadosByUser, updateFonteDados } from '@/lib/supabase-utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const Settings = () => {
   const { user } = useCRM();
@@ -78,83 +79,94 @@ const Settings = () => {
 
   return (
     <div className="text-foreground transition-colors">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-primary light-title mb-8">Configurações</h1>
-        
-        <div className="w-full">
+      <div className="p-6 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent light-welcome-title">Configurações</h1>
+            <p className="text-muted-foreground mt-1 text-lg">Gerencie suas preferências e fontes</p>
+          </div>
+        </div>
+        <Tabs defaultValue="gerais" className="w-full">
+          <TabsList className="bg-muted/40">
+            <TabsTrigger value="gerais">Gerais</TabsTrigger>
+            <TabsTrigger value="fontes">Fontes de Dados</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="gerais" className="pt-4">
             <Card className="border-border bg-card shadow-sm">
               <CardHeader className="pb-4">
                 <CardTitle className="text-xl font-semibold">Perfil do Usuário</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-            {/* Avatar e Nome */}
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-16 w-16">
-                 <AvatarImage src={undefined} alt={user.nome} />
-                 <AvatarFallback className="text-lg font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
-                   {getInitials(user.nome)}
-                 </AvatarFallback>
-               </Avatar>
-              <div>
-                <h2 className="text-2xl font-bold">{user.nome}</h2>
-                <p className="text-muted-foreground">Usuário do sistema</p>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Informações do Usuário */}
-            <div className="grid gap-4">
-              <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
-                <Hash className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">ID do Usuário</p>
-                  <p className="font-medium font-mono text-sm">{user.id}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
-                <Mail className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Email</p>
-                  <p className="font-medium">{user.email}</p>
-                </div>
-              </div>
-
-              {user.telefone && (
-                <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
-                  <Phone className="h-5 w-5 text-muted-foreground" />
+                <div className="flex items-center space-x-4">
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={undefined} alt={user.nome} />
+                    <AvatarFallback className="text-lg font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
+                      {getInitials(user.nome)}
+                    </AvatarFallback>
+                  </Avatar>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Telefone</p>
-                    <p className="font-medium">{user.telefone}</p>
+                    <h2 className="text-2xl font-bold">{user.nome}</h2>
+                    <p className="text-muted-foreground">Usuário do sistema</p>
                   </div>
                 </div>
-              )}
 
-              {user.empresa && (
-                <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
-                  <Building className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Empresa</p>
-                    <p className="font-medium">{user.empresa}</p>
-                  </div>
-                </div>
-              )}
+                <Separator />
 
-              <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
-                <Crown className="h-5 w-5 text-muted-foreground" />
-                <div className="flex items-center justify-between w-full">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Plano</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
+                    <Hash className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">ID do Usuário</p>
+                      <p className="font-medium font-mono text-sm">{user.id}</p>
+                    </div>
                   </div>
-                  {getPlanoBadge(user.plano)}
-                </div>
-              </div>
+
+                  <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
+                    <Mail className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Email</p>
+                      <p className="font-medium">{user.email}</p>
+                    </div>
+                  </div>
+
+                  {user.telefone && (
+                    <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
+                      <Phone className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Telefone</p>
+                        <p className="font-medium">{user.telefone}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {user.empresa && (
+                    <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
+                      <Building className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Empresa</p>
+                        <p className="font-medium">{user.empresa}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
+                    <Crown className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex items-center justify-between w-full">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Plano</p>
+                      </div>
+                      {getPlanoBadge(user.plano)}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="fontes" className="pt-4 space-y-8">
             {fontes.length === 0 && (
-              <Card className="border-border bg-card shadow-sm mt-8">
+              <Card className="border-border bg-card shadow-sm">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-xl font-semibold">Fontes de Dados</CardTitle>
                 </CardHeader>
@@ -242,7 +254,8 @@ const Settings = () => {
                 </CardContent>
               </Card>
             )}
-            <Card className="border-border bg-card shadow-sm mt-8">
+
+            <Card className="border-border bg-card shadow-sm">
               <CardHeader className="pb-4">
                 <CardTitle className="text-xl font-semibold">Fontes salvas</CardTitle>
               </CardHeader>
@@ -252,7 +265,7 @@ const Settings = () => {
                 ) : fontes.length === 0 ? (
                   <div className="text-muted-foreground">Nenhum registro encontrado.</div>
                 ) : (
-                  <div className="grid gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {fontes.map((f) => (
                       <div key={f.id} className="p-3 rounded-lg bg-muted/30 flex items-start justify-between">
                         <div className="space-y-1">
@@ -353,7 +366,8 @@ const Settings = () => {
                 )}
               </DialogContent>
             </Dialog>
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

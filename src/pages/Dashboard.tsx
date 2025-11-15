@@ -8,7 +8,6 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { DateRange } from "@/components/DateRangePicker";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { DateRangePicker } from "@/components/DateRangePicker";
-import { usePersistentDateRange } from '@/hooks/use-persistent-state';
 
 import { useCRM } from '@/contexts/CRMContext';
 import { useLeadOrigins } from '@/hooks/use-lead-origins';
@@ -31,10 +30,7 @@ const Dashboard = () => {
     }
   }
 
-  const [dateRange, setDateRange] = usePersistentDateRange(
-    'dashboard-date-range',
-    getCurrentMonthRange()
-  )
+  const [dateRange, setDateRange] = useState<DateRange>(getCurrentMonthRange())
 
   // Memoizar data atual para evitar recálculos constantes
   const now = useMemo(() => new Date(), []);
