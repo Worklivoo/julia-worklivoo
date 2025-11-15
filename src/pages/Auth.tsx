@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useCRM } from '@/contexts/CRMContext';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User, Phone, Building, ArrowLeft, HelpCircle } from 'lucide-react';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { supabase } from '@/lib/supabase';
 import { usePersistentTab } from '@/hooks/use-persistent-state';
 import { useForm } from 'react-hook-form';
@@ -51,6 +52,7 @@ const Auth = () => {
       name: '',
       email: '',
       password: '',
+      user_tipo: 'Imobiliaria',
       telefone: '',
       empresa: ''
     }
@@ -71,7 +73,8 @@ const Auth = () => {
       data.email,
       data.password,
       data.telefone,
-      data.empresa
+      data.empresa,
+      data.user_tipo
     );
     if (success) {
       // Após registro bem-sucedido, redirecionar para login
@@ -387,6 +390,23 @@ const Auth = () => {
                     <p className="text-xs text-slate-500">
                       Entre em contato com o administrador para obter a senha de autenticação
                     </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="user-tipo" className="text-sm font-medium text-slate-700">
+                      Escolha o tipo de cliente
+                    </Label>
+                    <Select value={registerForm.watch('user_tipo')} onValueChange={(v) => registerForm.setValue('user_tipo', v)}>
+                      <SelectTrigger className="w-full h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900">
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Imobiliaria" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Imobiliaria</SelectItem>
+                        <SelectItem value="Carro" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Carro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {registerForm.formState.errors.user_tipo && (
+                      <p className="text-sm text-red-600">{registerForm.formState.errors.user_tipo.message as string}</p>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">

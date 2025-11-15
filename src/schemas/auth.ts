@@ -13,6 +13,9 @@ export const registerSchema = z.object({
   password: z.string()
     .min(6, 'Senha deve ter pelo menos 6 caracteres')
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Senha deve conter maiúscula, minúscula e número'),
+  user_tipo: z.enum(['Imobiliaria', 'Carro'], {
+    required_error: 'Selecione o tipo de cliente'
+  }),
   telefone: z.string().optional(),
   empresa: z.string().optional()
 })

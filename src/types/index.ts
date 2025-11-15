@@ -44,6 +44,7 @@ export interface User {
   plano?: string | null;
   id_instancia_zapi?: string | null;
   token_instancia_zapi?: string | null;
+  tipo?: string | null;
   // Campos específicos para membros
   isMembro?: boolean;
   membroId?: string;

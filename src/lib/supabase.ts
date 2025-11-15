@@ -69,6 +69,7 @@ export interface Database {
             user_plano: string | null
             id_instancia_zapi: string | null
             token_instancia_zapi: string | null
+            user_tipo: string | null
           }
           Insert: {
             user_id: string
@@ -79,6 +80,7 @@ export interface Database {
             user_plano?: string | null
             id_instancia_zapi?: string | null
             token_instancia_zapi?: string | null
+            user_tipo?: string | null
           }
           Update: {
             user_id?: string
@@ -89,6 +91,7 @@ export interface Database {
             user_plano?: string | null
             id_instancia_zapi?: string | null
             token_instancia_zapi?: string | null
+            user_tipo?: string | null
           }
       },
       leads: {

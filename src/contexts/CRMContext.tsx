@@ -20,7 +20,7 @@ interface CRMContextType {
   addNote: (leadId: string, content: string) => Promise<boolean>;
   getNotesByLead: (leadId: string) => Promise<Note[]>;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string, telefone?: string, empresa?: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string) => Promise<boolean>;
   logout: () => void;
   getDashboardMetrics: () => DashboardMetrics;
   updateUser: (updates: Partial<User>) => void;
@@ -56,6 +56,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         plano: profile.user_plano,
         id_instancia_zapi: profile.id_instancia_zapi,
         token_instancia_zapi: profile.token_instancia_zapi,
+        tipo: profile.user_tipo,
         isMembro: false
       };
     }
@@ -265,7 +266,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Função de registro
-  const register = async (nome: string, email: string, password: string, telefone?: string, empresa?: string): Promise<boolean> => {
+  const register = async (nome: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string): Promise<boolean> => {
     try {
       // 1. Criar usuário no Supabase Auth
       const { data, error } = await supabase.auth.signUp({
@@ -285,6 +286,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user_email: email,
         user_telefone: telefone || null,
         user_empresa: empresa || null,
+        user_tipo: user_tipo || null,
       });
 
       if (!profile) {
@@ -322,6 +324,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       user_telefone: updates.telefone,
       user_empresa: updates.empresa,
       user_plano: updates.plano,
+      user_tipo: updates.tipo,
     });
     if (updated) {
       setUser({
@@ -331,6 +334,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         telefone: updated.user_telefone,
         empresa: updated.user_empresa,
         plano: updated.user_plano,
+        tipo: updated.user_tipo,
       });
     }
   };
