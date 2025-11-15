@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { BookOpen, FileText, Layers, Plus, Folder, Pencil, Sparkles, Check, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -261,8 +262,16 @@ const BaseDeConhecimento = () => {
                   const text = frag?.content || frag?.text || '';
                   const qMatch = /Pergunta:\s*(.*)/i.exec(text);
                   const aMatch = /Resposta:\s*(.*)/i.exec(text);
-                  const pergunta = qMatch ? qMatch[1] : text;
-                  const resposta = aMatch ? aMatch[1] : '';
+                  let pergunta = '';
+                  let resposta = '';
+                  if (qMatch && aMatch) {
+                    pergunta = qMatch[1];
+                    resposta = aMatch[1];
+                  } else {
+                    const parts = text.split(/\r?\n\r?\n/);
+                    pergunta = (parts[0] || text).trim();
+                    resposta = (parts[1] || '').trim();
+                  }
                   const segId = frag?.id || frag?.segment_id || '';
                   return (
                     <div key={idx} className="rounded-xl p-4 bg-muted/30 border border-border">
@@ -279,6 +288,33 @@ const BaseDeConhecimento = () => {
                         }}>
                           <Pencil className="w-4 h-4" />
                         </Button>
+                        <Switch
+                          className="self-center data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-muted"
+                          checked={!!frag?.enabled}
+                          onCheckedChange={async (checked) => {
+                            if (!user || !base?.conhecimento_id || !base?.documento_id || !segId) return;
+                            const API_URL = import.meta.env.VITE_KNOWLEDGE_API_URL || 'https://api-production-42480.up.railway.app/v1';
+                            const API_TOKEN = import.meta.env.VITE_KNOWLEDGE_API_TOKEN;
+                            if (!API_TOKEN) {
+                              toast({ title: 'Configuração ausente', description: 'Token da API não configurado.' });
+                              return;
+                            }
+                            try {
+                              const res = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments/${segId}`, {
+                                method: 'POST',
+                                headers: { Authorization: `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ segment: { enabled: checked } })
+                              });
+                              if (!res.ok) {
+                                toast({ title: 'Erro ao atualizar status', description: `Código: ${res.status}` });
+                              } else {
+                                setFragments((prev) => prev.map((it, ix) => ix === idx ? { ...it, enabled: checked } : it));
+                              }
+                            } catch {
+                              toast({ title: 'Erro de rede', description: 'Não foi possível contatar a API.' });
+                            }
+                          }}
+                        />
                       </div>
                     </div>
                   );
@@ -350,6 +386,49 @@ const BaseDeConhecimento = () => {
                       console.log('Supabase insert (no base) conhecimento_id result:', created);
                       setBase(created.data ?? null);
                     }
+                    try {
+                      const updateRes = await fetch(`${API_URL}/datasets/${knowledgeId}`, {
+                        method: 'PATCH',
+                        headers: { Authorization: `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          embedding_model: 'text-embedding-3-large',
+                          embedding_model_provider: 'langgenius/openai/openai',
+                          retrieval_model: {
+                            search_method: 'semantic_search',
+                            reranking_enable: false,
+                            reranking_model: { reranking_provider_name: '', reranking_model_name: '' },
+                            top_k: 3,
+                            score_threshold_enabled: false,
+                            score_threshold: 0.0
+                          }
+                        })
+                      });
+                      if (!updateRes.ok) {
+                        toast({ title: 'Aviso', description: 'Não foi possível ajustar as configurações padrão.' });
+                      }
+                    } catch {}
+                    try {
+                      const tagName = ((user?.empresa || '').trim()) || 'Empresa';
+                      const tagRes = await fetch(`${API_URL}/datasets/tags`, {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: tagName })
+                      });
+                      const tagJson = await tagRes.json();
+                      const tagId = tagJson?.id || tagJson?.data?.id || tagJson?.tag?.id || '';
+                      if (!tagId) {
+                        toast({ title: 'Aviso', description: 'Tag não criada. Verifique o nome da empresa.' });
+                      } else {
+                        const bindRes = await fetch(`${API_URL}/datasets/tags/binding`, {
+                          method: 'POST',
+                          headers: { Authorization: `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ target_id: knowledgeId, tag_ids: [tagId] })
+                        });
+                        if (!bindRes.ok) {
+                          toast({ title: 'Aviso', description: 'Não foi possível vincular a tag ao conhecimento.' });
+                        }
+                      }
+                    } catch {}
                     setOpenConhecimento(false);
                     toast({ title: 'Conhecimento criado', description: `ID: ${knowledgeId}` });
                   }
@@ -387,7 +466,7 @@ const BaseDeConhecimento = () => {
                 }
                 setLoading(true);
                 try {
-                  const content = `Pergunta: ${editFragPergunta}\nResposta: ${editFragResposta}`;
+                  const content = `${editFragPergunta}\n\n${editFragResposta}`;
                   const res = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments/${editingSegmentId}`, {
                     method: 'POST',
                     headers: { Authorization: `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
@@ -478,7 +557,7 @@ const BaseDeConhecimento = () => {
                 }
                 setLoading(true);
                 try {
-                  const content = `Pergunta: ${acceptQuestion}\nResposta: ${acceptAnswer}`;
+                  const content = `${acceptQuestion}\n\n${acceptAnswer}`;
                   const response = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments`, {
                     method: 'POST',
                     headers: { Authorization: `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
@@ -536,8 +615,8 @@ const BaseDeConhecimento = () => {
                 }
                 setLoading(true);
                 try {
-                  const text = `Pergunta: ${fragPergunta}\nResposta: ${fragResposta}`;
-                  const response = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/document/create-by-text`, {
+                  const text = `${fragPergunta}\n\n${fragResposta}`;
+                  const response = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/document/create_by_text`, {
                     method: 'POST',
                     headers: { Authorization: `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: documentName, text, indexing_technique: 'high_quality', process_rule: { mode: 'automatic' } })
@@ -571,6 +650,7 @@ const BaseDeConhecimento = () => {
                         setBase(created.data);
                       }
                     }
+                    
                     setOpenDocumento(false);
                     setFragPergunta('');
                     setFragResposta('');
@@ -610,7 +690,7 @@ const BaseDeConhecimento = () => {
                 }
                 setLoading(true);
                 try {
-                  const content = `Pergunta: ${newFragPergunta}\nResposta: ${newFragResposta}`;
+                  const content = `${newFragPergunta}\n\n${newFragResposta}`;
                   const response = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments`, {
                     method: 'POST',
                     headers: { Authorization: `Bearer ${API_TOKEN}`, 'Content-Type': 'application/json' },
