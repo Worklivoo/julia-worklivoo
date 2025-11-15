@@ -10,7 +10,7 @@ const ClientPage = () => {
   const [notFound, setNotFound] = useState(false);
 
   // URLs reservadas do sistema que não devem ser tratadas como clientUrl
-  const reservedUrls = ['404', 'auth', 'inicio', 'leads', 'lead', 'whatsapp', 'configuracoes', 'reset-password'];
+  const reservedUrls = ['404', 'auth', 'inicio', 'leads', 'lead', 'whatsapp', 'configuracoes', 'reset-password', 'base-de-conhecimento'];
 
   useEffect(() => {
     const loadClient = async () => {

@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
 import Membros from "./pages/Membros";
+import BaseDeConhecimento from "./pages/BaseDeConhecimento";
 
 
 import ClientPage from "./pages/ClientPage";
@@ -77,6 +78,7 @@ const AppRoutes = () => {
       <Route path="/lead/:id" element={<ProtectedRoute><Layout><LeadDetail /></Layout></ProtectedRoute>} />
       <Route path="/whatsapp" element={<ProtectedRoute><Layout><WhatsApp /></Layout></ProtectedRoute>} />
       <Route path="/membros" element={<ProtectedRoute><Layout><Membros /></Layout></ProtectedRoute>} />
+      <Route path="/base-de-conhecimento" element={<ProtectedRoute><Layout><BaseDeConhecimento /></Layout></ProtectedRoute>} />
       <Route path="/configuracoes" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
 
       <Route path="/404" element={<NotFound />} />

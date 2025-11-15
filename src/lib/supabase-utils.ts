@@ -161,3 +161,52 @@ export const updateFonteDados = async (
     .single()
   return { data, error }
 }
+
+export const getBaseConhecimentoByUser = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('teste_base_conhecimento')
+    .select('*')
+    .eq('user_id', userId)
+    .order('criado_em', { ascending: false })
+    .limit(1)
+  return { data: (data && data.length > 0) ? data[0] : null, error }
+}
+
+export const updateBaseConhecimentoByUser = async (
+  userId: string,
+  updates: { conhecimento_id?: string | null; documento_id?: string | null; prompt?: string | null }
+) => {
+  const { data, error } = await supabase
+    .from('teste_base_conhecimento')
+    .update(updates)
+    .eq('user_id', userId)
+    .select()
+  return { data: (data && data.length > 0) ? data[0] : null, error }
+}
+
+export const createBaseConhecimentoForUser = async (
+  userId: string,
+  conhecimentoId?: string | null,
+  documentoId?: string | null,
+  prompt?: string | null
+) => {
+  const { data, error } = await supabase
+    .from('teste_base_conhecimento')
+    .insert({ user_id: userId, conhecimento_id: conhecimentoId ?? null, documento_id: documentoId ?? null, prompt: prompt ?? null })
+    .select()
+    .single()
+  return { data, error }
+}
+
+export const updateBaseConhecimentoByBaseId = async (
+  baseId: number,
+  updates: { conhecimento_id?: string | null; documento_id?: string | null; prompt?: string | null }
+) => {
+  const { data, error } = await supabase
+    .from('teste_base_conhecimento')
+    .update(updates)
+    .eq('base_id', baseId)
+    .select()
+    .single()
+  return { data, error }
+}
