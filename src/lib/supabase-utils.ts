@@ -112,4 +112,52 @@ export const deleteAvatar = async (avatarUrl: string): Promise<boolean> => {
   }
 
   return true
-} 
+}
+
+export type FonteDadosInput = {
+  tipo: string
+  link: string
+  body?: string | null
+  cliente?: string | null
+  user_id: string
+}
+
+export const addFonteDados = async (input: FonteDadosInput) => {
+  const { data, error } = await supabase
+    .from('teste_fontes_dados')
+    .insert({
+      tipo: input.tipo,
+      link: input.link,
+      body: input.body ?? null,
+      cliente: input.cliente ?? null,
+      user_id: input.user_id
+    })
+    .select()
+    .single()
+  if (error) {
+    return { data: null, error }
+  }
+  return { data, error: null }
+}
+
+export const getFontesDadosByUser = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('teste_fontes_dados')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  return { data, error }
+}
+
+export const updateFonteDados = async (
+  id: number,
+  updates: { tipo?: string; link?: string; body?: string | null; cliente?: string | null }
+) => {
+  const { data, error } = await supabase
+    .from('teste_fontes_dados')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  return { data, error }
+}

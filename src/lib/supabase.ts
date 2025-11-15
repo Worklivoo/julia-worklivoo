@@ -173,6 +173,35 @@ export interface Database {
           historico_lead?: string
         }
       }
+      teste_fontes_dados: {
+        Row: {
+          id: number
+          created_at: string
+          tipo: string | null
+          link: string | null
+          body: string | null
+          cliente: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+          tipo?: string | null
+          link?: string | null
+          body?: string | null
+          cliente?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: number
+          created_at?: string
+          tipo?: string | null
+          link?: string | null
+          body?: string | null
+          cliente?: string | null
+          user_id?: string | null
+        }
+      }
     }
   }
 }
