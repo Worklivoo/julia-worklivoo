@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCRM } from '@/contexts/CRMContext';
-import { getBaseConhecimentoByUser, updateBaseConhecimentoByUser, createBaseConhecimentoForUser } from '@/lib/supabase-utils';
+import { getBaseConhecimentoByUser, updateBaseConhecimentoByUser } from '@/lib/supabase-utils';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -371,21 +371,12 @@ const BaseDeConhecimento = () => {
                   if (!knowledgeId) {
                     toast({ title: 'Erro ao criar conhecimento', description: `Falha na criação ou busca. Código: ${response.status}` });
                   } else {
-                    if (base) {
-                      const { data, error } = await updateBaseConhecimentoByUser(user.id, { conhecimento_id: knowledgeId });
-                      console.log('Supabase update conhecimento_id result:', { data, error });
-                      if (!data || error) {
-                        const created = await createBaseConhecimentoForUser(user.id, knowledgeId);
-                        console.log('Supabase insert conhecimento_id result:', created);
-                        setBase(created.data ?? null);
-                      } else {
-                        setBase(data);
-                      }
-                    } else {
-                      const created = await createBaseConhecimentoForUser(user.id, knowledgeId);
-                      console.log('Supabase insert (no base) conhecimento_id result:', created);
-                      setBase(created.data ?? null);
+                    const { data, error } = await updateBaseConhecimentoByUser(user.id, { conhecimento_id: knowledgeId });
+                    console.log('Supabase update conhecimento_id result:', { data, error });
+                    if (error) {
+                      toast({ title: 'Erro ao salvar conhecimento', description: 'Falha ao persistir no Supabase.' });
                     }
+                    setBase(data ?? { user_id: user.id, conhecimento_id: knowledgeId, documento_id: base?.documento_id ?? null, prompt: base?.prompt ?? null });
                     try {
                       const updateRes = await fetch(`${API_URL}/datasets/${knowledgeId}`, {
                         method: 'PATCH',
@@ -627,29 +618,12 @@ const BaseDeConhecimento = () => {
                   if (!docId) {
                     toast({ title: 'Erro ao criar documento', description: `Resposta inválida. Código: ${response.status}` });
                   } else {
-                    if (base) {
-                      const { data, error } = await updateBaseConhecimentoByUser(user.id, { documento_id: docId });
-                      console.log('Supabase update documento_id result:', { data, error });
-                      if (error || !data) {
-                        const created = await createBaseConhecimentoForUser(user.id, base.conhecimento_id ?? null, docId);
-                        console.log('Supabase insert documento_id result:', created);
-                        if (created.error || !created.data) {
-                          toast({ title: 'Erro ao salvar documento', description: 'Falha ao persistir no Supabase.' });
-                        } else {
-                          setBase(created.data);
-                        }
-                      } else {
-                        setBase(data);
-                      }
-                    } else {
-                      const created = await createBaseConhecimentoForUser(user.id, null, docId);
-                      console.log('Supabase insert (no base) documento_id result:', created);
-                      if (created.error || !created.data) {
-                        toast({ title: 'Erro ao criar base', description: 'Falha ao inserir no Supabase.' });
-                      } else {
-                        setBase(created.data);
-                      }
+                    const { data, error } = await updateBaseConhecimentoByUser(user.id, { documento_id: docId });
+                    console.log('Supabase update documento_id result:', { data, error });
+                    if (error) {
+                      toast({ title: 'Erro ao salvar documento', description: 'Falha ao persistir no Supabase.' });
                     }
+                    setBase(data ?? { user_id: user.id, conhecimento_id: base?.conhecimento_id ?? null, documento_id: docId, prompt: base?.prompt ?? null });
                     
                     setOpenDocumento(false);
                     setFragPergunta('');

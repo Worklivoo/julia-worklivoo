@@ -118,58 +118,86 @@ export type FonteDadosInput = {
   tipo: string
   link: string
   body?: string | null
-  cliente?: string | null
   user_id: string
 }
 
 export const addFonteDados = async (input: FonteDadosInput) => {
   const { data, error } = await supabase
-    .from('teste_fontes_dados')
-    .insert({
-      tipo: input.tipo,
-      link: input.link,
-      body: input.body ?? null,
-      cliente: input.cliente ?? null,
-      user_id: input.user_id
+    .from('usuarios')
+    .update({
+      scrapper_tipo: input.tipo,
+      scrapper_link: input.link,
+      scrapper_body: input.body ?? null,
     })
-    .select()
+    .eq('user_id', input.user_id)
+    .select('user_id, user_empresa, scrapper_tipo, scrapper_link, scrapper_body')
     .single()
   if (error) {
     return { data: null, error }
   }
-  return { data, error: null }
+  const normalized = {
+    id: data.user_id,
+    tipo: data.scrapper_tipo ?? 'HTML',
+    link: data.scrapper_link ?? '',
+    body: data.scrapper_body ?? null,
+    cliente: data.user_empresa ?? null,
+  }
+  return { data: normalized, error: null }
 }
 
 export const getFontesDadosByUser = async (userId: string) => {
   const { data, error } = await supabase
-    .from('teste_fontes_dados')
-    .select('*')
+    .from('usuarios')
+    .select('user_id, user_empresa, scrapper_tipo, scrapper_link, scrapper_body')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-  return { data, error }
+    .single()
+  if (error) {
+    return { data: null, error }
+  }
+  const item = {
+    id: data.user_id,
+    tipo: data.scrapper_tipo ?? 'HTML',
+    link: data.scrapper_link ?? '',
+    body: data.scrapper_body ?? null,
+    cliente: data.user_empresa ?? null,
+  }
+  return { data: item ? [item] : [], error: null }
 }
 
 export const updateFonteDados = async (
-  id: number,
-  updates: { tipo?: string; link?: string; body?: string | null; cliente?: string | null }
+  userId: string,
+  updates: { tipo?: string; link?: string; body?: string | null }
 ) => {
   const { data, error } = await supabase
-    .from('teste_fontes_dados')
-    .update(updates)
-    .eq('id', id)
-    .select()
+    .from('usuarios')
+    .update({
+      scrapper_tipo: updates.tipo,
+      scrapper_link: updates.link,
+      scrapper_body: updates.body ?? null,
+    })
+    .eq('user_id', userId)
+    .select('user_id, user_empresa, scrapper_tipo, scrapper_link, scrapper_body')
     .single()
-  return { data, error }
+  if (error) {
+    return { data: null, error }
+  }
+  const normalized = {
+    id: data.user_id,
+    tipo: data.scrapper_tipo ?? 'HTML',
+    link: data.scrapper_link ?? '',
+    body: data.scrapper_body ?? null,
+    cliente: data.user_empresa ?? null,
+  }
+  return { data: normalized, error: null }
 }
 
 export const getBaseConhecimentoByUser = async (userId: string) => {
   const { data, error } = await supabase
-    .from('teste_base_conhecimento')
-    .select('*')
+    .from('usuarios')
+    .select('user_id, conhecimento_id, documento_id, prompt')
     .eq('user_id', userId)
-    .order('criado_em', { ascending: false })
-    .limit(1)
-  return { data: (data && data.length > 0) ? data[0] : null, error }
+    .single()
+  return { data, error }
 }
 
 export const updateBaseConhecimentoByUser = async (
@@ -177,36 +205,18 @@ export const updateBaseConhecimentoByUser = async (
   updates: { conhecimento_id?: string | null; documento_id?: string | null; prompt?: string | null }
 ) => {
   const { data, error } = await supabase
-    .from('teste_base_conhecimento')
-    .update(updates)
+    .from('usuarios')
+    .update({
+      conhecimento_id: updates.conhecimento_id ?? null,
+      documento_id: updates.documento_id ?? null,
+      prompt: updates.prompt ?? null,
+    })
     .eq('user_id', userId)
     .select()
-  return { data: (data && data.length > 0) ? data[0] : null, error }
-}
-
-export const createBaseConhecimentoForUser = async (
-  userId: string,
-  conhecimentoId?: string | null,
-  documentoId?: string | null,
-  prompt?: string | null
-) => {
-  const { data, error } = await supabase
-    .from('teste_base_conhecimento')
-    .insert({ user_id: userId, conhecimento_id: conhecimentoId ?? null, documento_id: documentoId ?? null, prompt: prompt ?? null })
-    .select()
     .single()
   return { data, error }
 }
 
-export const updateBaseConhecimentoByBaseId = async (
-  baseId: number,
-  updates: { conhecimento_id?: string | null; documento_id?: string | null; prompt?: string | null }
-) => {
-  const { data, error } = await supabase
-    .from('teste_base_conhecimento')
-    .update(updates)
-    .eq('base_id', baseId)
-    .select()
-    .single()
-  return { data, error }
-}
+// Removido: migração concluída para a tabela 'usuarios'
+
+// Removido: migração concluiu o uso da antiga base de conhecimento

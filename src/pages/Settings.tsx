@@ -26,7 +26,7 @@ const Settings = () => {
   const [fontes, setFontes] = useState<any[]>([]);
   const [loadingFontes, setLoadingFontes] = useState<boolean>(false);
   const [editOpen, setEditOpen] = useState<boolean>(false);
-  const [editData, setEditData] = useState<{ id: number; tipo: string; links: string; body: string | '' } | null>(null);
+  const [editData, setEditData] = useState<{ id: string; tipo: string; links: string; body: string | '' } | null>(null);
 
   useEffect(() => {
     setCliente(user?.empresa || '');
@@ -229,7 +229,6 @@ const Settings = () => {
                             tipo,
                             link: normalizedLinks,
                             body: tipo === 'API' && body ? body : null,
-                            cliente: user.empresa ? user.empresa : null,
                             user_id: user.id,
                           });
                           setIsSubmittingFontes(false);
@@ -238,7 +237,7 @@ const Settings = () => {
                             return;
                           }
                           toast({ title: 'Fonte de dados salva', description: 'As informações foram registradas.' });
-                          setFontes(prev => [result.data, ...prev]);
+                          setFontes([result.data]);
                           setLinks('');
                           setBody('');
                           setCliente('');
@@ -267,11 +266,10 @@ const Settings = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {fontes.map((f) => (
-                      <div key={f.id} className="p-3 rounded-lg bg-muted/30 flex items-start justify-between">
+                      <div key={f.id || user.id} className="p-3 rounded-lg bg-muted/30 flex items-start justify-between">
                         <div className="space-y-1">
                           <div className="text-sm">Tipo: {f.tipo}</div>
                           <div className="text-sm">Cliente: {f.cliente || '-'}</div>
-                          <div className="text-xs text-muted-foreground">{new Date(f.created_at).toLocaleString('pt-BR')}</div>
                           <div className="text-xs text-foreground mt-2 whitespace-pre-wrap">{f.link}</div>
                           {f.body && <div className="text-xs text-foreground mt-2 whitespace-pre-wrap">{f.body}</div>}
                         </div>
@@ -279,7 +277,7 @@ const Settings = () => {
                           <Button
                             variant="secondary"
                             onClick={() => {
-                              setEditData({ id: f.id, tipo: f.tipo || 'HTML', links: f.link || '', body: f.body || '' });
+                              setEditData({ id: f.id || user.id, tipo: f.tipo || 'HTML', links: f.link || '', body: f.body || '' });
                               setEditOpen(true);
                             }}
                           >
@@ -343,11 +341,10 @@ const Settings = () => {
                             .map((l) => l.trim())
                             .filter((l) => l.length > 0)
                             .join('\n');
-                          const { data, error } = await updateFonteDados(editData.id, {
+                          const { data, error } = await updateFonteDados(user.id, {
                             tipo: editData.tipo,
                             link: normalizedLinks,
                             body: editData.tipo === 'API' && editData.body ? editData.body : null,
-                            cliente: user.empresa ? user.empresa : null,
                           });
                           if (error) {
                             toast({ title: 'Erro ao atualizar', description: 'Verifique os dados e tente novamente.' });

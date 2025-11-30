@@ -21,7 +21,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   // Configurações globais para reduzir atualizações desnecessárias
   global: {
     headers: {
-      'x-client-info': 'supabase-js-web'
+      'x-client-info': 'supabase-js-web',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseAnonKey}`
     }
   }
 })
@@ -70,6 +72,12 @@ export interface Database {
             id_instancia_zapi: string | null
             token_instancia_zapi: string | null
             user_tipo: string | null
+            conhecimento_id: string | null
+            documento_id: string | null
+            prompt: string | null
+            scrapper_tipo: string | null
+            scrapper_link: string | null
+            scrapper_body: string | null
           }
           Insert: {
             user_id: string
@@ -81,6 +89,12 @@ export interface Database {
             id_instancia_zapi?: string | null
             token_instancia_zapi?: string | null
             user_tipo?: string | null
+            conhecimento_id?: string | null
+            documento_id?: string | null
+            prompt?: string | null
+            scrapper_tipo?: string | null
+            scrapper_link?: string | null
+            scrapper_body?: string | null
           }
           Update: {
             user_id?: string
@@ -92,6 +106,12 @@ export interface Database {
             id_instancia_zapi?: string | null
             token_instancia_zapi?: string | null
             user_tipo?: string | null
+            conhecimento_id?: string | null
+            documento_id?: string | null
+            prompt?: string | null
+            scrapper_tipo?: string | null
+            scrapper_link?: string | null
+            scrapper_body?: string | null
           }
       },
       leads: {
@@ -174,35 +194,6 @@ export interface Database {
           created_at?: string
           lead_id?: number
           historico_lead?: string
-        }
-      }
-      teste_fontes_dados: {
-        Row: {
-          id: number
-          created_at: string
-          tipo: string | null
-          link: string | null
-          body: string | null
-          cliente: string | null
-          user_id: string | null
-        }
-        Insert: {
-          id?: number
-          created_at?: string
-          tipo?: string | null
-          link?: string | null
-          body?: string | null
-          cliente?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          id?: number
-          created_at?: string
-          tipo?: string | null
-          link?: string | null
-          body?: string | null
-          cliente?: string | null
-          user_id?: string | null
         }
       }
     }
