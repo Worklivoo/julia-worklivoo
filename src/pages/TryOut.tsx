@@ -207,13 +207,8 @@ const TryOut = () => {
   const sendFeedback = async () => {
     if (!userIdForData) return;
     try {
-      const { data: userRow } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('user_id', userIdForData)
-        .single();
       const url = `https://primary-production-d442.up.railway.app/webhook/feedback-${encodeURIComponent(userIdForData)}`;
-      const body = { mensagem_feedback: feedbackText, ...(userRow || {}) } as any;
+      const body = { mensagem_feedback: feedbackText, message_id: feedbackMessageId } as any;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -230,6 +225,7 @@ const TryOut = () => {
       toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível enviar o feedback.' });
     }
   };
+
 
   const selectedMessages = selectedConvId ? messagesByConv[selectedConvId] || [] : [];
 
