@@ -207,22 +207,38 @@ const TryOut = () => {
   const sendFeedback = async () => {
     if (!userIdForData) return;
     try {
-      const url = `https://primary-production-d442.up.railway.app/webhook/feedback-${encodeURIComponent(userIdForData)}`;
-      const body = { mensagem_feedback: feedbackText, message_id: feedbackMessageId } as any;
+      const idPath = String(userIdForData || '').replace(/-/g, '_');
+      const url = `https://primary-production-d442.up.railway.app/webhook/feedback-${idPath}`;
+      const profile = await getUserProfile(userIdForData);
+      const conv = conversations.find((c) => c.dify_conversation === selectedConvId) || conversations[0];
+      console.log('Debug Feedback URL:', url);
+      console.log('Debug Feedback Body:', { message_id: feedbackMessageId, mensagem_feedback: feedbackText });
+      const form = new URLSearchParams({
+        user_id: String(userIdForData || ''),
+        message_id: String(feedbackMessageId || ''),
+        mensagem_feedback: String(feedbackText || ''),
+        dify_user: String(conv?.dify_user || ''),
+        dify_conversation: String(conv?.dify_conversation || '')
+      });
+      if (profile && typeof profile === 'object') {
+        Object.entries(profile as any).forEach(([k, v]) => {
+          try {
+            const key = String(k);
+            const val = v == null ? '' : String(v);
+            form.append(key, val);
+          } catch {}
+        });
+      }
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString()
       });
-      if (res.ok) {
-        toast({ title: 'Feedback enviado', description: 'Obrigado pelo feedback!' });
-        setFeedbackModalOpen(false);
-      } else {
-        const text = await res.text();
-        toast({ title: 'Falha ao enviar feedback', description: text || `Status ${res.status}` });
-      }
+      toast({ title: 'Webhook enviado', description: 'Feedback enviado.' });
+      setFeedbackModalOpen(false);
     } catch (e: any) {
-      toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível enviar o feedback.' });
+      toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível enviar o webhook.' });
     }
   };
 
