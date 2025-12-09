@@ -137,10 +137,10 @@ const TryOut = () => {
               raw.forEach((it: any, idx: number) => {
                 const createdAt = it?.created_at ? String(it.created_at) : undefined;
                 if (typeof it?.query === 'string' && it.query.trim() !== '') {
-                  expanded.push({ id: `${it?.id || idx}-q`, role: 'assistant', content: it.query, created_at: createdAt });
+                  expanded.push({ id: `${it?.id || idx}-q`, role: 'user', content: it.query, created_at: createdAt });
                 }
                 if (typeof it?.answer === 'string' && it.answer.trim() !== '') {
-                  expanded.push({ id: `${it?.id || idx}-a`, role: 'user', content: it.answer, created_at: createdAt });
+                  expanded.push({ id: `${it?.id || idx}-a`, role: 'assistant', content: it.answer, created_at: createdAt });
                 }
               });
             return { id: c.dify_conversation, items: expanded };
@@ -154,11 +154,44 @@ const TryOut = () => {
       setMessagesByConv(map);
       const cacheKey = `tryout:messages:${userIdForData}`;
       localStorage.setItem(cacheKey, JSON.stringify(map));
+
+      try {
+        const convIds = Object.keys(map);
+        if (convIds.length > 0) {
+          const { data: marks } = await supabase
+            .from('tryout_feedback')
+            .select('conversation_id,message_id,status')
+            .eq('user_id', userIdForData)
+            .in('conversation_id', convIds);
+          if (Array.isArray(marks)) {
+            const next: Record<string, 'up' | 'down'> = {};
+            marks.forEach((m: any) => {
+              if (m?.status === 'down' && typeof m?.message_id === 'string') {
+                next[m.message_id] = 'down';
+              }
+              if (m?.status === 'up' && typeof m?.message_id === 'string') {
+                next[m.message_id] = 'up';
+              }
+            });
+            if (Object.keys(next).length > 0) {
+              setFeedbackByMessage(next);
+              const k = `tryout:feedback:${userIdForData}`;
+              try { localStorage.setItem(k, JSON.stringify(next)); } catch {}
+            }
+          }
+        }
+      } catch {}
       toast({ title: 'Conversas atualizadas', description: 'Mensagens recarregadas com sucesso.' });
       if (!selectedConvId && filtered.length > 0) setSelectedConvId(filtered[0].dify_conversation);
     } finally {
       setLoading(false);
     }
+  };
+
+  const normalizeMessageId = (id: string) => {
+    if (!id) return id;
+    if (id.endsWith('-q') || id.endsWith('-a')) return id.slice(0, -2);
+    return id;
   };
 
   const generateConversation = async () => {
@@ -177,27 +210,28 @@ const TryOut = () => {
         toast({ title: 'Configuração ausente', description: 'Chave da API do agente Dify não encontrada.' });
         return;
       }
-      const url = `https://primary-production-d442.up.railway.app/webhook/treinamento-${encodeURIComponent(userIdForData)}`;
+      const url = 'https://primary-production-d442.up.railway.app/webhook/treinamento-agente-treinamento-carro';
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ api_agente_dify: apiKey, user_id: userIdForData })
       });
       if (res.ok) {
-        toast({ title: 'Webhook enviado', description: 'Geração de conversa iniciada com sucesso.' });
+        toast({ title: 'Conversa Gerada', description: 'Aguarde 5 minutos para a conversa aparecer.' });
       } else {
         const text = await res.text();
-        toast({ title: 'Falha ao enviar webhook', description: text || `Status ${res.status}` });
+        toast({ title: 'Falha ao Gerar', description: text || `Status ${res.status}` });
       }
     } catch (e: any) {
-      toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível enviar o webhook.' });
+      toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível gerar a conversa.' });
     }
   };
 
   const setFeedback = (id: string, type: 'up' | 'down') => {
     if (!userIdForData) return;
     setFeedbackByMessage((prev) => {
-      const next = { ...prev, [id]: type };
+      const baseId = normalizeMessageId(id);
+      const next = { ...prev, [baseId]: type };
       const k = `tryout:feedback:${userIdForData}`;
       try { localStorage.setItem(k, JSON.stringify(next)); } catch {}
       return next;
@@ -208,15 +242,17 @@ const TryOut = () => {
     if (!userIdForData) return;
     try {
       const idPath = String(userIdForData || '').replace(/-/g, '_');
-      const url = `https://primary-production-d442.up.railway.app/webhook/feedback-${idPath}`;
+      const url = 'https://primary-production-d442.up.railway.app/webhook/feedback-agente-otimizacao-autonomo';
       const profile = await getUserProfile(userIdForData);
       const conv = conversations.find((c) => c.dify_conversation === selectedConvId) || conversations[0];
       console.log('Debug Feedback URL:', url);
       console.log('Debug Feedback Body:', { message_id: feedbackMessageId, mensagem_feedback: feedbackText });
+      const messageIdNormalized = normalizeMessageId(String(feedbackMessageId || ''));
       const form = new URLSearchParams({
         user_id: String(userIdForData || ''),
-        message_id: String(feedbackMessageId || ''),
+        message_id: messageIdNormalized,
         mensagem_feedback: String(feedbackText || ''),
+        conversation_id: String(selectedConvId || conv?.dify_conversation || ''),
         dify_user: String(conv?.dify_user || ''),
         dify_conversation: String(conv?.dify_conversation || '')
       });
@@ -235,10 +271,21 @@ const TryOut = () => {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: form.toString()
       });
-      toast({ title: 'Webhook enviado', description: 'Feedback enviado.' });
+      try {
+        await supabase
+          .from('tryout_feedback')
+          .upsert({
+            user_id: String(userIdForData || ''),
+            conversation_id: String(selectedConvId || conv?.dify_conversation || ''),
+            message_id: messageIdNormalized,
+            status: 'down'
+          });
+      } catch {}
+      setFeedback(String(feedbackMessageId || ''), 'down');
+      toast({ title: 'Feedback enviado', description: 'Vamos analisar e revisar a IA.' });
       setFeedbackModalOpen(false);
     } catch (e: any) {
-      toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível enviar o webhook.' });
+      toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível enviar o feedback.' });
     }
   };
 
@@ -324,22 +371,22 @@ const TryOut = () => {
                       {isAssistant && (
                         <div className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}>
                           <div className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-1 py-0.5 shadow-sm">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className={`h-5 w-5 p-0 transition-transform ${feedbackByMessage[m.id || String(idx)] === 'up' ? 'scale-105' : ''}`}
-                              onClick={() => setFeedback(String(m.id || idx), 'up')}
-                            >
-                              <ThumbsUp className={`h-3 w-3 ${feedbackByMessage[m.id || String(idx)] === 'up' ? 'text-green-600' : 'text-muted-foreground'}`} />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-5 w-5 p-0"
-                              onClick={() => { setFeedback(String(m.id || idx), 'down'); setFeedbackMessageId(String(m.id || idx)); setFeedbackText(''); setFeedbackModalOpen(true); }}
-                            >
-                              <ThumbsDown className="h-3 w-3 text-muted-foreground" />
-                            </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={`h-5 w-5 p-0 transition-transform ${feedbackByMessage[normalizeMessageId(String(m.id || idx))] === 'up' ? 'scale-105' : ''}`}
+                  onClick={() => setFeedback(String(m.id || idx), 'up')}
+                >
+                  <ThumbsUp className={`h-3 w-3 ${feedbackByMessage[normalizeMessageId(String(m.id || idx))] === 'up' ? 'text-green-600' : 'text-muted-foreground'}`} />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-5 w-5 p-0"
+                  onClick={() => { setFeedback(String(m.id || idx), 'down'); setFeedbackMessageId(normalizeMessageId(String(m.id || idx))); setFeedbackText(''); setFeedbackModalOpen(true); }}
+                >
+                  <ThumbsDown className="h-3 w-3 text-muted-foreground" />
+                </Button>
                           </div>
                         </div>
                       )}
