@@ -204,13 +204,14 @@ export const updateBaseConhecimentoByUser = async (
   userId: string,
   updates: { conhecimento_id?: string | null; documento_id?: string | null; prompt?: string | null }
 ) => {
+  const payload: Record<string, any> = {}
+  if (updates.conhecimento_id !== undefined) payload.conhecimento_id = updates.conhecimento_id
+  if (updates.documento_id !== undefined) payload.documento_id = updates.documento_id
+  if (updates.prompt !== undefined) payload.prompt = updates.prompt
+
   const { data, error } = await supabase
     .from('usuarios')
-    .update({
-      conhecimento_id: updates.conhecimento_id ?? null,
-      documento_id: updates.documento_id ?? null,
-      prompt: updates.prompt ?? null,
-    })
+    .update(payload)
     .eq('user_id', userId)
     .select()
     .single()
