@@ -35,6 +35,12 @@ const BaseDeConhecimento = () => {
   const [knowledgeInfo, setKnowledgeInfo] = useState<any | null>(null);
   const [docInfo, setDocInfo] = useState<any | null>(null);
   const [fragments, setFragments] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [totalSegments, setTotalSegments] = useState<number | null>(null);
+  const [totalPages, setTotalPages] = useState<number | null>(null);
+  const [totalLoading, setTotalLoading] = useState(false);
   const [fragPergunta, setFragPergunta] = useState('');
   const [fragResposta, setFragResposta] = useState('');
   const [openFragment, setOpenFragment] = useState(false);
@@ -90,14 +96,45 @@ const BaseDeConhecimento = () => {
         setDocInfo(json?.data ?? json);
       } catch {}
       try {
-        const segRes = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments?page=1&limit=20`, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
+        const segRes = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments?page=${currentPage}&limit=${pageSize}`, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
         const segJson = await segRes.json();
         const items = Array.isArray(segJson) ? segJson : (Array.isArray(segJson?.data) ? segJson.data : []);
         setFragments(items);
+        setHasNextPage(items.length === pageSize);
+
+        const possibleTotal = (
+          (segJson && typeof segJson.total === 'number' && segJson.total) ||
+          (segJson?.pagination && typeof segJson.pagination.total === 'number' && segJson.pagination.total) ||
+          (segJson?.meta && typeof segJson.meta.total === 'number' && segJson.meta.total) ||
+          (typeof segJson?.count === 'number' && segJson.count)
+        );
+        if (possibleTotal) {
+          setTotalSegments(possibleTotal);
+          setTotalPages(Math.max(1, Math.ceil(possibleTotal / pageSize)));
+        } else if (totalSegments === null && totalPages === null) {
+          setTotalLoading(true);
+          try {
+            let page = 1;
+            let total = 0;
+            while (true) {
+              const r = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments?page=${page}&limit=${pageSize}`, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
+              const j = await r.json();
+              const arr = Array.isArray(j) ? j : (Array.isArray(j?.data) ? j.data : []);
+              total += arr.length;
+              if (arr.length < pageSize) break;
+              page += 1;
+              // Evitar loops infinitos por segurança
+              if (page > 1000) break;
+            }
+            setTotalSegments(total);
+            setTotalPages(Math.max(1, Math.ceil(total / pageSize)));
+          } catch {}
+          setTotalLoading(false);
+        }
       } catch {}
     };
     fetchDocumentDetails();
-  }, [base?.conhecimento_id, base?.documento_id]);
+  }, [base?.conhecimento_id, base?.documento_id, currentPage]);
 
   return (
     <div className="p-6 space-y-6">
@@ -212,7 +249,11 @@ const BaseDeConhecimento = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="rounded-full">{fragments.length}</Badge>
+              {totalSegments !== null ? (
+                <Badge variant="outline" className="rounded-full">{totalSegments}</Badge>
+              ) : (
+                <Badge variant="outline" className="rounded-full">{fragments.length}{totalLoading ? '…' : ''}</Badge>
+              )}
               <Button disabled={loading || !base?.conhecimento_id || !base?.documento_id} onClick={() => setOpenFragment(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Adicionar Pergunta
@@ -257,6 +298,7 @@ const BaseDeConhecimento = () => {
           </CardHeader>
           <CardContent>
             {fragments.length > 0 ? (
+              <>
               <div className="space-y-3">
                 {fragments.map((frag, idx) => {
                   const text = frag?.content || frag?.text || '';
@@ -320,6 +362,14 @@ const BaseDeConhecimento = () => {
                   );
                 })}
               </div>
+              <div className="flex items-center justify-center gap-3 mt-6">
+                <Button variant="outline" size="sm" className="px-3" disabled={loading || currentPage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>Anterior</Button>
+                <div className="text-sm text-muted-foreground">
+                  Página {currentPage}{totalPages ? ` de ${totalPages}` : ''}
+                </div>
+                <Button variant="outline" size="sm" className="px-3" disabled={loading || !hasNextPage} onClick={() => setCurrentPage(p => p + 1)}>Próxima</Button>
+              </div>
+              </>
             ) : (
               <div className="border border-dashed border-border rounded-xl p-6 bg-muted/30 text-center">
                 <p className="text-sm text-muted-foreground">Nenhum fragmento cadastrado.</p>
@@ -466,10 +516,11 @@ const BaseDeConhecimento = () => {
                   if (!res.ok) {
                     toast({ title: 'Erro ao editar fragmento', description: `Código: ${res.status}` });
                   } else {
-                    const segRes = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments?page=1&limit=20`, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
+                    const segRes = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments?page=${currentPage}&limit=${pageSize}`, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
                     const segJson = await segRes.json();
                     const items = Array.isArray(segJson) ? segJson : (Array.isArray(segJson?.data) ? segJson.data : []);
                     setFragments(items);
+                    setHasNextPage(items.length === pageSize);
                     setOpenEditFragment(false);
                     setEditingSegmentId(null);
                     setEditFragPergunta('');
@@ -557,10 +608,11 @@ const BaseDeConhecimento = () => {
                   if (!response.ok) {
                     toast({ title: 'Erro ao criar fragmento', description: `Código: ${response.status}` });
                   } else {
-                    const segRes = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments?page=1&limit=20`, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
+                    const segRes = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments?page=${currentPage}&limit=${pageSize}`, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
                     const segJson = await segRes.json();
                     const items = Array.isArray(segJson) ? segJson : (Array.isArray(segJson?.data) ? segJson.data : []);
                     setFragments(items);
+                    setHasNextPage(items.length === pageSize);
                     if (acceptIndex !== null) {
                       setAISuggestions(aiSuggestions.filter((_, idx) => idx !== acceptIndex));
                     }
@@ -673,10 +725,11 @@ const BaseDeConhecimento = () => {
                   if (!response.ok) {
                     toast({ title: 'Erro ao criar fragmento', description: `Código: ${response.status}` });
                   } else {
-                    const segRes = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments?page=1&limit=20`, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
+                    const segRes = await fetch(`${API_URL}/datasets/${base.conhecimento_id}/documents/${base.documento_id}/segments?page=${currentPage}&limit=${pageSize}`, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
                     const segJson = await segRes.json();
                     const items = Array.isArray(segJson) ? segJson : (Array.isArray(segJson?.data) ? segJson.data : []);
                     setFragments(items);
+                    setHasNextPage(items.length === pageSize);
                     setOpenFragment(false);
                     setNewFragPergunta('');
                     setNewFragResposta('');

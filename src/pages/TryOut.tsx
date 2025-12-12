@@ -88,7 +88,12 @@ const TryOut = () => {
           } catch {}
         }
         if (filtered.length > 0) {
-          setSelectedConvId(filtered[0].dify_conversation);
+          const kSel = `tryout:selectedConv:${userIdForData}`;
+          let saved: string | null = null;
+          try { saved = localStorage.getItem(kSel); } catch {}
+          const candidate = saved || selectedConvId;
+          const exists = !!candidate && filtered.some((c) => c.dify_conversation === candidate);
+          setSelectedConvId(exists ? String(candidate) : filtered[0].dify_conversation);
         }
       } finally {
         setLoading(false);
@@ -108,6 +113,13 @@ const TryOut = () => {
       }
     } catch {}
   }, [userIdForData]);
+
+  useEffect(() => {
+    if (!userIdForData) return;
+    if (!selectedConvId) return;
+    const kSel = `tryout:selectedConv:${userIdForData}`;
+    try { localStorage.setItem(kSel, selectedConvId); } catch {}
+  }, [userIdForData, selectedConvId]);
 
   const reloadMessages = async () => {
     if (!userIdForData) return;
@@ -194,6 +206,24 @@ const TryOut = () => {
     if (!id) return id;
     if (id.endsWith('-q') || id.endsWith('-a')) return id.slice(0, -2);
     return id;
+  };
+
+  const formatMessage = (s: string) => {
+    const pieces: (string | JSX.Element)[] = [];
+    const regex = /\*(.+?)\*/g;
+    let lastIndex = 0;
+    let idx = 0;
+    let m: RegExpExecArray | null;
+    while ((m = regex.exec(s)) !== null) {
+      const start = m.index;
+      const end = regex.lastIndex;
+      if (start > lastIndex) pieces.push(s.slice(lastIndex, start));
+      pieces.push(<span key={`fmt-${idx}`} className="font-semibold opacity-90">{m[1]}</span>);
+      lastIndex = end;
+      idx++;
+    }
+    if (lastIndex < s.length) pieces.push(s.slice(lastIndex));
+    return pieces;
   };
 
   const generateConversation = async () => {
@@ -350,7 +380,7 @@ const TryOut = () => {
               <div className="text-xs text-muted-foreground">Ambiente de testes do agente</div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={reloadMessages} className="gap-2">
+              <Button variant="outline" onClick={reloadMessages} className="gap-2 hover:!bg-[#EBF57D]">
                 <RotateCcw className="h-4 w-4" />
                 Recarregar
               </Button>
@@ -433,8 +463,8 @@ const TryOut = () => {
                   return (
                     <div key={(m.id || idx).toString()} className="space-y-1">
                       <div className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}>
-                        <div className={`max-w-[70%] rounded-3xl px-3 py-2 text-sm shadow ${isAssistant ? 'bg-muted/60 backdrop-blur ring-1 ring-border text-foreground' : 'bg-primary/90 text-primary-foreground'}`}>
-                          {text}
+                        <div className={`max-w-[70%] rounded-3xl px-3 py-2 text-sm shadow whitespace-pre-line ${isAssistant ? 'bg-muted/60 backdrop-blur ring-1 ring-border text-foreground' : 'bg-primary/90 text-primary-foreground'}`}>
+                          {formatMessage(text)}
                         </div>
                       </div>
                       {isAssistant && (
