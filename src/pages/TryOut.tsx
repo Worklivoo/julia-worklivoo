@@ -114,6 +114,27 @@ const TryOut = () => {
   }, [userIdForData]);
 
   useEffect(() => {
+    const main = document.querySelector('.main-content') as HTMLElement | null;
+    if (!main) return;
+    const prev = {
+      paddingTop: main.style.paddingTop,
+      paddingBottom: main.style.paddingBottom,
+      height: main.style.height,
+      overflow: main.style.overflow,
+    };
+    main.style.paddingTop = '0';
+    main.style.paddingBottom = '0';
+    main.style.height = '100vh';
+    main.style.overflow = 'hidden';
+    return () => {
+      main.style.paddingTop = prev.paddingTop;
+      main.style.paddingBottom = prev.paddingBottom;
+      main.style.height = prev.height;
+      main.style.overflow = prev.overflow;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!userIdForData) return;
     const k = `tryout:feedback:${userIdForData}`;
     try {
@@ -624,9 +645,9 @@ const TryOut = () => {
   }, [orderedConversations, messagesByConv, search, convTypeFilter]);
 
   return (
-    <div className="p-6 bg-gradient-to-b from-background to-muted/40">
-      <Card className="border-border rounded-2xl shadow-sm">
-        <CardContent className="p-0">
+    <div className="h-[100vh] overflow-hidden bg-gradient-to-b from-background to-muted/40 py-4">
+      <Card className="border-border rounded-2xl shadow-sm h-full overflow-hidden">
+        <CardContent className="p-0 h-full flex flex-col overflow-hidden">
           <div className="p-4 border-b border-border flex items-center justify-between">
             <div className="flex flex-col">
               <div className="text-lg font-semibold tracking-tight">TryOut</div>
@@ -647,7 +668,7 @@ const TryOut = () => {
               </Button>
             </div>
           </div>
-          <div className="flex h-[85vh]">
+          <div className="flex flex-1 min-h-0">
             <div className="w-80 border-r border-border overflow-y-auto overflow-x-hidden bg-muted/30">
               <div className="p-4">
                 <div className="text-sm font-semibold mb-2">Conversas</div>
