@@ -44,6 +44,7 @@ const TryOut = () => {
   const [chatInput, setChatInput] = useState('');
   const [sendingChat, setSendingChat] = useState(false);
   const [typingByConv, setTypingByConv] = useState<Record<string, boolean>>({});
+  const [convTypeFilter, setConvTypeFilter] = useState<'all' | 'ia' | 'humano'>('all');
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const scrollMessagesToBottom = () => {
     const el = messagesRef.current;
@@ -604,15 +605,23 @@ const TryOut = () => {
   }, [conversations, messagesByConv]);
   const filteredConversations = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return orderedConversations;
-    return orderedConversations.filter((c) => {
+    const byType = orderedConversations.filter((c) => {
+      const du = String(c.dify_user || '');
+      const isManual = du.startsWith('worklivoo-manual-');
+      const isIa = du.startsWith('worklivoo-') && !isManual;
+      if (convTypeFilter === 'humano') return isManual;
+      if (convTypeFilter === 'ia') return isIa;
+      return true;
+    });
+    if (!term) return byType;
+    return byType.filter((c) => {
       const msgs = messagesByConv[c.dify_conversation] || [];
       const last = msgs[msgs.length - 1];
       const preview = (last?.content || last?.answer || '').toString().toLowerCase();
       const title = typeof c.treinamento_id !== 'undefined' ? `Conversa ${c.treinamento_id}` : 'Conversa';
       return title.toLowerCase().includes(term) || preview.includes(term);
     });
-  }, [orderedConversations, messagesByConv, search]);
+  }, [orderedConversations, messagesByConv, search, convTypeFilter]);
 
   return (
     <div className="p-6 bg-gradient-to-b from-background to-muted/40">
@@ -648,6 +657,24 @@ const TryOut = () => {
                   onChange={(e) => setSearch(e.target.value)}
                   className="h-9"
                 />
+                <div className="mt-2 flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={convTypeFilter === 'ia' ? 'default' : 'outline'}
+                    className="h-7 px-2 text-xs hover:!bg-[#EBF57D]"
+                    onClick={() => setConvTypeFilter((prev) => (prev === 'ia' ? 'all' : 'ia'))}
+                  >
+                    IA
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={convTypeFilter === 'humano' ? 'default' : 'outline'}
+                    className="h-7 px-2 text-xs hover:!bg-[#EBF57D]"
+                    onClick={() => setConvTypeFilter((prev) => (prev === 'humano' ? 'all' : 'humano'))}
+                  >
+                    Humano
+                  </Button>
+                </div>
               </div>
               <Separator />
               <div>
@@ -661,12 +688,18 @@ const TryOut = () => {
                   return (
                     <button
                       key={c.dify_conversation}
-                      className={`w-full text-left px-2 py-3 mx-0 my-1 rounded-xl transition-colors ${selectedConvId === c.dify_conversation ? (isManual ? 'bg-[#EBF57D] ring-1 ring-primary/30' : 'bg-muted ring-1 ring-primary/30') : (isManual ? 'bg-[#EBF57D] hover:bg-[#EBF57D]' : 'hover:bg-muted/60')}`}
+                      className={`w-full text-left px-2 py-3 mx-0 my-1 rounded-xl transition-colors ${selectedConvId === c.dify_conversation ? (isManual ? 'bg-[#EBF57D] ring-1 ring-primary/30' : 'bg-muted ring-1 ring-primary/30') : (isManual ? 'bg-[#EBF57D]/25 hover:bg-[#EBF57D]' : 'hover:bg-muted/60')}`}
                       onClick={() => setSelectedConvId(c.dify_conversation)}
                     >
                       <div className="flex items-center gap-1">
                         <Avatar className="h-8 w-8">
-                          <AvatarFallback>{initials}</AvatarFallback>
+                          <AvatarFallback>
+                            {isManual ? (
+                              <MessageCircle className="h-4 w-4" />
+                            ) : (
+                              <Sparkles className="h-4 w-4" />
+                            )}
+                          </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium truncate max-w-[7rem]">{title}</div>
@@ -690,7 +723,9 @@ const TryOut = () => {
                           {selectedConvId && (
                             <>
                               <Avatar className="h-8 w-8">
-                                <AvatarFallback>{(() => { const sel = conversations.find((x)=>x.dify_conversation===selectedConvId); return (sel && typeof sel.treinamento_id !== 'undefined') ? String(sel.treinamento_id) : 'WL' })()}</AvatarFallback>
+                                <AvatarFallback>
+                                  {(() => { const sel = conversations.find((x)=>x.dify_conversation===selectedConvId); const manual = !!sel && typeof sel.dify_user === 'string' && sel.dify_user.startsWith('worklivoo-manual-'); return manual ? <MessageCircle className="h-4 w-4" /> : <Sparkles className="h-4 w-4" /> })()}
+                                </AvatarFallback>
                               </Avatar>
                               <div className="text-sm font-semibold truncate">{(() => { const sel = conversations.find((x)=>x.dify_conversation===selectedConvId); return (sel && typeof sel.treinamento_id !== 'undefined') ? `TryOut ${sel.treinamento_id}` : 'TryOut'; })()}</div>
                             </>
