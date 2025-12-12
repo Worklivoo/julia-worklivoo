@@ -14,6 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { addFonteDados, getFontesDadosByUser, updateFonteDados } from '@/lib/supabase-utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import Membros from '@/pages/Membros';
+import BaseDeConhecimento from '@/pages/BaseDeConhecimento';
 
 const Settings = () => {
   const { user } = useCRM();
@@ -119,6 +121,8 @@ const Settings = () => {
           <TabsList className="bg-muted/40">
             <TabsTrigger value="gerais">Gerais</TabsTrigger>
             <TabsTrigger value="fontes">Fontes de Dados</TabsTrigger>
+            <TabsTrigger value="membros">Membros</TabsTrigger>
+            <TabsTrigger value="base-de-conhecimento">Base de Conhecimento</TabsTrigger>
           </TabsList>
 
           <TabsContent value="gerais" className="pt-4">
@@ -394,6 +398,14 @@ const Settings = () => {
                 )}
               </DialogContent>
             </Dialog>
+          </TabsContent>
+
+          <TabsContent value="membros" className="pt-4">
+            <Membros />
+          </TabsContent>
+
+          <TabsContent value="base-de-conhecimento" className="pt-4">
+            <BaseDeConhecimento />
           </TabsContent>
         </Tabs>
       </div>

@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
-import { ThumbsUp, ThumbsDown, RotateCcw, Sparkles } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, RotateCcw, Sparkles, MessageCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,6 +41,16 @@ const TryOut = () => {
   const [feedbackText, setFeedbackText] = useState('');
   const [sendingFeedback, setSendingFeedback] = useState(false);
   const [search, setSearch] = useState('');
+  const [chatInput, setChatInput] = useState('');
+  const [sendingChat, setSendingChat] = useState(false);
+  const [typingByConv, setTypingByConv] = useState<Record<string, boolean>>({});
+  const messagesRef = useRef<HTMLDivElement | null>(null);
+  const scrollMessagesToBottom = () => {
+    const el = messagesRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  };
 
   const userIdForData = useMemo(() => {
     if (!user) return null;
@@ -209,20 +219,54 @@ const TryOut = () => {
   };
 
   const formatMessage = (s: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+    const renderWithLinks = (text: string, keyPrefix: string) => {
+      const out: (string | JSX.Element)[] = [];
+      let last = 0;
+      let i = 0;
+      let m: RegExpExecArray | null;
+      while ((m = urlRegex.exec(text)) !== null) {
+        const start = m.index;
+        const end = urlRegex.lastIndex;
+        if (start > last) out.push(text.slice(last, start));
+        const raw = m[0];
+        const href = raw.startsWith('http') ? raw : `https://${raw}`;
+        out.push(
+          <a
+            key={`${keyPrefix}-lnk-${i}`}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold underline opacity-90 hover:opacity-100 break-all"
+          >
+            {raw}
+          </a>
+        );
+        last = end;
+        i++;
+      }
+      if (last < text.length) out.push(text.slice(last));
+      return out;
+    };
+
     const pieces: (string | JSX.Element)[] = [];
-    const regex = /\*(.+?)\*/g;
+    const boldRegex = /\*(.+?)\*/g;
     let lastIndex = 0;
     let idx = 0;
     let m: RegExpExecArray | null;
-    while ((m = regex.exec(s)) !== null) {
+    while ((m = boldRegex.exec(s)) !== null) {
       const start = m.index;
-      const end = regex.lastIndex;
-      if (start > lastIndex) pieces.push(s.slice(lastIndex, start));
-      pieces.push(<span key={`fmt-${idx}`} className="font-semibold opacity-90">{m[1]}</span>);
+      const end = boldRegex.lastIndex;
+      if (start > lastIndex) pieces.push(...renderWithLinks(s.slice(lastIndex, start), `pre-${idx}`));
+      pieces.push(
+        <span key={`fmt-${idx}`} className="font-semibold opacity-90">
+          {renderWithLinks(m[1], `bold-${idx}`)}
+        </span>
+      );
       lastIndex = end;
       idx++;
     }
-    if (lastIndex < s.length) pieces.push(s.slice(lastIndex));
+    if (lastIndex < s.length) pieces.push(...renderWithLinks(s.slice(lastIndex), `post-${idx}`));
     return pieces;
   };
 
@@ -256,6 +300,206 @@ const TryOut = () => {
       }
     } catch (e: any) {
       toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível gerar a conversa.' });
+    }
+  };
+
+  const startManualConversation = async () => {
+    if (!userIdForData) return;
+    try {
+      let apiKey = (import.meta as any)?.env?.VITE_KNOWLEDGE_API_TOKEN || null;
+      if (!apiKey) {
+        const { data: keyRow } = await supabase
+          .from('usuarios')
+          .select('api_agente_dify')
+          .eq('user_id', userIdForData)
+          .single();
+        apiKey = (keyRow as any)?.api_agente_dify || null;
+      }
+      if (!apiKey) {
+        toast({ title: 'Configuração ausente', description: 'Chave da API do agente Dify não encontrada.' });
+        return;
+      }
+      const API_URL = 'https://api-production-42480.up.railway.app/v1/chat-messages';
+      const rand = Math.floor(Math.random() * 10000000);
+      const body = {
+        inputs: {},
+        query: 'TELEFONE: 5512999999999',
+        response_mode: 'streaming',
+        conversation_id: '',
+        user: `worklivoo-manual-${rand}`
+      };
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        const rawText = await res.text();
+        let payload = rawText;
+        try {
+          const maybeJson = JSON.parse(rawText);
+          if (Array.isArray(maybeJson) && maybeJson.length > 0 && typeof maybeJson[0]?.data === 'string') {
+            payload = String(maybeJson[0].data || '');
+          }
+        } catch {}
+        const lines = String(payload || '').split('\n').filter((l) => l.startsWith('data: ')).map((l) => l.slice(6));
+        const events: any[] = [];
+        lines.forEach((j) => {
+          try { const obj = JSON.parse(j); events.push(obj); } catch {}
+        });
+        let convId: string | null = null;
+        let messageAnswer = '';
+        let createdAt: number = Date.now();
+        events.forEach((ev) => {
+          if (!convId && typeof ev?.conversation_id === 'string') convId = ev.conversation_id;
+          if (typeof ev?.created_at !== 'undefined') { const t = Number(ev.created_at || 0); if (!Number.isNaN(t)) createdAt = t * 1000; }
+          if (ev?.event === 'agent_message' && typeof ev?.answer === 'string') messageAnswer += ev.answer;
+          if (!messageAnswer && ev?.event === 'agent_thought' && typeof ev?.thought === 'string') messageAnswer = ev.thought;
+        });
+        if (convId) {
+          try {
+            await supabase
+              .from('leads_treinamento')
+              .insert({
+                dify_conversation: convId,
+                dify_user: body.user,
+                user_id: userIdForData,
+                tipo: 'HUMANO'
+              });
+          } catch {}
+          setConversations((prev) => {
+            const exists = prev.some((c) => c.dify_conversation === convId);
+            const next = exists ? prev : [...prev, { dify_conversation: convId, dify_user: body.user } as any];
+            return next;
+          });
+          setMessagesByConv((prev) => {
+            const next = { ...prev };
+            const items: MessageItem[] = [
+              { id: `${convId}-q`, role: 'user', content: body.query, created_at: String(createdAt) },
+              { id: `${convId}-a`, role: 'assistant', content: messageAnswer, created_at: String(createdAt) }
+            ];
+            next[convId!] = items;
+            const cacheKey = `tryout:messages:${userIdForData}`;
+            try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
+            return next;
+          });
+          setSelectedConvId(convId);
+          const kSel = `tryout:selectedConv:${userIdForData}`;
+          try { localStorage.setItem(kSel, convId); } catch {}
+          toast({ title: 'Conversa iniciada', description: 'Conversa criada e aberta.' });
+        } else {
+          toast({ title: 'Conversa iniciada', description: 'Solicitação enviada. Aguardando ID da conversa.' });
+        }
+      } else {
+        const text = await res.text();
+        toast({ title: 'Falha ao iniciar', description: text || `Status ${res.status}` });
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível iniciar a conversa.' });
+    }
+  };
+
+  const sendManualMessage = async () => {
+    if (!userIdForData) return;
+    if (!selectedConvId) return;
+    const msg = chatInput.trim();
+    if (!msg) return;
+    setChatInput('');
+    setSendingChat(true);
+    try {
+      let apiKey = (import.meta as any)?.env?.VITE_KNOWLEDGE_API_TOKEN || null;
+      if (!apiKey) {
+        const { data: keyRow } = await supabase
+          .from('usuarios')
+          .select('api_agente_dify')
+          .eq('user_id', userIdForData)
+          .single();
+        apiKey = (keyRow as any)?.api_agente_dify || null;
+      }
+      if (!apiKey) {
+        toast({ title: 'Configuração ausente', description: 'Chave da API do agente Dify não encontrada.' });
+        return;
+      }
+      const conv = conversations.find((c) => c.dify_conversation === selectedConvId);
+      if (!conv) {
+        toast({ title: 'Conversa inválida', description: 'Seleção de conversa não encontrada.' });
+        return;
+      }
+      const API_URL = 'https://api-production-42480.up.railway.app/v1/chat-messages';
+      const body = {
+        inputs: {},
+        query: msg,
+        response_mode: 'streaming',
+        conversation_id: conv.dify_conversation,
+        user: conv.dify_user
+      };
+      const optimisticUser: MessageItem = { id: `${Date.now()}-q`, role: 'user', content: msg, created_at: String(Date.now()) };
+      setMessagesByConv((prev) => {
+        const next = { ...prev };
+        const arr = next[conv.dify_conversation] ? [...next[conv.dify_conversation]] : [];
+        arr.push(optimisticUser);
+        next[conv.dify_conversation] = arr;
+        const cacheKey = `tryout:messages:${userIdForData}`;
+        try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
+        return next;
+      });
+      setTimeout(scrollMessagesToBottom, 0);
+      setTypingByConv((prev) => ({ ...prev, [conv.dify_conversation]: true }));
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        const rawText = await res.text();
+        let payload = rawText;
+        try {
+          const maybeJson = JSON.parse(rawText);
+          if (Array.isArray(maybeJson) && maybeJson.length > 0 && typeof maybeJson[0]?.data === 'string') {
+            payload = String(maybeJson[0].data || '');
+          }
+        } catch {}
+        const lines = String(payload || '').split('\n').filter((l) => l.startsWith('data: ')).map((l) => l.slice(6));
+        const events: any[] = [];
+        lines.forEach((j) => { try { const obj = JSON.parse(j); events.push(obj); } catch {} });
+        let messageAnswer = '';
+        let createdAt: number = Date.now();
+        events.forEach((ev) => {
+          if (typeof ev?.created_at !== 'undefined') { const t = Number(ev.created_at || 0); if (!Number.isNaN(t)) createdAt = t * 1000; }
+          if (ev?.event === 'agent_message' && typeof ev?.answer === 'string') messageAnswer += ev.answer;
+          if (!messageAnswer && ev?.event === 'agent_thought' && typeof ev?.thought === 'string') messageAnswer = ev.thought;
+        });
+        const assistantMsg: MessageItem = { id: `${Date.now()}-a`, role: 'assistant', content: messageAnswer, created_at: String(createdAt) };
+        setMessagesByConv((prev) => {
+          const next = { ...prev };
+          const arr = next[conv.dify_conversation] ? [...next[conv.dify_conversation]] : [];
+          arr.push(assistantMsg);
+          next[conv.dify_conversation] = arr;
+          const cacheKey = `tryout:messages:${userIdForData}`;
+          try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
+          return next;
+        });
+        setTimeout(scrollMessagesToBottom, 0);
+        setTypingByConv((prev) => ({ ...prev, [conv.dify_conversation]: false }));
+        setChatInput('');
+      } else {
+        const text = await res.text();
+        toast({ title: 'Falha ao enviar', description: text || `Status ${res.status}` });
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível enviar a mensagem.' });
+    } finally {
+      setSendingChat(false);
+      try {
+        const conv = conversations.find((c) => c.dify_conversation === selectedConvId);
+        if (conv) setTypingByConv((prev) => ({ ...prev, [conv.dify_conversation]: false }));
+      } catch {}
     }
   };
 
@@ -386,7 +630,11 @@ const TryOut = () => {
               </Button>
               <Button onClick={generateConversation} className="gap-2">
                 <Sparkles className="h-4 w-4" />
-                Gerar Conversa
+                Gerar Conversa por IA
+              </Button>
+              <Button className="gap-2" onClick={startManualConversation}>
+                <MessageCircle className="h-4 w-4" />
+                Iniciar Conversa
               </Button>
             </div>
           </div>
@@ -408,19 +656,20 @@ const TryOut = () => {
                   const last = msgs[msgs.length - 1];
                   const preview = (last?.content || last?.answer || '').toString();
                   const initials = typeof c.treinamento_id !== 'undefined' ? String(c.treinamento_id) : 'WL';
-                  const title = typeof c.treinamento_id !== 'undefined' ? `Conversa ${c.treinamento_id}` : 'Conversa';
+                  const title = typeof c.treinamento_id !== 'undefined' ? `TryOut ${c.treinamento_id}` : 'TryOut';
+                  const isManual = typeof c.dify_user === 'string' && c.dify_user.startsWith('worklivoo-manual-');
                   return (
                     <button
                       key={c.dify_conversation}
-                      className={`w-full text-left px-3 py-3 mx-2 my-1 rounded-xl transition-colors ${selectedConvId === c.dify_conversation ? 'bg-muted ring-1 ring-primary/30' : 'hover:bg-muted/60'}`}
+                      className={`w-full text-left px-2 py-3 mx-0 my-1 rounded-xl transition-colors ${selectedConvId === c.dify_conversation ? (isManual ? 'bg-[#EBF57D] ring-1 ring-primary/30' : 'bg-muted ring-1 ring-primary/30') : (isManual ? 'bg-[#EBF57D] hover:bg-[#EBF57D]' : 'hover:bg-muted/60')}`}
                       onClick={() => setSelectedConvId(c.dify_conversation)}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback>{initials}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate max-w-[9rem]">{title}</div>
+                          <div className="text-sm font-medium truncate max-w-[7rem]">{title}</div>
                           <div className="text-xs text-muted-foreground line-clamp-1">{preview}</div>
                         </div>
                       </div>
@@ -435,21 +684,21 @@ const TryOut = () => {
                 )}
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto bg-background">
+            <div className="flex-1 bg-background flex flex-col overflow-hidden">
               <div className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="px-4 py-3 flex items-center gap-3">
-                  {selectedConvId && (
-                    <>
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback>{(() => { const sel = conversations.find((x)=>x.dify_conversation===selectedConvId); return (sel && typeof sel.treinamento_id !== 'undefined') ? String(sel.treinamento_id) : 'WL' })()}</AvatarFallback>
-                      </Avatar>
-                      <div className="text-sm font-semibold truncate">{(() => { const sel = conversations.find((x)=>x.dify_conversation===selectedConvId); return (sel && typeof sel.treinamento_id !== 'undefined') ? `Conversa ${sel.treinamento_id}` : 'Conversa'; })()}</div>
-                    </>
-                  )}
-                  {!selectedConvId && <div className="text-sm font-semibold">Conversas</div>}
-                </div>
+                        <div className="px-4 py-3 flex items-center gap-3">
+                          {selectedConvId && (
+                            <>
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback>{(() => { const sel = conversations.find((x)=>x.dify_conversation===selectedConvId); return (sel && typeof sel.treinamento_id !== 'undefined') ? String(sel.treinamento_id) : 'WL' })()}</AvatarFallback>
+                              </Avatar>
+                              <div className="text-sm font-semibold truncate">{(() => { const sel = conversations.find((x)=>x.dify_conversation===selectedConvId); return (sel && typeof sel.treinamento_id !== 'undefined') ? `TryOut ${sel.treinamento_id}` : 'TryOut'; })()}</div>
+                            </>
+                          )}
+                          {!selectedConvId && <div className="text-sm font-semibold">Conversas</div>}
+                        </div>
               </div>
-              <div className="p-4 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={messagesRef}>
                 {selectedMessages.length === 0 && (
                   <div className="text-sm text-muted-foreground">Nenhuma mensagem para esta conversa</div>
                 )}
@@ -504,7 +753,33 @@ const TryOut = () => {
                     </div>
                   );
                 })}
+                {(() => { const sel = conversations.find((x)=>x.dify_conversation===selectedConvId); const manual = !!sel && typeof sel.dify_user === 'string' && sel.dify_user.startsWith('worklivoo-manual-'); const typing = !!selectedConvId && typingByConv[selectedConvId]; return manual && typing; })() && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[70%] rounded-3xl px-3 py-2 text-sm shadow bg-muted/60 backdrop-blur ring-1 ring-border text-foreground">
+                      <div className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                        <span className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '100ms' }}></span>
+                        <span className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '200ms' }}></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+              {(() => { const sel = conversations.find((x)=>x.dify_conversation===selectedConvId); const manual = !!sel && typeof sel.dify_user === 'string' && sel.dify_user.startsWith('worklivoo-manual-'); return manual; })() && (
+                <div className="border-t border-border bg-background px-4 py-3 flex items-center gap-2">
+                  <Input
+                    placeholder="Digite sua mensagem"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !sendingChat && chatInput.trim()) { e.preventDefault(); sendManualMessage(); } }}
+                    className="flex-1 h-9"
+                  />
+                  <Button onClick={sendManualMessage} disabled={sendingChat || !chatInput.trim()} className="gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    Enviar
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
           <Dialog open={feedbackModalOpen} onOpenChange={setFeedbackModalOpen}>

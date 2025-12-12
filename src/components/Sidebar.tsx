@@ -63,18 +63,6 @@ const Sidebar = () => {
       tooltip: 'WhatsApp'
     },
     {
-      name: 'Membros',
-      path: '/membros',
-      icon: UsersRound,
-      tooltip: 'Membros'
-    },
-    {
-      name: 'Base de Conhecimento',
-      path: '/base-de-conhecimento',
-      icon: Book,
-      tooltip: 'Base de Conhecimento'
-    },
-    {
       name: 'Try-Out',
       path: '/try-out',
       icon: Sparkles,
