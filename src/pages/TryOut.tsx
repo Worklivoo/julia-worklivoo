@@ -3,7 +3,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { ThumbsUp, ThumbsDown, RotateCcw, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,6 +39,8 @@ const TryOut = () => {
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [feedbackMessageId, setFeedbackMessageId] = useState<string | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
+  const [sendingFeedback, setSendingFeedback] = useState(false);
+  const [search, setSearch] = useState('');
 
   const userIdForData = useMemo(() => {
     if (!user) return null;
@@ -159,19 +163,17 @@ const TryOut = () => {
         const convIds = Object.keys(map);
         if (convIds.length > 0) {
           const { data: marks } = await supabase
-            .from('tryout_feedback')
-            .select('conversation_id,message_id,status')
+            .from('feedbacks')
+            .select('dify_conversation,mensagem_id,comentario_tipo')
             .eq('user_id', userIdForData)
-            .in('conversation_id', convIds);
+            .in('dify_conversation', convIds);
           if (Array.isArray(marks)) {
             const next: Record<string, 'up' | 'down'> = {};
             marks.forEach((m: any) => {
-              if (m?.status === 'down' && typeof m?.message_id === 'string') {
-                next[m.message_id] = 'down';
-              }
-              if (m?.status === 'up' && typeof m?.message_id === 'string') {
-                next[m.message_id] = 'up';
-              }
+              const mid = normalizeMessageId(String(m?.mensagem_id || ''));
+              if (!mid) return;
+              if (m?.comentario_tipo === 'negativo') next[mid] = 'down';
+              if (m?.comentario_tipo === 'positivo') next[mid] = 'up';
             });
             if (Object.keys(next).length > 0) {
               setFeedbackByMessage(next);
@@ -238,23 +240,44 @@ const TryOut = () => {
     });
   };
 
+  const sendPositive = async (messageId: string) => {
+    if (!userIdForData) return;
+    const conv = conversations.find((c) => c.dify_conversation === selectedConvId) || conversations[0];
+    const messageIdNormalized = normalizeMessageId(String(messageId || ''));
+    try {
+      await supabase
+        .from('feedbacks')
+        .insert({
+          user_id: String(userIdForData || ''),
+          mensagem_id: messageIdNormalized,
+          comentario_tipo: 'positivo',
+          comentario_mensagem: null,
+          dify_conversation: String(selectedConvId || conv?.dify_conversation || ''),
+          dify_user: String(conv?.dify_user || '')
+        });
+    } catch {}
+    setFeedback(String(messageId || ''), 'up');
+    toast({ title: 'Feedback positivo', description: 'Registrado com sucesso.' });
+  };
+
   const sendFeedback = async () => {
     if (!userIdForData) return;
+    if (sendingFeedback) return;
+    setSendingFeedback(true);
     try {
-      const idPath = String(userIdForData || '').replace(/-/g, '_');
       const url = 'https://primary-production-d442.up.railway.app/webhook/feedback-agente-otimizacao-autonomo';
       const profile = await getUserProfile(userIdForData);
       const conv = conversations.find((c) => c.dify_conversation === selectedConvId) || conversations[0];
-      console.log('Debug Feedback URL:', url);
-      console.log('Debug Feedback Body:', { message_id: feedbackMessageId, mensagem_feedback: feedbackText });
       const messageIdNormalized = normalizeMessageId(String(feedbackMessageId || ''));
+      const idempotencyKey = `${String(userIdForData || '')}:${messageIdNormalized}:negativo`;
       const form = new URLSearchParams({
         user_id: String(userIdForData || ''),
         message_id: messageIdNormalized,
         mensagem_feedback: String(feedbackText || ''),
         conversation_id: String(selectedConvId || conv?.dify_conversation || ''),
         dify_user: String(conv?.dify_user || ''),
-        dify_conversation: String(conv?.dify_conversation || '')
+        dify_conversation: String(conv?.dify_conversation || ''),
+        idempotency_key: idempotencyKey
       });
       if (profile && typeof profile === 'object') {
         Object.entries(profile as any).forEach(([k, v]) => {
@@ -265,7 +288,7 @@ const TryOut = () => {
           } catch {}
         });
       }
-      const res = await fetch(url, {
+      await fetch(url, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -273,12 +296,14 @@ const TryOut = () => {
       });
       try {
         await supabase
-          .from('tryout_feedback')
-          .upsert({
+          .from('feedbacks')
+          .insert({
             user_id: String(userIdForData || ''),
-            conversation_id: String(selectedConvId || conv?.dify_conversation || ''),
-            message_id: messageIdNormalized,
-            status: 'down'
+            mensagem_id: messageIdNormalized,
+            comentario_tipo: 'negativo',
+            comentario_mensagem: String(feedbackText || ''),
+            dify_conversation: String(selectedConvId || conv?.dify_conversation || ''),
+            dify_user: String(conv?.dify_user || '')
           });
       } catch {}
       setFeedback(String(feedbackMessageId || ''), 'down');
@@ -286,26 +311,69 @@ const TryOut = () => {
       setFeedbackModalOpen(false);
     } catch (e: any) {
       toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível enviar o feedback.' });
+    } finally {
+      setSendingFeedback(false);
     }
   };
 
 
   const selectedMessages = selectedConvId ? messagesByConv[selectedConvId] || [] : [];
+  const orderedConversations = useMemo(() => {
+    const arr = [...conversations];
+    return arr.sort((a, b) => {
+      const am = messagesByConv[a.dify_conversation] || [];
+      const bm = messagesByConv[b.dify_conversation] || [];
+      const al = am.reduce((mx, m) => { const t = Number(m.created_at || 0); return t > mx ? t : mx; }, 0);
+      const bl = bm.reduce((mx, m) => { const t = Number(m.created_at || 0); return t > mx ? t : mx; }, 0);
+      return bl - al;
+    });
+  }, [conversations, messagesByConv]);
+  const filteredConversations = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return orderedConversations;
+    return orderedConversations.filter((c) => {
+      const msgs = messagesByConv[c.dify_conversation] || [];
+      const last = msgs[msgs.length - 1];
+      const preview = (last?.content || last?.answer || '').toString().toLowerCase();
+      const title = typeof c.treinamento_id !== 'undefined' ? `Conversa ${c.treinamento_id}` : 'Conversa';
+      return title.toLowerCase().includes(term) || preview.includes(term);
+    });
+  }, [orderedConversations, messagesByConv, search]);
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-gradient-to-b from-background to-muted/40">
       <Card className="border-border rounded-2xl shadow-sm">
         <CardContent className="p-0">
-          <div className="p-4 border-b border-border flex items-center justify-end gap-2">
-            <Button variant="secondary" onClick={reloadMessages}>Recarregar Conversas</Button>
-            <Button onClick={generateConversation}>Gerar Conversa</Button>
+          <div className="p-4 border-b border-border flex items-center justify-between">
+            <div className="flex flex-col">
+              <div className="text-lg font-semibold tracking-tight">TryOut</div>
+              <div className="text-xs text-muted-foreground">Ambiente de testes do agente</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={reloadMessages} className="gap-2">
+                <RotateCcw className="h-4 w-4" />
+                Recarregar
+              </Button>
+              <Button onClick={generateConversation} className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                Gerar Conversa
+              </Button>
+            </div>
           </div>
           <div className="flex h-[85vh]">
-            <div className="w-80 border-r border-border overflow-y-auto bg-muted/30">
-              <div className="p-4 text-sm font-semibold">Conversas</div>
+            <div className="w-80 border-r border-border overflow-y-auto overflow-x-hidden bg-muted/30">
+              <div className="p-4">
+                <div className="text-sm font-semibold mb-2">Conversas</div>
+                <Input
+                  placeholder="Buscar conversa"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-9"
+                />
+              </div>
               <Separator />
               <div>
-                {conversations.map((c) => {
+                {filteredConversations.map((c) => {
                   const msgs = messagesByConv[c.dify_conversation] || [];
                   const last = msgs[msgs.length - 1];
                   const preview = (last?.content || last?.answer || '').toString();
@@ -314,7 +382,7 @@ const TryOut = () => {
                   return (
                     <button
                       key={c.dify_conversation}
-                      className={`w-full text-left px-3 py-3 hover:bg-muted transition-colors ${selectedConvId === c.dify_conversation ? 'bg-muted' : ''}`}
+                      className={`w-full text-left px-3 py-3 mx-2 my-1 rounded-xl transition-colors ${selectedConvId === c.dify_conversation ? 'bg-muted ring-1 ring-primary/30' : 'hover:bg-muted/60'}`}
                       onClick={() => setSelectedConvId(c.dify_conversation)}
                     >
                       <div className="flex items-center gap-3">
@@ -351,7 +419,7 @@ const TryOut = () => {
                   {!selectedConvId && <div className="text-sm font-semibold">Conversas</div>}
                 </div>
               </div>
-              <div className="p-4 space-y-3">
+              <div className="p-4 space-y-4">
                 {selectedMessages.length === 0 && (
                   <div className="text-sm text-muted-foreground">Nenhuma mensagem para esta conversa</div>
                 )}
@@ -361,32 +429,45 @@ const TryOut = () => {
                 }).map((m, idx) => {
                   const isAssistant = m.role === 'assistant' || m.role === 'bot';
                   const text = (m.content || m.answer || '') as string;
+                  const baseId = normalizeMessageId(String(m.id || idx));
                   return (
                     <div key={(m.id || idx).toString()} className="space-y-1">
                       <div className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}>
-                        <div className={`max-w-[70%] rounded-2xl px-3 py-2 text-sm shadow-sm ${isAssistant ? 'bg-muted text-foreground' : 'bg-primary text-primary-foreground'}`}>
+                        <div className={`max-w-[70%] rounded-3xl px-3 py-2 text-sm shadow ${isAssistant ? 'bg-muted/60 backdrop-blur ring-1 ring-border text-foreground' : 'bg-primary/90 text-primary-foreground'}`}>
                           {text}
                         </div>
                       </div>
                       {isAssistant && (
                         <div className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}>
-                          <div className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-1 py-0.5 shadow-sm">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className={`h-5 w-5 p-0 transition-transform ${feedbackByMessage[normalizeMessageId(String(m.id || idx))] === 'up' ? 'scale-105' : ''}`}
-                  onClick={() => setFeedback(String(m.id || idx), 'up')}
-                >
-                  <ThumbsUp className={`h-3 w-3 ${feedbackByMessage[normalizeMessageId(String(m.id || idx))] === 'up' ? 'text-green-600' : 'text-muted-foreground'}`} />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-5 w-5 p-0"
-                  onClick={() => { setFeedback(String(m.id || idx), 'down'); setFeedbackMessageId(normalizeMessageId(String(m.id || idx))); setFeedbackText(''); setFeedbackModalOpen(true); }}
-                >
-                  <ThumbsDown className="h-3 w-3 text-muted-foreground" />
-                </Button>
+                          <div className="inline-flex items-center gap-1 rounded-full ring-1 ring-border bg-background/80 px-1 py-0.5 shadow">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className={`h-6 w-6 p-0 transition-transform ${feedbackByMessage[baseId] === 'up' ? 'scale-105' : ''}`}
+                                    onClick={() => sendPositive(String(m.id || idx))}
+                                  >
+                                    <ThumbsUp className={`h-3.5 w-3.5 ${feedbackByMessage[baseId] === 'up' ? 'text-green-600' : 'text-muted-foreground'}`} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Gostei</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className={`h-6 w-6 p-0 transition-transform ${feedbackByMessage[baseId] === 'down' ? 'scale-105' : ''}`}
+                                    onClick={() => { setFeedback(String(m.id || idx), 'down'); setFeedbackMessageId(String(m.id || idx)); setFeedbackText(''); setFeedbackModalOpen(true); }}
+                                  >
+                                    <ThumbsDown className={`h-3.5 w-3.5 ${feedbackByMessage[baseId] === 'down' ? 'text-red-600' : 'text-muted-foreground'}`} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Não gostei</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         </div>
                       )}
@@ -409,7 +490,7 @@ const TryOut = () => {
                 <Textarea id="feedback-text" value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} placeholder="Descreva seu feedback" />
               </div>
               <DialogFooter>
-                <Button onClick={sendFeedback}>Enviar</Button>
+                <Button onClick={sendFeedback} disabled={sendingFeedback}>Enviar</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

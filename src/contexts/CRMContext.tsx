@@ -14,13 +14,13 @@ interface CRMContextType {
   user: User | null;
   isAuthenticated: boolean;
   loadingUser: boolean;
-  addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'notes'>) => Promise<{ success: boolean; error?: string }>;
+  addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'notes'> & { company?: string; notes?: string }) => Promise<{ success: boolean; error?: string }>;
   updateLead: (id: string, updates: Partial<Lead>) => void;
   deleteLead: (id: string) => Promise<boolean>;
   addNote: (leadId: string, content: string) => Promise<boolean>;
   getNotesByLead: (leadId: string) => Promise<Note[]>;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string) => Promise<boolean>;
+  register: (name: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string, leadsVolume?: number) => Promise<boolean>;
   logout: () => void;
   getDashboardMetrics: () => DashboardMetrics;
   updateUser: (updates: Partial<User>) => void;
@@ -192,7 +192,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           source: lead.lead_canal_origem,
           value: 0, // Ajuste se houver campo de valor
           notes: notes, // Carregar anotações do banco
-          priority: 'medium', // Ajuste se houver prioridade
+          priority: 'medium' as const,
           expectedCloseDate: undefined,
           lead_notas: lead.lead_notas,
           thread_dify: lead.thread_dify,
@@ -266,7 +266,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Função de registro
-  const register = async (nome: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string): Promise<boolean> => {
+  const register = async (nome: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string, leadsVolume?: number): Promise<boolean> => {
     try {
       // 1. Criar usuário no Supabase Auth
       const { data, error } = await supabase.auth.signUp({
@@ -287,6 +287,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user_telefone: telefone || null,
         user_empresa: empresa || null,
         user_tipo: user_tipo || null,
+        user_plano: (leadsVolume !== undefined && leadsVolume !== null) ? String(leadsVolume) : null,
       });
 
       if (!profile) {
@@ -339,7 +340,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const addLead = async (leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'notes'>): Promise<{ success: boolean; error?: string }> => {
+  const addLead = async (leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'notes'> & { company?: string; notes?: string }): Promise<{ success: boolean; error?: string }> => {
     if (!user) {
       return { success: false, error: 'Usuário não autenticado.' };
     }
@@ -409,9 +410,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           source: lead.lead_canal_origem,
           value: 0,
           notes: notes,
-          priority: 'medium',
+          priority: 'medium' as const,
           expectedCloseDate: undefined,
-          company: lead.lead_empresa,
         };
       }));
 

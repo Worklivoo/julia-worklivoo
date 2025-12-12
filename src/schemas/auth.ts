@@ -17,7 +17,8 @@ export const registerSchema = z.object({
     required_error: 'Selecione o tipo de cliente'
   }),
   telefone: z.string().optional(),
-  empresa: z.string().optional()
+  empresa: z.string().optional(),
+  leads_volume: z.coerce.number().min(1, 'Informe um volume válido')
 })
 
 // Tipos TypeScript derivados dos schemas
