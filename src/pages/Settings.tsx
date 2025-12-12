@@ -77,6 +77,35 @@ const Settings = () => {
     );
   };
 
+  const triggerFontesWebhook = async (params: { tipo: string; link: string; userId: string; body?: string | null }) => {
+    const url = `https://primary-production-d442.up.railway.app/webhook/banco-dados${params.userId}`;
+    const payload: any = { TIPO: params.tipo, LINK: params.link, USER_ID: params.userId };
+    if (params.tipo === 'API') {
+      let bodyObj: any = {};
+      if (params.body && params.body.trim().length > 0) {
+        try {
+          bodyObj = JSON.parse(params.body);
+        } catch (e: any) {
+          toast({ title: 'Body inválido', description: 'JSON do body não é válido' });
+        }
+      }
+      payload.BODY = bodyObj;
+    }
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        toast({ title: 'Webhook falhou', description: text || `Status ${res.status}` });
+      }
+    } catch (err: any) {
+      toast({ title: 'Erro no webhook', description: err?.message || 'Falha ao enviar' });
+    }
+  };
+
   return (
     <div className="text-foreground transition-colors">
       <div className="p-6 space-y-6">
@@ -237,6 +266,7 @@ const Settings = () => {
                             return;
                           }
                           toast({ title: 'Fonte de dados salva', description: 'As informações foram registradas.' });
+                          await triggerFontesWebhook({ tipo, link: normalizedLinks, userId: user.id, body });
                           setFontes([result.data]);
                           setLinks('');
                           setBody('');
@@ -351,6 +381,7 @@ const Settings = () => {
                             return;
                           }
                           setFontes(prev => prev.map(f => f.id === data.id ? data : f));
+                          await triggerFontesWebhook({ tipo: editData.tipo, link: normalizedLinks, userId: user.id, body: editData.body });
                           setEditOpen(false);
                           setEditData(null);
                           toast({ title: 'Fonte de dados atualizada', description: 'As informações foram alteradas.' });
