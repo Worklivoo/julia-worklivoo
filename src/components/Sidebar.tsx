@@ -6,8 +6,8 @@ import { useCRM } from '@/contexts/CRMContext';
 import './Sidebar.css';
 import { 
   Home, 
-  Users, 
   MessageCircle, 
+  MessageSquare,
   Settings, 
   ChevronLeft, 
   Menu, 
@@ -15,10 +15,7 @@ import {
   Sun,
   Moon,
   LogOut,
-  Smartphone,
-  UsersRound,
   Contact,
-  Book,
   Sparkles
 } from 'lucide-react';
 
@@ -27,13 +24,12 @@ interface NavigationItem {
   path: string;
   icon: React.ComponentType<any>;
   tooltip: string;
-  external?: boolean;
 }
 
 const Sidebar = () => {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const { user, logout } = useCRM();
+  const { logout } = useCRM();
   
   // Recuperar estado do sidebar do localStorage na inicialização
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -63,17 +59,16 @@ const Sidebar = () => {
       tooltip: 'WhatsApp'
     },
     {
+      name: 'Conversas',
+      path: '/conversas',
+      icon: MessageSquare,
+      tooltip: 'Conversas'
+    },
+    {
       name: 'Try-Out',
       path: '/try-out',
       icon: Sparkles,
       tooltip: 'Try-Out'
-    },
-    {
-      name: 'Console',
-      path: user ? `https://console.worklivoo.com/${user.isMembro ? user.user_id_empresa : user.id}` : '#',
-      icon: Smartphone,
-      tooltip: 'Console',
-      external: true
     },
     {
       name: 'Configurações',
@@ -156,25 +151,13 @@ const Sidebar = () => {
             const IconComponent = item.icon;
             return (
               <li key={item.name} className="nav-item">
-                {item.external ? (
-                  <a
-                    href={item.path}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="nav-link"
-                  >
-                    <IconComponent className="nav-icon material-symbols-rounded" />
-                    <span className="nav-label">{item.name}</span>
-                  </a>
-                ) : (
-                  <Link
-                    to={item.path}
-                    className={`nav-link ${isActiveLink(item.path) ? 'active' : ''}`}
-                  >
-                    <IconComponent className="nav-icon material-symbols-rounded" />
-                    <span className="nav-label">{item.name}</span>
-                  </Link>
-                )}
+                <Link
+                  to={item.path}
+                  className={`nav-link ${isActiveLink(item.path) ? 'active' : ''}`}
+                >
+                  <IconComponent className="nav-icon material-symbols-rounded" />
+                  <span className="nav-label">{item.name}</span>
+                </Link>
                 <span className="nav-tooltip">{item.tooltip}</span>
               </li>
             );

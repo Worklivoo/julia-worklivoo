@@ -17,6 +17,7 @@ import Membros from "./pages/Membros";
 import BaseDeConhecimento from "./pages/BaseDeConhecimento";
 
 import TryOut from "./pages/TryOut";
+import Conversas from "./pages/Conversas";
 
 
 import ClientPage from "./pages/ClientPage";
@@ -82,6 +83,7 @@ const AppRoutes = () => {
       <Route path="/membros" element={<ProtectedRoute><Layout><Membros /></Layout></ProtectedRoute>} />
       <Route path="/base-de-conhecimento" element={<ProtectedRoute><Layout><BaseDeConhecimento /></Layout></ProtectedRoute>} />
       <Route path="/configuracoes" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
+      <Route path="/conversas" element={<ProtectedRoute><Layout><Conversas /></Layout></ProtectedRoute>} />
       <Route path="/try-out" element={<ProtectedRoute><Layout><TryOut /></Layout></ProtectedRoute>} />
 
       <Route path="/404" element={<NotFound />} />
