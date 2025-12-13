@@ -5,11 +5,18 @@ import { PIPELINE_STAGES, NOTE_TRUNCATE_LENGTH } from './lead-detail-constants';
  */
 export function formatPhone(phone: string): string {
   if (!phone) return '';
-  const cleaned = phone.replace(/\D/g, '');
-  if (cleaned.length === 13) {
-    return `+${cleaned.slice(0,2)} ${cleaned.slice(2,4)} ${cleaned.slice(4,9)}-${cleaned.slice(9)}`;
+  const digits = phone.replace(/\D/g, '');
+  let rest = digits.startsWith('55') ? digits.slice(2) : digits;
+  const area = rest.slice(0, 2);
+  const number = rest.slice(2);
+  if (!area || !number) return phone;
+  if (number.length >= 9) {
+    return `+55 ${area} ${number.slice(0, 5)}-${number.slice(5, 9)}`;
   }
-  return phone;
+  if (number.length >= 8) {
+    return `+55 ${area} ${number.slice(0, 4)}-${number.slice(4, 8)}`;
+  }
+  return `+55 ${area} ${number}`;
 }
 
 /**

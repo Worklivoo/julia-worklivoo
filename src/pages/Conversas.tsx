@@ -55,11 +55,16 @@ const TryOut = () => {
 
   const formatPhone = (raw: string) => {
     const digits = String(raw || '').replace(/\D/g, '');
-    let rest = digits;
-    if (rest.startsWith('55')) rest = rest.slice(2);
+    let rest = digits.startsWith('55') ? digits.slice(2) : digits;
     const area = rest.slice(0, 2);
-    const number = rest.slice(2, 11);
+    const number = rest.slice(2);
     if (!area || !number) return String(raw || '');
+    if (number.length === 9) {
+      return `+55 ${area} ${number.slice(0, 5)}-${number.slice(5)}`;
+    }
+    if (number.length === 8) {
+      return `+55 ${area} ${number.slice(0, 4)}-${number.slice(4)}`;
+    }
     return `+55 ${area} ${number}`;
   };
 

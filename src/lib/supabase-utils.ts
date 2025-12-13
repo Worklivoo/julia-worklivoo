@@ -218,6 +218,38 @@ export const updateBaseConhecimentoByUser = async (
   return { data, error }
 }
 
+export const getTelefoneQualificadoByUser = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('usuarios')
+    .select('telefone_qualificado')
+    .eq('user_id', userId)
+    .single()
+  if (error) {
+    return { data: null, error }
+  }
+  const valor = (data as any)?.telefone_qualificado ?? null
+  return { data: valor, error: null }
+}
+
+export const updateTelefoneQualificadoByUser = async (userId: string, telefone55: string) => {
+  const { data, error } = await supabase
+    .from('usuarios')
+    .update({ telefone_qualificado: telefone55 })
+    .eq('user_id', userId)
+    .select('telefone_qualificado')
+    .single()
+  return { data, error }
+}
+
+export const getFeedbacksByUser = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('feedbacks')
+    .select('feedback_id,criado_em,mensagem_id,comentario_tipo,comentario_mensagem,dify_conversation,dify_user,user_id,status')
+    .eq('user_id', userId)
+    .order('criado_em', { ascending: false })
+  return { data: (data || []) as any[], error }
+}
+
 // Removido: migração concluída para a tabela 'usuarios'
 
 // Removido: migração concluiu o uso da antiga base de conhecimento

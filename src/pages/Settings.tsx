@@ -11,11 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { addFonteDados, getFontesDadosByUser, updateFonteDados } from '@/lib/supabase-utils';
+import { addFonteDados, getFontesDadosByUser, updateFonteDados, getTelefoneQualificadoByUser, updateTelefoneQualificadoByUser, getFeedbacksByUser } from '@/lib/supabase-utils';
+import { formatPhone } from '@/lib/lead-detail-utils';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import Membros from '@/pages/Membros';
 import BaseDeConhecimento from '@/pages/BaseDeConhecimento';
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 const Settings = () => {
   const { user } = useCRM();
@@ -29,6 +31,12 @@ const Settings = () => {
   const [loadingFontes, setLoadingFontes] = useState<boolean>(false);
   const [editOpen, setEditOpen] = useState<boolean>(false);
   const [editData, setEditData] = useState<{ id: string; tipo: string; links: string; body: string | '' } | null>(null);
+  const [telefoneQualificado, setTelefoneQualificado] = useState<string | null>(null);
+  const [editTelefoneOpen, setEditTelefoneOpen] = useState<boolean>(false);
+  const [telefoneQualificadoEdit, setTelefoneQualificadoEdit] = useState<string>('');
+  const [isSavingTelefone, setIsSavingTelefone] = useState<boolean>(false);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [loadingFeedbacks, setLoadingFeedbacks] = useState<boolean>(false);
 
   useEffect(() => {
     setCliente(user?.empresa || '');
@@ -43,6 +51,26 @@ const Settings = () => {
       setLoadingFontes(false);
     };
     load();
+  }, [user?.id]);
+
+  useEffect(() => {
+    const loadTelefone = async () => {
+      if (!user) return;
+      const { data } = await getTelefoneQualificadoByUser(user.id);
+      setTelefoneQualificado(data || null);
+    };
+    loadTelefone();
+  }, [user?.id]);
+
+  useEffect(() => {
+    const loadFeedbacks = async () => {
+      if (!user) return;
+      setLoadingFeedbacks(true);
+      const { data } = await getFeedbacksByUser(user.id);
+      setFeedbacks(data || []);
+      setLoadingFeedbacks(false);
+    };
+    loadFeedbacks();
   }, [user?.id]);
 
   if (!user) {
@@ -123,6 +151,7 @@ const Settings = () => {
             <TabsTrigger value="fontes">Fontes de Dados</TabsTrigger>
             <TabsTrigger value="membros">Membros</TabsTrigger>
             <TabsTrigger value="base-de-conhecimento">Base de Conhecimento</TabsTrigger>
+            <TabsTrigger value="historico-de-otimizacoes">Histórico de Otimizações</TabsTrigger>
           </TabsList>
 
           <TabsContent value="gerais" className="pt-4">
@@ -167,8 +196,8 @@ const Settings = () => {
                     <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
                       <Phone className="h-5 w-5 text-muted-foreground" />
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Telefone</p>
-                        <p className="font-medium">{user.telefone}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Celular Principal</p>
+                        <p className="font-medium">{formatPhone(user.telefone || '')}</p>
                       </div>
                     </div>
                   )}
@@ -192,9 +221,86 @@ const Settings = () => {
                       {getPlanoBadge(user.plano)}
                     </div>
                   </div>
+                  <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
+                    <Phone className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex items-center justify-between w-full">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Telefone para Notificar</p>
+                        <p className="font-medium">{telefoneQualificado ? formatPhone(telefoneQualificado) : '-'}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const digits = String(telefoneQualificado || '').replace(/\D/g, '');
+                          const rest = digits.startsWith('55') ? digits.slice(2) : digits;
+                          setTelefoneQualificadoEdit(rest);
+                          setEditTelefoneOpen(true);
+                        }}
+                      >
+                        Editar
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+            <Dialog open={editTelefoneOpen} onOpenChange={setEditTelefoneOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Telefone para Notificar</DialogTitle>
+                  <DialogDescription>Informe o número iniciando por DDD e número. O prefixo +55 será aplicado automaticamente.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium text-muted-foreground">Número</Label>
+                  <div className="flex items-center">
+                    <div className="bg-muted px-3 py-2 rounded-l-md border border-r-0 border-input">+55</div>
+                    <Input
+                      type="tel"
+                      className="rounded-l-none"
+                      placeholder="11999999999"
+                      value={telefoneQualificadoEdit}
+                      onChange={(e) => {
+                        const onlyDigits = e.target.value.replace(/\D/g, '');
+                        setTelefoneQualificadoEdit(onlyDigits);
+                      }}
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditTelefoneOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        if (!user) return;
+                        const rest = String(telefoneQualificadoEdit || '').replace(/\D/g, '');
+                        if (!rest) {
+                          toast({ title: 'Telefone inválido', description: 'Informe o DDD e número.' });
+                          return;
+                        }
+                        const full = `55${rest}`.slice(0, 13);
+                        setIsSavingTelefone(true);
+                        const { error } = await updateTelefoneQualificadoByUser(user.id, full);
+                        setIsSavingTelefone(false);
+                        if (error) {
+                          toast({ title: 'Erro ao salvar', description: 'Não foi possível atualizar o telefone.' });
+                          return;
+                        }
+                        setTelefoneQualificado(full);
+                        setEditTelefoneOpen(false);
+                        toast({ title: 'Telefone atualizado', description: 'O número foi salvo com sucesso.' });
+                      }}
+                      disabled={isSavingTelefone}
+                    >
+                      {isSavingTelefone ? 'Salvando...' : 'Salvar'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="fontes" className="pt-4 space-y-8">
@@ -406,6 +512,48 @@ const Settings = () => {
 
           <TabsContent value="base-de-conhecimento" className="pt-4">
             <BaseDeConhecimento />
+          </TabsContent>
+
+          <TabsContent value="historico-de-otimizacoes" className="pt-4">
+            <Card className="border-border bg-card shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-semibold">Histórico de Otimizações</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {loadingFeedbacks ? (
+                  <div className="text-muted-foreground">Carregando...</div>
+                ) : feedbacks.length === 0 ? (
+                  <div className="text-muted-foreground">Nenhum registro encontrado.</div>
+                ) : (
+                  <div className="rounded-md border border-border/50 overflow-hidden">
+                    <Table className="w-full">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Mensagem</TableHead>
+                          <TableHead>Conversa</TableHead>
+                          <TableHead>Telefone</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {feedbacks.map((f) => (
+                          <TableRow key={String(f.feedback_id || `${f.user_id}-${f.mensagem_id}-${f.criado_em}`)}>
+                            <TableCell>{f.criado_em ? new Date(f.criado_em).toLocaleString('pt-BR') : '-'}</TableCell>
+                            <TableCell>{f.comentario_tipo || '-'}</TableCell>
+                            <TableCell className="max-w-[320px] truncate">{f.comentario_mensagem || '-'}</TableCell>
+                            <TableCell className="max-w-[240px] truncate">{f.dify_conversation || '-'}</TableCell>
+                            <TableCell>{formatPhone(f.dify_user || '')}</TableCell>
+                            <TableCell>{f.status || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

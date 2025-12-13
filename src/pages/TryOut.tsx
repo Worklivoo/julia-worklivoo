@@ -566,6 +566,22 @@ const TryOut = () => {
       const conv = conversations.find((c) => c.dify_conversation === selectedConvId) || conversations[0];
       const messageIdNormalized = normalizeMessageId(String(feedbackMessageId || ''));
       const idempotencyKey = `${String(userIdForData || '')}:${messageIdNormalized}:negativo`;
+      let feedbackId: string | null = null;
+      try {
+        const { data: inserted } = await supabase
+          .from('feedbacks')
+          .insert({
+            user_id: String(userIdForData || ''),
+            mensagem_id: messageIdNormalized,
+            comentario_tipo: 'negativo',
+            comentario_mensagem: String(feedbackText || ''),
+            dify_conversation: String(selectedConvId || conv?.dify_conversation || ''),
+            dify_user: String(conv?.dify_user || '')
+          })
+          .select('feedback_id')
+          .single();
+        feedbackId = (inserted as any)?.feedback_id ? String((inserted as any).feedback_id) : null;
+      } catch {}
       const form = new URLSearchParams({
         user_id: String(userIdForData || ''),
         message_id: messageIdNormalized,
@@ -575,6 +591,7 @@ const TryOut = () => {
         dify_conversation: String(conv?.dify_conversation || ''),
         idempotency_key: idempotencyKey
       });
+      if (feedbackId) form.append('feedback_id', feedbackId);
       if (profile && typeof profile === 'object') {
         Object.entries(profile as any).forEach(([k, v]) => {
           try {
@@ -590,18 +607,6 @@ const TryOut = () => {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: form.toString()
       });
-      try {
-        await supabase
-          .from('feedbacks')
-          .insert({
-            user_id: String(userIdForData || ''),
-            mensagem_id: messageIdNormalized,
-            comentario_tipo: 'negativo',
-            comentario_mensagem: String(feedbackText || ''),
-            dify_conversation: String(selectedConvId || conv?.dify_conversation || ''),
-            dify_user: String(conv?.dify_user || '')
-          });
-      } catch {}
       setFeedback(String(feedbackMessageId || ''), 'down');
       toast({ title: 'Feedback enviado', description: 'Vamos analisar e revisar a IA.' });
       setFeedbackModalOpen(false);
