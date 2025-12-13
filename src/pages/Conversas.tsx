@@ -18,6 +18,7 @@ type TrainingConversation = {
   treinamento_id?: number
   dify_conversation: string
   dify_user: string
+  user_id: string
 }
 
 type MessageItem = {
@@ -62,9 +63,11 @@ const TryOut = () => {
     return `+55 ${area} ${number}`;
   };
 
+  const mask = (t: string | null) => (t ? `${String(t).slice(0,4)}...${String(t).slice(-4)}` : '<missing>');
+
   const userIdForData = useMemo(() => {
     if (!user) return null;
-    return user.id || null;
+    return user.isMembro ? (user.user_id_empresa || null) : (user.id || null);
   }, [user]);
 
   useEffect(() => {
@@ -108,7 +111,7 @@ const TryOut = () => {
 
         const filtered = allRows
           .filter((r) => typeof r?.thread_dify === 'string' && r.thread_dify.trim() !== '')
-          .map((r) => ({ dify_conversation: String(r.thread_dify), dify_user: String(r.lead_telefone) })) as TrainingConversation[];
+          .map((r) => ({ dify_conversation: String(r.thread_dify), dify_user: String(r.lead_telefone), user_id: String(r.user_id) })) as TrainingConversation[];
         setConversations(filtered);
         console.log('Debug: conversations filtered count:', filtered.length);
         if (filtered.length > 0) {
@@ -188,8 +191,10 @@ const TryOut = () => {
 
   const reloadMessages = async () => {
     if (!userIdForData) return;
+    if (loading) return;
     setLoading(true);
     try {
+      console.log('Debug reloadMessages start:', { userIdForData, selectedConvId, conversationsCount: conversations.length });
       const filtered = conversations;
       if (filtered.length === 0) return;
       const { data: keyRow } = await supabase
@@ -197,7 +202,22 @@ const TryOut = () => {
         .select('api_agente_dify')
         .eq('user_id', userIdForData)
         .single();
-      const apiKey = (keyRow as any)?.api_agente_dify || null;
+      console.log('Debug reloadMessages keyRow:', keyRow);
+      let apiKey = (keyRow as any)?.api_agente_dify || null;
+      console.log('Debug reloadMessages apiKey present:', !!apiKey);
+      if (!apiKey) {
+        const selConv = selectedConvId ? filtered.find((c) => c.dify_conversation === selectedConvId) : null;
+        const fallbackUserId = selConv?.user_id || filtered[0]?.user_id;
+        if (fallbackUserId) {
+          const { data: altKeyRow } = await supabase
+            .from('usuarios')
+            .select('api_agente_dify')
+            .eq('user_id', fallbackUserId)
+            .single();
+          apiKey = (altKeyRow as any)?.api_agente_dify || null;
+          console.log('Debug reloadMessages fallback apiKey present:', !!apiKey, 'fallbackUserId:', fallbackUserId);
+        }
+      }
       if (!apiKey) {
         const MAX_FETCH_CONVERSATIONS = 50;
         const baseList = filtered.slice(0, MAX_FETCH_CONVERSATIONS);
@@ -205,6 +225,7 @@ const TryOut = () => {
         const convList = selConv && !baseList.some((c) => c.dify_conversation === selConv.dify_conversation)
           ? [selConv, ...baseList]
           : baseList;
+        console.log('Debug reloadMessages without apiKey:', { MAX_FETCH_CONVERSATIONS, convListCount: convList.length });
         const map: Record<string, MessageItem[]> = {};
         convList.forEach((c) => { map[c.dify_conversation] = messagesByConv[c.dify_conversation] || []; });
         setMessagesByConv(map);
@@ -221,6 +242,7 @@ const TryOut = () => {
       const convList = selConv && !baseList.some((c) => c.dify_conversation === selConv.dify_conversation)
         ? [selConv, ...baseList]
         : baseList;
+      console.log('Debug reloadMessages params:', { API_URL, MAX_FETCH_CONVERSATIONS, convListCount: convList.length, selectedConvId });
 
       const parallelMap = async <T, R>(items: T[], limit: number, fn: (item: T, idx: number) => Promise<R>): Promise<R[]> => {
         const results: R[] = new Array(items.length) as any;
@@ -236,12 +258,36 @@ const TryOut = () => {
         return results;
       };
 
-      const fetchAll = await parallelMap(convList, 10, async (c) => {
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const fetchAll = await parallelMap(convList, 4, async (c) => {
         try {
-          const res = await fetch(`${API_URL}/messages?conversation_id=${encodeURIComponent(c.dify_conversation)}&user=${encodeURIComponent(c.dify_user)}`, {
-            headers: { Authorization: `Bearer ${apiKey}` },
-          });
-          const json = await res.json();
+          const url = `${API_URL}/messages?conversation_id=${encodeURIComponent(c.dify_conversation)}&user=${encodeURIComponent(c.dify_user)}`;
+          console.log('Dify GET /messages payload:', { url, headers: { Authorization: `Bearer ${mask(apiKey)}` } });
+          let lastErrorText = '';
+          let json: any = null;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+            if (res.ok) {
+              try {
+                json = await res.json();
+              } catch (e: any) {
+                lastErrorText = e?.message || 'json parse error';
+                json = null;
+              }
+              if (json != null) break;
+            } else {
+              try {
+                lastErrorText = await res.text();
+              } catch {}
+              console.warn('Dify GET /messages failed:', { conversation_id: c.dify_conversation, status: res.status, error: lastErrorText });
+            }
+            const backoff = 250 * Math.pow(2, attempt);
+            await sleep(backoff);
+          }
+          if (json == null) {
+            console.warn('Dify GET /messages no data after retries:', { conversation_id: c.dify_conversation, user: c.dify_user, error: lastErrorText });
+            return { id: c.dify_conversation, items: [] };
+          }
           const raw: any[] = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
           const expanded: MessageItem[] = [];
           raw.forEach((it: any, idx: number) => {
@@ -253,25 +299,30 @@ const TryOut = () => {
               expanded.push({ id: `${it?.id || idx}-a`, role: 'assistant', content: it.answer, created_at: createdAt });
             }
           });
+          console.log('Debug fetch messages response:', { conversation_id: c.dify_conversation, items: expanded.length });
           return { id: c.dify_conversation, items: expanded };
-        } catch {
+        } catch (e: any) {
+          console.warn('Dify GET /messages network error:', { conversation_id: c.dify_conversation, user: c.dify_user, error: e?.message || 'unknown' });
           return { id: c.dify_conversation, items: [] };
         }
       });
       const map: Record<string, MessageItem[]> = {};
       fetchAll.forEach((r) => { map[r.id] = r.items; });
+      console.log('Debug messages map size:', Object.keys(map).length);
       setMessagesByConv(map);
       const cacheKey = `tryout:messages:${userIdForData}`;
       localStorage.setItem(cacheKey, JSON.stringify(map));
 
       try {
         const convIds = Object.keys(map);
+        console.log('Debug fetch feedback marks params:', { user_id: userIdForData, convIdsCount: convIds.length });
         if (convIds.length > 0) {
           const { data: marks } = await supabase
             .from('feedbacks')
             .select('dify_conversation,mensagem_id,comentario_tipo')
             .eq('user_id', userIdForData)
             .in('dify_conversation', convIds);
+          console.log('Debug feedback marks count:', Array.isArray(marks) ? marks.length : 0);
           if (Array.isArray(marks)) {
             const next: Record<string, 'up' | 'down'> = {};
             marks.forEach((m: any) => {
@@ -385,6 +436,11 @@ const TryOut = () => {
         conversation_id: conv.dify_conversation,
         user: conv.dify_user
       };
+      console.log('Dify POST /chat-messages payload:', {
+        url: API_URL,
+        headers: { Authorization: `Bearer ${mask(apiKey)}`, 'Content-Type': 'application/json' },
+        body
+      });
       const optimisticUser: MessageItem = { id: `${Date.now()}-q`, role: 'user', content: msg, created_at: String(Date.now()) };
       setMessagesByConv((prev) => {
         const next = { ...prev };
@@ -573,9 +629,9 @@ const TryOut = () => {
               <div className="text-xs text-muted-foreground">Conversas da IA</div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={reloadMessages} className="gap-2 hover:!bg-[#EBF57D]">
-                <RotateCcw className="h-4 w-4" />
-                Recarregar
+              <Button variant="outline" onClick={reloadMessages} disabled={loading} className="gap-2 hover:!bg-[#EBF57D]">
+                <RotateCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Carregando' : 'Recarregar'}
               </Button>
               
             </div>
