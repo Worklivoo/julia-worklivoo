@@ -67,7 +67,8 @@ const Settings = () => {
       if (!user) return;
       setLoadingFeedbacks(true);
       const { data } = await getFeedbacksByUser(user.id);
-      setFeedbacks(data || []);
+      const negatives = (data || []).filter((f: any) => String(f?.comentario_tipo || '').toLowerCase() === 'negativo');
+      setFeedbacks(negatives);
       setLoadingFeedbacks(false);
     };
     loadFeedbacks();
@@ -525,14 +526,12 @@ const Settings = () => {
                 ) : feedbacks.length === 0 ? (
                   <div className="text-muted-foreground">Nenhum registro encontrado.</div>
                 ) : (
-                  <div className="rounded-md border border-border/50 overflow-hidden">
+                  <div className="rounded-xl border border-border/50 shadow-sm overflow-hidden">
                     <Table className="w-full">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Data</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead>Mensagem</TableHead>
-                          <TableHead>Conversa</TableHead>
+                          <TableHead>Feedback</TableHead>
                           <TableHead>Telefone</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
@@ -541,11 +540,20 @@ const Settings = () => {
                         {feedbacks.map((f) => (
                           <TableRow key={String(f.feedback_id || `${f.user_id}-${f.mensagem_id}-${f.criado_em}`)}>
                             <TableCell>{f.criado_em ? new Date(f.criado_em).toLocaleString('pt-BR') : '-'}</TableCell>
-                            <TableCell>{f.comentario_tipo || '-'}</TableCell>
                             <TableCell className="max-w-[320px] truncate">{f.comentario_mensagem || '-'}</TableCell>
-                            <TableCell className="max-w-[240px] truncate">{f.dify_conversation || '-'}</TableCell>
                             <TableCell>{formatPhone(f.dify_user || '')}</TableCell>
-                            <TableCell>{f.status || '-'}</TableCell>
+                            <TableCell>
+                              {(() => {
+                                const s = String(f.status || '').trim().toUpperCase();
+                                if (s === 'OK') {
+                                  return <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">OK</Badge>;
+                                }
+                                if (!s) {
+                                  return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Em Andamento</Badge>;
+                                }
+                                return <Badge variant="outline">{s}</Badge>;
+                              })()}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
