@@ -24,6 +24,7 @@ const Auth = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetMessage, setResetMessage] = useState('');
   const [resetError, setResetError] = useState('');
+  const [loginError, setLoginError] = useState('');
   const { login, register } = useCRM();
   const navigate = useNavigate();
 
@@ -38,9 +39,12 @@ const Auth = () => {
 
   const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
-    const success = await login(data.email, data.password);
-    if (success) {
+    setLoginError('');
+    const result = await login(data.email, data.password);
+    if (result.success) {
       navigate('/inicio');
+    } else {
+      setLoginError(result.error || 'Falha ao entrar. Verifique suas credenciais.');
     }
     setIsLoading(false);
   };
@@ -272,6 +276,11 @@ const Auth = () => {
                       <p className="text-sm text-red-600">{loginForm.formState.errors.password.message}</p>
                     )}
                   </div>
+                  {loginError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-700">{loginError}</p>
+                    </div>
+                  )}
                   <Button 
                     type="submit" 
                     className="w-full h-11 bg-black hover:bg-gray-800 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"

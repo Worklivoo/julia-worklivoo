@@ -27,8 +27,11 @@ const ResetPassword = () => {
         setIsValidSession(true);
       } else {
         // Verificar se há tokens na URL
-        const accessToken = searchParams.get('access_token');
-        const refreshToken = searchParams.get('refresh_token');
+        const rawHash = window.location.hash || '';
+        const hash = rawHash.startsWith('#') ? rawHash.slice(1) : rawHash;
+        const hashParams = new URLSearchParams(hash);
+        const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
         
         if (accessToken && refreshToken) {
           const { error } = await supabase.auth.setSession({
@@ -38,6 +41,10 @@ const ResetPassword = () => {
           
           if (!error) {
             setIsValidSession(true);
+            try {
+              const cleanUrl = window.location.pathname + window.location.search;
+              window.history.replaceState({}, document.title, cleanUrl);
+            } catch {}
           } else {
             setError('Link de recuperação inválido ou expirado.');
           }

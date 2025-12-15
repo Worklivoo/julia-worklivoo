@@ -19,7 +19,7 @@ interface CRMContextType {
   deleteLead: (id: string) => Promise<boolean>;
   addNote: (leadId: string, content: string) => Promise<boolean>;
   getNotesByLead: (leadId: string) => Promise<Note[]>;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string, leadsVolume?: number) => Promise<boolean>;
   logout: () => void;
   getDashboardMetrics: () => DashboardMetrics;
@@ -245,24 +245,24 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }
 
   // Função de login
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error || !data.session) {
       setUser(null);
       setIsAuthenticated(false);
-      return false;
+      return { success: false, error: error?.message || 'Credenciais inválidas. Verifique email e senha.' };
     }
     
     const userProfile = await getCompleteUserProfile(data.user.id, data.user.email);
     if (userProfile) {
       setUser(userProfile);
       setIsAuthenticated(true);
-      return true;
+      return { success: true };
     }
     
     setUser(null);
     setIsAuthenticated(false);
-    return false;
+    return { success: false, error: 'Perfil não encontrado. Usuário não vinculado a cliente ou membro.' };
   };
 
   // Função de registro
