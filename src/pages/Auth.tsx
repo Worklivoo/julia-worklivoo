@@ -310,6 +310,7 @@ const Auth = () => {
                           type="text"
                           placeholder="Seu nome completo"
                           {...registerForm.register('name')}
+                          required
                           className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.name ? 'border-red-500' : ''}`}
                         />
                       </div>
@@ -326,6 +327,7 @@ const Auth = () => {
                           type="email"
                           placeholder="seu@email.com"
                           {...registerForm.register('email')}
+                          required
                           className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.email ? 'border-red-500' : ''}`}
                         />
                       </div>
@@ -345,6 +347,7 @@ const Auth = () => {
                           type={showRegisterPassword ? 'text' : 'password'}
                           placeholder="Crie uma senha segura"
                           {...registerForm.register('password')}
+                          required
                           className={`pl-10 pr-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.password ? 'border-red-500' : ''}`}
                         />
                         <button
@@ -397,6 +400,7 @@ const Auth = () => {
                         <SelectContent>
                           <SelectItem value="Imobiliaria" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Imobiliaria</SelectItem>
                           <SelectItem value="Carro" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Carro</SelectItem>
+                          <SelectItem value="Outro" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Outro</SelectItem>
                         </SelectContent>
                       </Select>
                       {registerForm.formState.errors.user_tipo && (
@@ -412,6 +416,7 @@ const Auth = () => {
                           min={1}
                           placeholder="Ex.: 100"
                           {...registerForm.register('leads_volume', { valueAsNumber: true })}
+                          required
                           className={`h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.leads_volume ? 'border-red-500' : ''}`}
                         />
                       </div>
@@ -423,7 +428,7 @@ const Auth = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-sm font-medium text-slate-700">Telefone <span className="text-slate-400">(opcional)</span></Label>
+                      <Label htmlFor="phone" className="text-sm font-medium text-slate-700">Telefone</Label>
                       <div className="relative">
                         <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                         <Input
@@ -431,6 +436,7 @@ const Auth = () => {
                           type="text"
                           placeholder="(11) 99999-9999"
                           {...registerForm.register('telefone')}
+                          required
                           className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.telefone ? 'border-red-500' : ''}`}
                         />
                       </div>
@@ -439,7 +445,7 @@ const Auth = () => {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="company" className="text-sm font-medium text-slate-700">Empresa <span className="text-slate-400">(opcional)</span></Label>
+                      <Label htmlFor="company" className="text-sm font-medium text-slate-700">Empresa</Label>
                       <div className="relative">
                         <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                         <Input
@@ -447,6 +453,7 @@ const Auth = () => {
                           type="text"
                           placeholder="Nome da empresa"
                           {...registerForm.register('empresa')}
+                          required
                           className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.empresa ? 'border-red-500' : ''}`}
                         />
                       </div>

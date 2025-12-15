@@ -18,10 +18,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import Membros from '@/pages/Membros';
 import BaseDeConhecimento from '@/pages/BaseDeConhecimento';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { usePersistentTab } from '@/hooks/use-persistent-state';
 
 const Settings = () => {
   const { user } = useCRM();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = usePersistentTab('settings', 'gerais');
   const [tipo, setTipo] = useState<string>('HTML');
   const [links, setLinks] = useState<string>('');
   const [body, setBody] = useState<string>('');
@@ -146,7 +148,7 @@ const Settings = () => {
             <p className="text-muted-foreground mt-1 text-lg">Gerencie suas preferências e fontes</p>
           </div>
         </div>
-        <Tabs defaultValue="gerais" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="bg-muted/40">
             <TabsTrigger value="gerais">Gerais</TabsTrigger>
             <TabsTrigger value="fontes">Fontes de Dados</TabsTrigger>
@@ -532,7 +534,7 @@ const Settings = () => {
                         <TableRow>
                           <TableHead>Data</TableHead>
                           <TableHead>Feedback</TableHead>
-                          <TableHead>Telefone</TableHead>
+                          <TableHead>USER</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -541,12 +543,15 @@ const Settings = () => {
                           <TableRow key={String(f.feedback_id || `${f.user_id}-${f.mensagem_id}-${f.criado_em}`)}>
                             <TableCell>{f.criado_em ? new Date(f.criado_em).toLocaleString('pt-BR') : '-'}</TableCell>
                             <TableCell className="max-w-[320px] truncate">{f.comentario_mensagem || '-'}</TableCell>
-                            <TableCell>{formatPhone(f.dify_user || '')}</TableCell>
+                            <TableCell>{String(f.dify_user ?? '')}</TableCell>
                             <TableCell>
                               {(() => {
                                 const s = String(f.status || '').trim().toUpperCase();
                                 if (s === 'OK') {
                                   return <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100">OK</Badge>;
+                                }
+                                if (s === 'EM ANÁLISE') {
+                                  return <Badge variant="secondary" className="bg-red-100 text-red-800 hover:bg-red-100">EM ANÁLISE</Badge>;
                                 }
                                 if (!s) {
                                   return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Em Andamento</Badge>;

@@ -13,11 +13,11 @@ export const registerSchema = z.object({
   password: z.string()
     .min(6, 'Senha deve ter pelo menos 6 caracteres')
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Senha deve conter maiúscula, minúscula e número'),
-  user_tipo: z.enum(['Imobiliaria', 'Carro'], {
+  user_tipo: z.enum(['Imobiliaria', 'Carro', 'Outros'], {
     required_error: 'Selecione o tipo de cliente'
   }),
-  telefone: z.string().optional(),
-  empresa: z.string().optional(),
+  telefone: z.string().min(1, 'Telefone é obrigatório'),
+  empresa: z.string().min(1, 'Empresa é obrigatória'),
   leads_volume: z.coerce.number().min(1, 'Informe um volume válido')
 })
 
