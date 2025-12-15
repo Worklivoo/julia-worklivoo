@@ -311,7 +311,7 @@ const Auth = () => {
                 <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="name" className="text-sm font-medium text-slate-700">Nome completo</Label>
+                      <Label htmlFor="name" className="text-sm font-medium text-slate-700">Nome completo <span className="text-red-500">*</span></Label>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                         <Input
@@ -328,7 +328,7 @@ const Auth = () => {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="register-email" className="text-sm font-medium text-slate-700">E-mail</Label>
+                      <Label htmlFor="register-email" className="text-sm font-medium text-slate-700">E-mail <span className="text-red-500">*</span></Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                         <Input
@@ -348,7 +348,7 @@ const Auth = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="register-password" className="text-sm font-medium text-slate-700">Senha</Label>
+                      <Label htmlFor="register-password" className="text-sm font-medium text-slate-700">Senha <span className="text-red-500">*</span></Label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                         <Input
@@ -401,7 +401,7 @@ const Auth = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="user-tipo" className="text-sm font-medium text-slate-700">Escolha o tipo de cliente</Label>
+                      <Label htmlFor="user-tipo" className="text-sm font-medium text-slate-700">Escolha o tipo de cliente <span className="text-red-500">*</span></Label>
                       <Select value={registerForm.watch('user_tipo')} onValueChange={(v) => registerForm.setValue('user_tipo', v as RegisterFormData['user_tipo'])}>
                         <SelectTrigger className="w-full h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900">
                           <SelectValue placeholder="Selecione o tipo" />
@@ -417,7 +417,7 @@ const Auth = () => {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="leads-volume" className="text-sm font-medium text-slate-700">Volume de Leads/mês</Label>
+                      <Label htmlFor="leads-volume" className="text-sm font-medium text-slate-700">Volume de Leads/mês <span className="text-red-500">*</span></Label>
                       <div className="relative">
                         <Input
                           id="leads-volume"
@@ -437,7 +437,7 @@ const Auth = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-sm font-medium text-slate-700">Telefone</Label>
+                      <Label htmlFor="phone" className="text-sm font-medium text-slate-700">Telefone <span className="text-red-500">*</span></Label>
                       <div className="relative">
                         <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                         <Input
@@ -454,7 +454,7 @@ const Auth = () => {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="company" className="text-sm font-medium text-slate-700">Empresa</Label>
+                      <Label htmlFor="company" className="text-sm font-medium text-slate-700">Empresa <span className="text-red-500">*</span></Label>
                       <div className="relative">
                         <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                         <Input
