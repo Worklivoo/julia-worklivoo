@@ -13,7 +13,8 @@ import { usePersistentDateRange } from '@/hooks/use-persistent-state';
 import { useLeadOrigins } from '@/hooks/use-lead-origins';
 import { useIsMobile } from '@/hooks/use-mobile';
 import KanbanBoard from '@/components/KanbanBoard';
-import { Search, Plus, Filter, Activity } from 'lucide-react';
+import { Search, Plus, Filter, Activity, FileDown } from 'lucide-react';
+import { getLeadsByUser } from '@/lib/leads';
 
 const Pipeline = () => {
   const { leads, addLead, user } = useCRM();
@@ -34,6 +35,41 @@ const Pipeline = () => {
   const [addLeadError, setAddLeadError] = useState<string | null>(null);
   const [addLeadSuccess, setAddLeadSuccess] = useState<string | null>(null);
   const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportStatus, setExportStatus] = useState<string>('all');
+  const [exportStage, setExportStage] = useState<string>('all');
+  const [exportDateRange, setExportDateRange] = useState<DateRange>({ from: undefined as any, to: undefined as any });
+  const formatDateForInput = (date?: Date) => {
+    if (!date) return '';
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const [exportStartInput, setExportStartInput] = useState<string>(formatDateForInput(exportDateRange?.from));
+  const [exportEndInput, setExportEndInput] = useState<string>(formatDateForInput(exportDateRange?.to));
+  useEffect(() => {
+    setExportStartInput(formatDateForInput(exportDateRange?.from));
+    setExportEndInput(formatDateForInput(exportDateRange?.to));
+  }, [exportDateRange]);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const allColumns = [
+    { key: 'lead_id', label: 'ID' },
+    { key: 'created_at', label: 'DATA DE CRIAÇÃO' },
+    { key: 'lead_etapa', label: 'ETAPA DO LEAD' },
+    { key: 'lead_status', label: 'STATUS' },
+    { key: 'lead_nome_pessoa', label: 'NOME' },
+    { key: 'lead_empresa', label: 'EMPRESA' },
+    { key: 'lead_telefone', label: 'TELEFONE' },
+    { key: 'lead_email', label: 'EMAIL' },
+    { key: 'lead_canal_origem', label: 'CANAL DE ORIGEM' },
+    { key: 'lead_notas', label: 'NOTAS' },
+    { key: 'ativo_ia', label: 'IA ESTA ATIVA?' },
+  ];
+  const selectedColumns = allColumns.map(c => c.key);
+  const columnLabels: Record<string, string> =
+    Object.fromEntries(allColumns.map(c => [c.key, c.label]));
 
   const [newLead, setNewLead] = useState({
     opportunityName: '',
@@ -118,6 +154,75 @@ const Pipeline = () => {
       }
     } else {
       setAddLeadError('Preencha todos os campos obrigatórios.');
+    }
+  };
+
+  const handleExportLeads = async () => {
+    setExportError(null);
+    if (!user) {
+      setExportError('Usuário não autenticado.');
+      return;
+    }
+    setExportLoading(true);
+    try {
+      const userIdForLeads = user.isMembro ? user.user_id_empresa : user.id;
+      let membroIdFilter: string | undefined;
+      if (user.isMembro && user.membro_cargo === 'Usuario') {
+        membroIdFilter = user.membroId;
+      }
+      const { data, error } = await getLeadsByUser(userIdForLeads || '', membroIdFilter);
+      if (error) {
+        setExportError(error.message || 'Erro ao buscar leads.');
+        setExportLoading(false);
+        return;
+      }
+      const rows = (data || []).filter((lead: any) => {
+        const statusOk = exportStatus === 'all' ? true : (lead.lead_status || '').toLowerCase() === exportStatus.toLowerCase();
+        const normalize = (s: string) => (s || '').toLowerCase().trim();
+        const stageOk =
+          exportStage === 'all'
+            ? true
+            : normalize(lead.lead_etapa) === normalize(exportStage);
+        let dateOk = true;
+        if (exportDateRange?.from && exportDateRange?.to) {
+          const createdAt = new Date(lead.created_at);
+          const fromDate = new Date(exportDateRange.from);
+          const toDate = new Date(exportDateRange.to);
+          toDate.setHours(23, 59, 59, 999);
+          dateOk = createdAt >= fromDate && createdAt <= toDate;
+        }
+        return statusOk && stageOk && dateOk;
+      });
+      const headers = selectedColumns.map((key) => columnLabels[key] || key);
+      const escapeCSV = (value: any) => {
+        const v = value === null || value === undefined ? '' : String(value);
+        if (/[",\n]/.test(v)) {
+          return `"${v.replace(/"/g, '""')}"`;
+        }
+        return v;
+      };
+      const csv = [
+        headers.join(','),
+        ...rows.map((lead: any) =>
+          selectedColumns
+            .map((key) => escapeCSV(lead[key]))
+            .join(',')
+        ),
+      ].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `leads_export_worklivoo_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setShowExportDialog(false);
+    } catch (e: any) {
+      setExportError('Erro interno ao exportar leads.');
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -539,6 +644,20 @@ const Pipeline = () => {
               dateRange={dateRange}
               onDateRangeChange={setDateRange}
             />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="bg-background/50 border-border/50 hover:bg-muted/50"
+                  onClick={() => setShowExportDialog(true)}
+                >
+                  <FileDown className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                Exportar Leads
+              </TooltipContent>
+            </Tooltip>
             {(searchTerm || statusFilter !== 'open' || (dateRange.from && dateRange.to && (dateRange.from.getTime() !== startOfMonth(new Date()).getTime() || dateRange.to.getTime() !== endOfMonth(new Date()).getTime()))) && (
               <Button variant="outline" size="sm" 
                 onClick={() => {
@@ -555,6 +674,114 @@ const Pipeline = () => {
               </Button>
             )}
           </div>
+          <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+            <DialogContent className="sm:max-w-[680px] max-h-[85vh] overflow-y-auto">
+              <DialogHeader className="pb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: '#EBF57D'}}>
+                    <FileDown className="w-5 h-5 text-black" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-xl font-semibold text-gray-900">Exportar Leads</DialogTitle>
+                    <DialogDescription className="text-gray-600 mt-1">
+                      Defina os parâmetros para exportar os leads do seu pipeline
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+              <div className="space-y-6">
+                <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide border-b border-gray-200 pb-2">Parâmetros de Exportação</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Status</label>
+                      <Select value={exportStatus} onValueChange={setExportStatus}>
+                        <SelectTrigger className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-400">
+                          <SelectValue placeholder="Todos os Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="Aberto">Aberto</SelectItem>
+                          <SelectItem value="Ganho">Ganho</SelectItem>
+                          <SelectItem value="Perdido">Perdido</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Etapa</label>
+                      <Select value={exportStage} onValueChange={setExportStage}>
+                        <SelectTrigger className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-400">
+                          <SelectValue placeholder="Todas as Etapas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas</SelectItem>
+                          <SelectItem value="entrada do lead">Entrada do Lead</SelectItem>
+                          <SelectItem value="tentando contato">Tentando Contato</SelectItem>
+                          <SelectItem value="contato realizado">Contato Realizado</SelectItem>
+                          <SelectItem value="oportunidade qualificada">Oportunidade Qualificada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Período (Data de Criação)</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label htmlFor="export-start" className="text-sm text-gray-700">Data Inicial</label>
+                        <Input
+                          id="export-start"
+                          type="date"
+                          value={exportStartInput}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setExportStartInput(v);
+                            setExportDateRange(prev => ({
+                              from: v ? new Date(v + 'T00:00:00') : undefined,
+                              to: prev?.to
+                            }));
+                          }}
+                          className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="export-end" className="text-sm text-gray-700">Data Final</label>
+                        <Input
+                          id="export-end"
+                          type="date"
+                          value={exportEndInput}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setExportEndInput(v);
+                            setExportDateRange(prev => ({
+                              from: prev?.from,
+                              to: v ? new Date(v + 'T00:00:00') : undefined
+                            }));
+                          }}
+                          className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {exportError && (
+                    <div className="rounded-md p-3 bg-red-50 text-red-700 text-sm border border-red-200">{exportError}</div>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
+                <Button variant="outline" onClick={() => setShowExportDialog(false)} className="border-gray-300 text-gray-700 hover:bg-gray-50">Cancelar</Button>
+                <Button
+                  onClick={handleExportLeads}
+                  disabled={exportLoading}
+                  className="shadow-lg hover:shadow-xl transition-all duration-300 min-w-[140px]"
+                  style={{backgroundColor: '#EBF57D', color: '#000000'}}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d4e06a'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#EBF57D'}
+                >
+                  {exportLoading ? 'Exportando...' : 'Exportar CSV'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Conteúdo do Pipeline */}
