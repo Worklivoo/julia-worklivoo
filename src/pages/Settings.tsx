@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import Membros from '@/pages/Membros';
 import BaseDeConhecimento from '@/pages/BaseDeConhecimento';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { usePersistentTab } from '@/hooks/use-persistent-state';
 
 const Settings = () => {
@@ -528,13 +529,13 @@ const Settings = () => {
                 ) : feedbacks.length === 0 ? (
                   <div className="text-muted-foreground">Nenhum registro encontrado.</div>
                 ) : (
+                  <TooltipProvider delayDuration={150}>
                   <div className="rounded-xl border border-border/50 shadow-sm overflow-hidden">
                     <Table className="w-full">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Data</TableHead>
                           <TableHead>Feedback</TableHead>
-                          <TableHead>USER</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -542,8 +543,20 @@ const Settings = () => {
                         {feedbacks.map((f) => (
                           <TableRow key={String(f.feedback_id || `${f.user_id}-${f.mensagem_id}-${f.criado_em}`)}>
                             <TableCell>{f.criado_em ? new Date(f.criado_em).toLocaleString('pt-BR') : '-'}</TableCell>
-                            <TableCell className="max-w-[320px] truncate">{f.comentario_mensagem || '-'}</TableCell>
-                            <TableCell>{String(f.dify_user ?? '')}</TableCell>
+                            <TableCell className="max-w-[320px] truncate">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="block truncate">
+                                    {f.comentario_mensagem || '-'}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start" className="max-w-[640px]">
+                                  <div className="max-h-[320px] overflow-auto whitespace-pre-wrap break-words">
+                                    {f.comentario_mensagem || '-'}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TableCell>
                             <TableCell>
                               {(() => {
                                 const s = String(f.status || '').trim().toUpperCase();
@@ -564,6 +577,7 @@ const Settings = () => {
                       </TableBody>
                     </Table>
                   </div>
+                  </TooltipProvider>
                 )}
               </CardContent>
             </Card>
