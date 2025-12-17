@@ -16,7 +16,8 @@ import {
   Moon,
   LogOut,
   Contact,
-  Sparkles
+  Sparkles,
+  CreditCard
 } from 'lucide-react';
 
 interface NavigationItem {
@@ -69,6 +70,12 @@ const Sidebar = () => {
       path: '/try-out',
       icon: Sparkles,
       tooltip: 'Try-Out'
+    },
+    {
+      name: 'Assinatura',
+      path: '/assinatura',
+      icon: CreditCard,
+      tooltip: 'Assinatura'
     },
     {
       name: 'Configurações',

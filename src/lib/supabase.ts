@@ -196,6 +196,56 @@ export interface Database {
           historico_lead?: string
         }
       }
+      clientes_pagamento: {
+        Row: {
+          id: string
+          user_id: string
+          id_cliente_asaas: string
+          id_cobranca_asaas: string | null
+          valor_total: number
+          data_vencimento: string
+          status_pagamento: string | null
+          url_fatura: string | null
+          url_comprovante: string | null
+          cartao_token: string | null
+          cartao_final: string | null
+          cartao_bandeira: string | null
+          data_criacao: string
+          data_pagamento: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          id_cliente_asaas: string
+          id_cobranca_asaas?: string | null
+          valor_total: number
+          data_vencimento: string
+          status_pagamento?: string | null
+          url_fatura?: string | null
+          url_comprovante?: string | null
+          cartao_token?: string | null
+          cartao_final?: string | null
+          cartao_bandeira?: string | null
+          data_criacao?: string
+          data_pagamento?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          id_cliente_asaas?: string
+          id_cobranca_asaas?: string | null
+          valor_total?: number
+          data_vencimento?: string
+          status_pagamento?: string | null
+          url_fatura?: string | null
+          url_comprovante?: string | null
+          cartao_token?: string | null
+          cartao_final?: string | null
+          cartao_bandeira?: string | null
+          data_criacao?: string
+          data_pagamento?: string | null
+        }
+      }
     }
   }
 }
