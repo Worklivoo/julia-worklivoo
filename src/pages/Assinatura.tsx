@@ -3,64 +3,125 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { CreditCard, User, Mail, Phone, Calendar, Lock, MapPin, Building, ShieldCheck, Check, AlertCircle } from 'lucide-react';
+import { User, Mail, Phone, Building, Check, AlertCircle, Loader2, CreditCard, Calendar, Lock, FileText, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/supabase-utils';
 import { usePersistentState } from '@/hooks/use-persistent-state';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+
+interface Payment {
+  id: string;
+  value: number;
+  status: string;
+  clientPaymentDate: string | null;
+  dateCreated: string;
+  invoiceUrl: string;
+  description: string | null;
+}
 
 const Assinatura = () => {
-  const [isPersonalInfoSaved, setIsPersonalInfoSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isCardSaved, setIsCardSaved] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [paymentProfileId, setPaymentProfileId] = useState<string | null>(null);
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [asaasCustomerId, setAsaasCustomerId] = useState<string | null>(null);
+  const [cardFinal, setCardFinal] = useState<string | null>(null);
+  
+  const [invoices, setInvoices] = useState<Payment[]>([]);
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
 
-  // Form states with persistence
-  const [formData, setFormData] = usePersistentState('assinatura-form-data', {
+  // Estado persistente do formulário de cliente
+  const [formData, setFormData] = usePersistentState('assinatura-novo-form', {
     nome: '',
     documento: '',
     email: '',
     celular: '',
-    cardName: '',
-    cardNumber: '',
-    cardMonth: '',
-    cardYear: '',
-    cardCvv: '',
-    cardCep: '',
-    cardAddressNumber: ''
+    cep: '',
+    numero: ''
+  });
+
+  // Estado persistente do formulário de cartão
+  const [cardData, setCardData] = usePersistentState('assinatura-cartao-form', {
+    holderName: '',
+    number: '',
+    expiryMonth: '',
+    expiryYear: '',
+    ccv: ''
   });
 
   useEffect(() => {
     loadInitialData();
   }, []);
 
+  useEffect(() => {
+    if (asaasCustomerId) {
+      fetchInvoices();
+    }
+  }, [asaasCustomerId]);
+
+  const fetchInvoices = async () => {
+    if (!asaasCustomerId) return;
+    
+    setIsLoadingInvoices(true);
+    try {
+      const apiKey = import.meta.env.VITE_ASAAS_API_KEY;
+      if (!apiKey) return;
+
+      const response = await fetch(`/api/asaas/payments?customer=${asaasCustomerId}`, {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'access_token': apiKey
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data && Array.isArray(data.data)) {
+          setInvoices(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar faturas:', error);
+    } finally {
+      setIsLoadingInvoices(false);
+    }
+  };
+
   const loadInitialData = async () => {
     try {
+      setIsLoading(true);
       const user = await getCurrentUser();
       if (!user) return;
       setUserId(user.id);
 
-      // Carregar dados do usuário para preencher formulário
-      const { data: userData } = await supabase
+      // Buscar dados do usuário no banco
+      const { data: userData, error } = await supabase
         .from('usuarios')
         .select('*')
         .eq('user_id', user.id)
         .single();
 
+      if (error) throw error;
+
       if (userData) {
+        // Se já tiver ID Asaas, marcamos como salvo
+        if (userData.id_cliente_asaas) {
+          setAsaasCustomerId(userData.id_cliente_asaas);
+          setIsSaved(true);
+        }
+        
+        // Se já tiver token do cartão, marcamos como salvo
+        if (userData.cartao_token) {
+          setIsCardSaved(true);
+        }
+
+        // Se já tiver final do cartão, carregamos
+        if (userData.cartao_final) {
+          setCardFinal(userData.cartao_final);
+        }
+
+        // Preencher formulário com dados existentes se o formulário estiver vazio
         setFormData(prev => ({
           ...prev,
           nome: prev.nome || userData.user_nome || '',
@@ -68,24 +129,11 @@ const Assinatura = () => {
           celular: prev.celular || userData.user_telefone || '',
         }));
       }
-
-      // Verificar se já existe perfil de pagamento
-      const { data: paymentData, error } = await supabase
-        .from('clientes_pagamento')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('data_criacao', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (paymentData) {
-        setPaymentProfileId(paymentData.id);
-        setIsPersonalInfoSaved(true);
-        // Se houver dados de cartão salvos (parcialmente), poderíamos preencher aqui
-        // Mas por segurança, geralmente não trazemos dados sensíveis de volta ou tokenizados
-      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
+      toast.error('Erro ao carregar informações do usuário.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -93,35 +141,29 @@ const Assinatura = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveClick = () => {
+  const handleCardChange = (field: string, value: string) => {
+    setCardData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = async () => {
+    // Validação básica
     if (!formData.nome || !formData.documento || !formData.email || !formData.celular) {
       toast.error('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
-    setIsConfirmDialogOpen(true);
-  };
 
-  const handleConfirmSave = async () => {
-    if (!userId) return;
+    if (!userId) {
+      toast.error('Usuário não identificado.');
+      return;
+    }
+
     setIsLoading(true);
-    setIsConfirmDialogOpen(false);
 
     try {
       const apiKey = import.meta.env.VITE_ASAAS_API_KEY;
-      console.log('Ambiente:', import.meta.env.MODE);
-      console.log('API Key presente:', !!apiKey);
-      
-      if (!apiKey) {
-        throw new Error('Chave de API do Asaas não configurada.');
-      }
+      if (!apiKey) throw new Error('Chave de API do Asaas não configurada.');
 
-      // Determinar URL com base no ambiente da chave (produção ou sandbox)
-      // A chave fornecida começa com $aact_prod, o que indica produção.
-      // O endpoint correto é https://api.asaas.com/v3/customers
-      
-      const baseUrl = 'https://api.asaas.com/v3/customers';
-
-      // Preparar dados para API do Asaas
+      // 1. Criar Cliente no Asaas
       const asaasPayload = {
         name: formData.nome,
         cpfCnpj: formData.documento.replace(/\D/g, ''),
@@ -129,8 +171,7 @@ const Assinatura = () => {
         mobilePhone: formData.celular.replace(/\D/g, '')
       };
 
-      // Chamada API Asaas
-      // Usar proxy para evitar problemas de CORS e proteger a chave
+      // Usando o proxy configurado no vite.config.ts
       const response = await fetch('/api/asaas/customers', {
         method: 'POST',
         headers: {
@@ -150,62 +191,39 @@ const Assinatura = () => {
       const asaasData = await response.json();
       const asaasId = asaasData.id;
 
-      if (!asaasId) {
-        throw new Error('ID do cliente não retornado pelo Asaas');
-      }
+      if (!asaasId) throw new Error('ID do cliente não retornado pelo Asaas');
 
-      // Salvar no Supabase
-      const dbPayload = {
-        user_id: userId,
-        id_cliente_asaas: asaasId,
-        valor_total: 0,
-        data_vencimento: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0],
-        status_pagamento: 'PENDENTE'
-      };
+      // 2. Salvar ID na tabela usuarios (apenas o ID, sem atualizar outros dados)
+      const { error: updateError } = await supabase
+        .from('usuarios')
+        .update({
+          id_cliente_asaas: asaasId
+        })
+        .eq('user_id', userId);
 
-      let error;
-      
-      if (paymentProfileId) {
-        // Atualizar existente
-        const { error: updateError } = await supabase
-          .from('clientes_pagamento')
-          .update({
-             id_cliente_asaas: asaasId // Atualiza caso tenha mudado
-          })
-          .eq('id', paymentProfileId);
-        error = updateError;
-      } else {
-        // Criar novo
-        const { data, error: insertError } = await supabase
-          .from('clientes_pagamento')
-          .insert(dbPayload)
-          .select()
-          .single();
-        
-        if (data) {
-          setPaymentProfileId(data.id);
-        }
-        error = insertError;
-      }
+      if (updateError) throw updateError;
 
-      if (error) throw error;
+      setAsaasCustomerId(asaasId);
+      setIsSaved(true);
+      toast.success('Cliente cadastrado com sucesso!');
 
-      setIsPersonalInfoSaved(true);
-      toast.success('Informações salvas e cliente criado com sucesso!');
     } catch (error: any) {
       console.error('Erro ao salvar:', error);
-      toast.error(error.message || 'Erro ao salvar informações pessoais.');
+      toast.error(error.message || 'Erro ao salvar informações.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleFinalizeSubscription = async () => {
-    if (!userId || !paymentProfileId) return;
-    
-    // Validação básica
-    if (!formData.cardName || !formData.cardNumber || !formData.cardMonth || !formData.cardYear || !formData.cardCvv || !formData.cardCep || !formData.cardAddressNumber) {
+  const handleSaveCard = async () => {
+    // Validação básica do cartão
+    if (!cardData.holderName || !cardData.number || !cardData.expiryMonth || !cardData.expiryYear || !cardData.ccv) {
       toast.error('Por favor, preencha todos os dados do cartão.');
+      return;
+    }
+
+    if (!userId) {
+      toast.error('Usuário não identificado.');
       return;
     }
 
@@ -215,438 +233,451 @@ const Assinatura = () => {
       const apiKey = import.meta.env.VITE_ASAAS_API_KEY;
       if (!apiKey) throw new Error('Chave de API do Asaas não configurada.');
 
-      // Obter ID do cliente Asaas do banco de dados (garantir que temos o mais atual)
-      const { data: currentPaymentProfile } = await supabase
-        .from('clientes_pagamento')
-        .select('id_cliente_asaas')
-        .eq('id', paymentProfileId)
-        .single();
-
-      if (!currentPaymentProfile?.id_cliente_asaas) {
-        throw new Error('ID do cliente Asaas não encontrado. Salve suas informações pessoais primeiro.');
+      // Obter IP do cliente
+      let remoteIp = '0.0.0.0';
+      try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        if (ipResponse.ok) {
+           const ipData = await ipResponse.json();
+           remoteIp = ipData.ip;
+        }
+      } catch (e) {
+        console.warn('Não foi possível obter o IP do cliente, usando padrão.', e);
       }
 
-      // Obter IP do cliente
-      const ipResponse = await fetch('https://api.ipify.org?format=json');
-      const ipData = await ipResponse.json();
-      const remoteIp = ipData.ip;
-
-      // Preparar payload para tokenização
-      const tokenizePayload = {
+      // 1. Tokenizar Cartão no Asaas
+      const tokenPayload = {
+        customer: asaasCustomerId,
         creditCard: {
-          holderName: formData.cardName,
-          number: formData.cardNumber.replace(/\D/g, ''),
-          expiryMonth: formData.cardMonth,
-          expiryYear: formData.cardYear,
-          ccv: formData.cardCvv
+          holderName: cardData.holderName,
+          number: cardData.number.replace(/\s/g, ''),
+          expiryMonth: cardData.expiryMonth,
+          expiryYear: cardData.expiryYear,
+          ccv: cardData.ccv
         },
         creditCardHolderInfo: {
           name: formData.nome,
           email: formData.email,
           cpfCnpj: formData.documento.replace(/\D/g, ''),
-          postalCode: formData.cardCep.replace(/\D/g, ''),
-          addressNumber: formData.cardAddressNumber,
+          postalCode: formData.cep.replace(/\D/g, ''),
+          addressNumber: formData.numero,
           phone: formData.celular.replace(/\D/g, '')
         },
-        customer: currentPaymentProfile.id_cliente_asaas,
         remoteIp: remoteIp
       };
 
-      // Chamada API Asaas via Proxy
-      const response = await fetch('/api/asaas/creditCard/tokenizeCreditCard', {
+      console.log('Payload enviado:', tokenPayload);
+
+      // Usando o proxy para tokenização
+      // Endpoint correto para tokenizar: /api/v3/creditCard/tokenize
+      const response = await fetch('/api/asaas/creditCard/tokenize', {
         method: 'POST',
         headers: {
           'accept': 'application/json',
           'access_token': apiKey,
           'content-type': 'application/json'
         },
-        body: JSON.stringify(tokenizePayload)
+        body: JSON.stringify(tokenPayload)
       });
 
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Erro Asaas Tokenização:', errorData);
-        throw new Error(errorData.errors?.[0]?.description || 'Erro ao processar cartão.');
+        throw new Error(errorData.errors?.[0]?.description || 'Erro ao tokenizar cartão');
       }
 
-      const creditCardData = await response.json();
-      // A resposta é um array com os dados do cartão, pegamos o primeiro (e único) item
-      /*
-         [ 
-           { 
-             "creditCardNumber": "7916", 
-             "creditCardBrand": "MASTERCARD", 
-             "creditCardToken": "e65ddd03-4b9e-439b-934d-f2d466061fb3" 
-           } 
-         ] 
-      */
+      const tokenData = await response.json();
+      const creditCardToken = tokenData.creditCardToken;
+
+      if (!creditCardToken) throw new Error('Token do cartão não retornado.');
+
+      // 2. Calcular dia de vencimento
+      const today = new Date();
+      let dueDay = today.getDate();
       
-      const cardInfo = creditCardData; // Dependendo da resposta exata, pode ser creditCardData[0] ou o próprio objeto. A documentação/exemplo diz array.
-      // O exemplo do usuário mostra array: [ { ... } ]
-      // Vamos verificar se é array
-      const tokenizedCard = Array.isArray(creditCardData) ? creditCardData[0] : creditCardData;
-
-      if (!tokenizedCard.creditCardToken) {
-        throw new Error('Token do cartão não retornado.');
+      // Regra: se for dia 29, 30 ou 31, o vencimento será dia 1
+      if (dueDay >= 29) {
+        dueDay = 1;
       }
 
-      // Calcular data de pagamento (30 dias após hoje)
-      const dataPagamento = new Date();
-      dataPagamento.setDate(dataPagamento.getDate() + 30);
-
-      // Atualizar Supabase
-      const { error } = await supabase
-        .from('clientes_pagamento')
+      // 3. Atualizar tabela usuarios
+      const lastFourDigits = cardData.number.replace(/\s/g, '').slice(-4);
+      
+      const { error: updateError } = await supabase
+        .from('usuarios')
         .update({
-          cartao_token: tokenizedCard.creditCardToken,
-          cartao_final: tokenizedCard.creditCardNumber,
-          cartao_bandeira: tokenizedCard.creditCardBrand,
-          status_pagamento: 'CONFIRMADO',
-          data_pagamento: dataPagamento.toISOString()
+          cartao_token: creditCardToken,
+          cartao_final: lastFourDigits,
+          dia_vencimento: dueDay
         })
-        .eq('id', paymentProfileId);
+        .eq('user_id', userId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
-      toast.success('Cartão cadastrado e assinatura confirmada!');
-      
-      // Limpar CVV por segurança (mantendo outros dados para conveniência visual, ou limpar tudo sensível)
-      setFormData(prev => ({ ...prev, cardCvv: '' }));
+      setCardFinal(lastFourDigits);
+      setIsCardSaved(true);
+      toast.success('Cartão cadastrado com sucesso!');
 
     } catch (error: any) {
-      console.error('Erro ao finalizar assinatura:', error);
-      toast.error(error.message || 'Erro ao processar assinatura.');
+      console.error('Erro ao salvar cartão:', error);
+      toast.error(error.message || 'Erro ao processar cartão.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  return (
-    <div className="text-foreground transition-colors">
-      <div className="p-6 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent light-welcome-title">Assinatura & Cobrança</h1>
-            <p className="text-muted-foreground mt-1 text-lg">Gerencie suas informações pessoais e métodos de pagamento</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-[1600px]">
-          
-          {/* Coluna da Esquerda - Formulários */}
-          <div className="space-y-8">
-            
-            {/* Seção 1: Dados Pessoais */}
-            <Card className="border-border/60 shadow-sm hover:shadow-md transition-shadow duration-300">
-              <CardHeader>
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <User className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl">Informações Pessoais</CardTitle>
-                    <CardDescription>Dados para identificação e contato.</CardDescription>
-                  </div>
+  // Se tudo estiver salvo (cliente e cartão)
+  if (isSaved && isCardSaved) {
+    return (
+      <div className="container mx-auto py-10 px-4 max-w-3xl flex flex-col items-center min-h-[50vh]">
+        <Card className="border-green-200 dark:border-green-900 bg-green-50/50 dark:bg-green-900/10 w-full max-w-md mb-8">
+          <CardContent className="pt-6 flex flex-col items-center text-center space-y-4">
+            <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">
+              <Check size={32} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-green-700 dark:text-green-400">Tudo Pronto!</h2>
+              <p className="text-muted-foreground mt-2">
+                Seus dados e cartão foram cadastrados com sucesso. Sua assinatura está ativa.
+              </p>
+              {cardFinal && (
+                <div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 inline-block">
+                   <div className="flex items-center gap-3 text-left">
+                      <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                        <CreditCard size={20} className="text-gray-600 dark:text-gray-300"/>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Cartão de Crédito</p>
+                        <p className="text-xs text-muted-foreground">Terminado em •••• {cardFinal}</p>
+                      </div>
+                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="nome" className="text-sm font-medium">Nome Completo</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        id="nome" 
-                        placeholder="Seu nome completo" 
-                        className="pl-9" 
-                        disabled={isPersonalInfoSaved}
-                        value={formData.nome}
-                        onChange={(e) => handleInputChange('nome', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="documento" className="text-sm font-medium">CPF / CNPJ</Label>
-                    <div className="relative">
-                      <Building className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        id="documento" 
-                        placeholder="000.000.000-00" 
-                        className="pl-9" 
-                        disabled={isPersonalInfoSaved}
-                        value={formData.documento}
-                        onChange={(e) => handleInputChange('documento', e.target.value)}
-                      />
-                    </div>
-                  </div>
+              )}
+            </div>
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={() => {
+                // Opcional: permitir editar ou resetar
+                // setIsCardSaved(false);
+                // setIsSaved(false);
+                window.location.href = '/'; // Redirecionar para dashboard
+              }}
+            >
+              Voltar ao Início
+            </Button>
+          </CardContent>
+        </Card>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        id="email" 
-                        type="email" 
-                        placeholder="seu@email.com" 
-                        className="pl-9" 
-                        disabled={isPersonalInfoSaved}
-                        value={formData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="celular" className="text-sm font-medium">Celular</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        id="celular" 
-                        type="tel" 
-                        placeholder="(00) 00000-0000" 
-                        className="pl-9" 
-                        disabled={isPersonalInfoSaved}
-                        value={formData.celular}
-                        onChange={(e) => handleInputChange('celular', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {!isPersonalInfoSaved ? (
-                  <Button 
-                    className="w-full mt-4" 
-                    onClick={handleSaveClick}
-                    disabled={isLoading}
+        {/* Seção de Faturas */}
+        <Card className="w-full max-w-md border-muted/60">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <FileText size={20} />
+              </div>
+              <div>
+                <CardTitle>Histórico de Pagamentos</CardTitle>
+                <CardDescription>Visualize suas faturas e comprovantes.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingInvoices ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : invoices.length > 0 ? (
+              <div className="space-y-3">
+                {invoices.map((invoice) => (
+                  <div 
+                    key={invoice.id} 
+                    className="flex items-center justify-between p-3 rounded-lg border border-muted hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => window.open(invoice.invoiceUrl, '_blank')}
                   >
-                    {isLoading ? 'Salvando...' : 'Salvar Informações'}
-                  </Button>
-                ) : (
-                  <div className="flex items-center justify-center gap-2 p-3 bg-green-500/10 text-green-600 rounded-md mt-4 border border-green-200 dark:border-green-900">
-                    <Check className="w-4 h-4" />
-                    <span className="text-sm font-medium">Informações salvas</span>
-                    <Button variant="link" className="h-auto p-0 text-green-600 ml-2" onClick={() => setIsPersonalInfoSaved(false)}>
-                      Editar
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Seção 2: Dados do Cartão (Só aparece se dados pessoais estiverem salvos) */}
-            {isPersonalInfoSaved && (
-              <Card className="border-border/60 shadow-sm hover:shadow-md transition-shadow duration-300 animate-in fade-in slide-in-from-bottom-4">
-                <CardHeader>
-                  <div className="flex items-center gap-3 mb-1">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <CreditCard className="w-5 h-5 text-primary" />
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">
+                        {invoice.description || 'Assinatura'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(invoice.clientPaymentDate || invoice.dateCreated).toLocaleDateString('pt-BR')}
+                      </span>
                     </div>
-                    <div>
-                      <CardTitle className="text-xl">Método de Pagamento</CardTitle>
-                      <CardDescription>Cadastre seu cartão de crédito para faturamento.</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  
-                  {/* Visual do Cartão (Decorativo) */}
-                  <div className="relative w-full max-w-sm mx-auto h-48 rounded-xl bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 shadow-xl mb-8 transform transition-transform hover:scale-[1.02]">
-                    <div className="flex justify-between items-start">
-                      <div className="w-12 h-8 bg-yellow-500/80 rounded flex items-center justify-center">
-                        <div className="w-8 h-5 border border-white/30 rounded-sm" />
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <span className="block font-medium text-sm">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(invoice.value)}
+                        </span>
+                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full ${
+                          invoice.status === 'CONFIRMED' || invoice.status === 'RECEIVED' 
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                            : invoice.status === 'OVERDUE'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                        }`}>
+                          {invoice.status === 'CONFIRMED' || invoice.status === 'RECEIVED' ? 'Pago' : 
+                           invoice.status === 'OVERDUE' ? 'Atrasado' : 'Pendente'}
+                        </span>
                       </div>
-                      <CreditCard className="w-6 h-6 text-white/50" />
-                    </div>
-                    <div className="mt-8">
-                      <div className="text-lg tracking-widest font-mono text-white/90">
-                        {formData.cardNumber ? formData.cardNumber : '•••• •••• •••• ••••'}
-                      </div>
-                    </div>
-                    <div className="mt-8 flex justify-between items-end">
-                      <div>
-                        <div className="text-xs text-white/60 uppercase mb-1">Titular</div>
-                        <div className="text-sm font-medium tracking-wide uppercase">
-                          {formData.cardName ? formData.cardName : 'NOME NO CARTÃO'}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-white/60 uppercase mb-1">Validade</div>
-                        <div className="text-sm font-medium tracking-wide">
-                          {formData.cardMonth || 'MM'}/{formData.cardYear ? formData.cardYear.slice(-2) : 'AA'}
-                        </div>
-                      </div>
+                      <ExternalLink size={14} className="text-muted-foreground" />
                     </div>
                   </div>
-
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="card-name">Nome no Cartão</Label>
-                        <Input 
-                          id="card-name" 
-                          placeholder="Como aparece no cartão" 
-                          value={formData.cardName}
-                          onChange={(e) => handleInputChange('cardName', e.target.value)}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="card-number">Número do Cartão</Label>
-                        <div className="relative">
-                          <CreditCard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input 
-                            id="card-number" 
-                            placeholder="0000 0000 0000 0000" 
-                            className="pl-9" 
-                            value={formData.cardNumber}
-                            onChange={(e) => handleInputChange('cardNumber', e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Validade</Label>
-                        <div className="flex gap-2">
-                          <Select value={formData.cardMonth} onValueChange={(v) => handleInputChange('cardMonth', v)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Mês" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                                <SelectItem key={m} value={m.toString().padStart(2, '0')}>
-                                  {m.toString().padStart(2, '0')}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Select value={formData.cardYear} onValueChange={(v) => handleInputChange('cardYear', v)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Ano" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.from({ length: 15 }, (_, i) => new Date().getFullYear() + i).map((y) => (
-                                <SelectItem key={y} value={y.toString()}>
-                                  {y}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="cvv">CVV</Label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input 
-                            id="cvv" 
-                            placeholder="123" 
-                            maxLength={4} 
-                            className="pl-9" 
-                            value={formData.cardCvv}
-                            onChange={(e) => handleInputChange('cardCvv', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Endereço de Faturamento</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label htmlFor="cep">CEP</Label>
-                          <div className="relative">
-                            <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input 
-                              id="cep" 
-                              placeholder="00000-000" 
-                              className="pl-9" 
-                              value={formData.cardCep}
-                              onChange={(e) => handleInputChange('cardCep', e.target.value)}
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="numero">Número</Label>
-                          <Input 
-                            id="numero" 
-                            placeholder="123" 
-                            value={formData.cardAddressNumber}
-                            onChange={(e) => handleInputChange('cardAddressNumber', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhuma fatura encontrada.
+              </div>
             )}
-          </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-          {/* Coluna da Direita - Resumo e Ação */}
-          <div className="space-y-6 lg:sticky lg:top-6 h-fit">
-            <Card className="bg-primary/5 border-primary/20">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-primary" />
-                  Ambiente Seguro
-                </CardTitle>
-                <CardDescription>
-                  Seus dados são criptografados e armazenados com segurança.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Resumo</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Ao salvar, você confirma que as informações fornecidas são verdadeiras e autoriza cobranças futuras neste cartão.
-                </div>
-                <Separator />
-                <Button 
-                  className="w-full" 
-                  size="lg" 
-                  disabled={!isPersonalInfoSaved || isLoading}
-                  onClick={handleFinalizeSubscription}
-                >
-                  {isLoading ? 'Processando...' : 'Finalizar Assinatura'}
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-        </div>
+  return (
+    <div className="container mx-auto py-10 px-4 max-w-3xl">
+      <div className="mb-8 text-center">
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Configuração de Assinatura</h1>
+        <p className="text-muted-foreground">
+          {isSaved ? 'Agora, cadastre seu cartão de crédito.' : 'Preencha seus dados para criar sua conta de faturamento.'}
+        </p>
       </div>
 
-      <AlertDialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Informações Pessoais</AlertDialogTitle>
-            <AlertDialogDescription>
-              Por favor, verifique se os dados abaixo estão corretos antes de salvar.
-              <br /><br />
-              <div className="bg-muted p-3 rounded-md text-sm space-y-2 text-foreground">
-                <p><strong>Nome:</strong> {formData.nome}</p>
-                <p><strong>CPF/CNPJ:</strong> {formData.documento}</p>
-                <p><strong>Email:</strong> {formData.email}</p>
-                <p><strong>Celular:</strong> {formData.celular}</p>
+      {!isSaved ? (
+        <Card className="border-muted/60 shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <User size={20} />
               </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isLoading}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSave} disabled={isLoading}>
-              {isLoading ? 'Salvando...' : 'Confirmar e Salvar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <div>
+                <CardTitle>Dados do Cliente</CardTitle>
+                <CardDescription>Informações para emissão de notas fiscais e cobrança.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="nome">Nome Completo</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="nome"
+                    placeholder="Seu nome completo"
+                    className="pl-9"
+                    value={formData.nome}
+                    onChange={(e) => handleInputChange('nome', e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="documento">CPF / CNPJ</Label>
+                <div className="relative">
+                  <Building className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="documento"
+                    placeholder="000.000.000-00"
+                    className="pl-9"
+                    value={formData.documento}
+                    onChange={(e) => handleInputChange('documento', e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    className="pl-9"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="celular">Celular</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="celular"
+                    type="tel"
+                    placeholder="(00) 00000-0000"
+                    className="pl-9"
+                    value={formData.celular}
+                    onChange={(e) => handleInputChange('celular', e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cep">CEP</Label>
+                <div className="relative">
+                  <Building className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="cep"
+                    placeholder="00000-000"
+                    className="pl-9"
+                    value={formData.cep}
+                    onChange={(e) => handleInputChange('cep', e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="numero">Número</Label>
+                <div className="relative">
+                  <Building className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="numero"
+                    placeholder="123"
+                    className="pl-9"
+                    value={formData.numero}
+                    onChange={(e) => handleInputChange('numero', e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4">
+              <Button 
+                className="w-full md:w-auto min-w-[200px]" 
+                onClick={handleSave} 
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  'Salvar e Continuar'
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-muted/60 shadow-lg animate-in fade-in slide-in-from-right-8 duration-500">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <CreditCard size={20} />
+              </div>
+              <div>
+                <CardTitle>Dados do Cartão</CardTitle>
+                <CardDescription>Insira os dados do cartão para a assinatura.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="holderName">Nome no Cartão</Label>
+                <Input
+                  id="holderName"
+                  placeholder="Como está impresso no cartão"
+                  value={cardData.holderName}
+                  onChange={(e) => handleCardChange('holderName', e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cardNumber">Número do Cartão</Label>
+                <div className="relative">
+                  <CreditCard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="cardNumber"
+                    placeholder="0000 0000 0000 0000"
+                    className="pl-9"
+                    value={cardData.number}
+                    onChange={(e) => handleCardChange('number', e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="expiryMonth">Mês</Label>
+                  <Input
+                    id="expiryMonth"
+                    placeholder="MM"
+                    maxLength={2}
+                    value={cardData.expiryMonth}
+                    onChange={(e) => handleCardChange('expiryMonth', e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="expiryYear">Ano</Label>
+                  <Input
+                    id="expiryYear"
+                    placeholder="AA"
+                    maxLength={4}
+                    value={cardData.expiryYear}
+                    onChange={(e) => handleCardChange('expiryYear', e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ccv">CVV</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="ccv"
+                      placeholder="123"
+                      maxLength={4}
+                      className="pl-9"
+                      value={cardData.ccv}
+                      onChange={(e) => handleCardChange('ccv', e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 flex gap-3">
+               <Button 
+                variant="outline"
+                onClick={() => setIsSaved(false)}
+                disabled={isLoading}
+              >
+                Voltar
+              </Button>
+              <Button 
+                className="flex-1" 
+                onClick={handleSaveCard} 
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  'Finalizar Assinatura'
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

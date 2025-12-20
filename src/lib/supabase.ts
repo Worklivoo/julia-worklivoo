@@ -78,6 +78,10 @@ export interface Database {
             scrapper_tipo: string | null
             scrapper_link: string | null
             scrapper_body: string | null
+            id_cliente_asaas: string | null
+            cartao_token: string | null
+            cartao_final: string | null
+            dia_vencimento: number | null
           }
           Insert: {
             user_id: string
@@ -95,6 +99,10 @@ export interface Database {
             scrapper_tipo?: string | null
             scrapper_link?: string | null
             scrapper_body?: string | null
+            id_cliente_asaas?: string | null
+            cartao_token?: string | null
+            cartao_final?: string | null
+            dia_vencimento?: number | null
           }
           Update: {
             user_id?: string
@@ -112,6 +120,10 @@ export interface Database {
             scrapper_tipo?: string | null
             scrapper_link?: string | null
             scrapper_body?: string | null
+            id_cliente_asaas?: string | null
+            cartao_token?: string | null
+            cartao_final?: string | null
+            dia_vencimento?: number | null
           }
       },
       leads: {
