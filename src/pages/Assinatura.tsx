@@ -300,7 +300,32 @@ const Assinatura = () => {
     setIsLoading(true);
 
     try {
-      const apiKey = import.meta.env.VITE_ASAAS_API_KEY;
+      let apiKey = import.meta.env.VITE_ASAAS_API_KEY;
+      
+      // Sanitização da API Key para evitar erros comuns de cópia/cola
+      if (apiKey) {
+        apiKey = apiKey.trim();
+        // Remove aspas se houver (erro comum ao configurar env vars)
+        if ((apiKey.startsWith('"') && apiKey.endsWith('"')) || (apiKey.startsWith("'") && apiKey.endsWith("'"))) {
+           apiKey = apiKey.substring(1, apiKey.length - 1);
+        }
+        // Remove backslash inicial se houver (erro comum ao copiar de .env)
+        if (apiKey.startsWith('\\$')) {
+           apiKey = apiKey.replace('\\$', '$');
+        }
+      }
+
+      // Definir cleanApiKey para uso posterior
+      const cleanApiKey = apiKey;
+
+      // Debug API Key (apenas para verificação, remover em produção se necessário)
+      console.log('API Key definida:', !!apiKey);
+      console.log('API Key length:', apiKey ? apiKey.length : 0);
+      if (apiKey) {
+         console.log('API Key start:', apiKey.substring(0, 4) + '...');
+         console.log('API Key end:', '...' + apiKey.substring(apiKey.length - 4));
+      }
+      
       if (!apiKey) throw new Error('Chave de API do Asaas não configurada.');
 
       // 1. Criar Cliente no Asaas
@@ -318,7 +343,7 @@ const Assinatura = () => {
         method: 'POST',
         headers: {
           'accept': 'application/json',
-          'access_token': apiKey,
+          'access_token': cleanApiKey,
           'content-type': 'application/json'
         },
         body: JSON.stringify(asaasPayload)
@@ -374,6 +399,9 @@ const Assinatura = () => {
     try {
       const apiKey = import.meta.env.VITE_ASAAS_API_KEY;
       if (!apiKey) throw new Error('Chave de API do Asaas não configurada.');
+
+      // Sanitização da API Key
+      const cleanApiKey = apiKey.trim().replace(/^['"]|['"]$/g, '');
 
       // Obter IP do cliente
       let remoteIp = '0.0.0.0';
