@@ -138,14 +138,27 @@ const Assinatura = () => {
     
     setIsLoadingInvoices(true);
     try {
-      const apiKey = import.meta.env.VITE_ASAAS_API_KEY;
+      let apiKey = import.meta.env.VITE_ASAAS_API_KEY;
       if (!apiKey) return;
+
+      // Sanitização da API Key
+      if (apiKey) {
+        apiKey = apiKey.trim();
+        if ((apiKey.startsWith('"') && apiKey.endsWith('"')) || (apiKey.startsWith("'") && apiKey.endsWith("'"))) {
+           apiKey = apiKey.substring(1, apiKey.length - 1);
+        }
+        if (apiKey.startsWith('\\$')) {
+           apiKey = apiKey.replace('\\$', '$');
+        }
+      }
+
+      const cleanApiKey = apiKey;
 
       const response = await fetch(`/api/asaas/payments?customer=${asaasCustomerId}&limit=12`, {
         method: 'GET',
         headers: {
           'accept': 'application/json',
-          'access_token': apiKey
+          'access_token': cleanApiKey
         }
       });
 
@@ -444,7 +457,7 @@ const Assinatura = () => {
         method: 'POST',
         headers: {
           'accept': 'application/json',
-          'access_token': apiKey,
+          'access_token': cleanApiKey,
           'content-type': 'application/json'
         },
         body: JSON.stringify(tokenPayload)
@@ -479,7 +492,7 @@ const Assinatura = () => {
           method: 'POST',
           headers: {
             'accept': 'application/json',
-            'access_token': apiKey,
+            'access_token': cleanApiKey,
             'content-type': 'application/json'
           },
           body: JSON.stringify(paymentPayload)
