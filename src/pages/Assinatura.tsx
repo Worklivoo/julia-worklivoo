@@ -311,6 +311,8 @@ const Assinatura = () => {
         mobilePhone: formData.celular.replace(/\D/g, '')
       };
 
+      console.log('Payload Cliente Asaas:', asaasPayload);
+
       // Usando o proxy configurado no vite.config.ts
       const response = await fetch('/api/asaas/customers', {
         method: 'POST',
