@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
     port: 8080,
     proxy: {
       '/api/asaas': {
-        target: 'https://api.asaas.com/v3',
+        target: 'https://api-sandbox.asaas.com/v3',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/asaas/, ''),
       },

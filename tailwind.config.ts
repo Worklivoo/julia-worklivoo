@@ -37,6 +37,10 @@ export default {
 					DEFAULT: '#EBF57D',
 					foreground: 'hsl(var(--primary-foreground))'
 				},
+				brand: {
+					primary: '#EBF57D',
+					bg: '#F6F6F6'
+				},
 				secondary: {
 					DEFAULT: 'hsl(var(--secondary))',
 					foreground: 'hsl(var(--secondary-foreground))'

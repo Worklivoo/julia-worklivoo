@@ -1,9 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { User, Mail, Phone, Building, Check, AlertCircle, Loader2, CreditCard, Calendar, Lock, FileText, ExternalLink } from 'lucide-react';
+import { 
+  CreditCard, 
+  User, 
+  CheckCircle2, 
+  ChevronRight, 
+  AlertCircle, 
+  Download, 
+  TrendingUp, 
+  Layers, 
+  Zap,
+  MoreVertical,
+  Mail,
+  Phone,
+  Building,
+  Lock,
+  Loader2,
+  CalendarDays,
+  ArrowUpRight
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/supabase-utils';
@@ -29,8 +43,13 @@ const Assinatura = () => {
   
   const [invoices, setInvoices] = useState<Payment[]>([]);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
+  const [showAllInvoices, setShowAllInvoices] = useState(false);
+  const [renewalDays, setRenewalDays] = useState<number | null>(null);
+  const [userPlanValue, setUserPlanValue] = useState<number>(0); // Valor mensal do plano (user_valor_mensal)
+  const [userPlanLimit, setUserPlanLimit] = useState<number>(2000); // Limite de leads (user_plano)
+  const [currentMonthLeads, setCurrentMonthLeads] = useState<number>(0);
+  const [usageHistory, setUsageHistory] = useState<any[]>([]);
 
-  // Estado persistente do formulário de cliente
   const [formData, setFormData] = usePersistentState('assinatura-novo-form', {
     nome: '',
     documento: '',
@@ -59,6 +78,61 @@ const Assinatura = () => {
     }
   }, [asaasCustomerId]);
 
+  useEffect(() => {
+    if (invoices.length > 0 && userId) {
+      const fetchHistory = async () => {
+        // Mostrar todas as faturas, não apenas as pagas
+        const historyPromises = invoices.map(async (inv) => {
+          // Usa o valor da coluna user_valor_mensal como base (userPlanValue)
+          const planBasePrice = userPlanValue > 0 ? userPlanValue : 0; 
+          
+          const totalPaid = inv.value;
+          // Custo Adicional: A diferença entre o valor da cobrança com o valor em "user_valor_mensal"
+          const extraPaid = planBasePrice > 0 ? Math.max(0, totalPaid - planBasePrice) : 0;
+          
+          // Leads Excedidos: Calculado pegando o extraPaid e dividindo por 2 (custo por lead)
+          const leadsExceededCount = extraPaid > 0 ? Math.floor(extraPaid / 2) : 0;
+          
+          const date = new Date(inv.clientPaymentDate || inv.dateCreated);
+          const monthName = date.toLocaleString('pt-BR', { month: 'long' });
+          
+          // Calcular range de datas para buscar leads do mês da fatura
+          const year = date.getFullYear();
+          const month = date.getMonth();
+          const startDate = new Date(year, month, 1).toISOString().split('T')[0];
+          const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+          // Buscar contagem de leads (Total de Leads)
+          const { count } = await supabase
+            .from('leads')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('created_at', `${startDate}T00:00:00`)
+            .lte('created_at', `${endDate}T23:59:59`);
+            
+          const leadsCount = count || 0;
+          
+          return {
+            month: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+            year: date.getFullYear().toString(),
+            planValue: planBasePrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            leadsCount: leadsCount,
+            leadsExceededCount: leadsExceededCount,
+            exceeded: extraPaid > 0 ? 1 : 0, // Flag para indicar que houve excedente
+            extraValue: extraPaid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            status: inv.status,
+            totalValue: totalPaid
+          };
+        });
+        
+        const history = await Promise.all(historyPromises);
+        setUsageHistory(history);
+      };
+      
+      fetchHistory();
+    }
+  }, [invoices, userPlanValue, userId]);
+
   const fetchInvoices = async () => {
     if (!asaasCustomerId) return;
     
@@ -67,7 +141,7 @@ const Assinatura = () => {
       const apiKey = import.meta.env.VITE_ASAAS_API_KEY;
       if (!apiKey) return;
 
-      const response = await fetch(`/api/asaas/payments?customer=${asaasCustomerId}`, {
+      const response = await fetch(`/api/asaas/payments?customer=${asaasCustomerId}&limit=12`, {
         method: 'GET',
         headers: {
           'accept': 'application/json',
@@ -119,6 +193,72 @@ const Assinatura = () => {
         // Se já tiver final do cartão, carregamos
         if (userData.cartao_final) {
           setCardFinal(userData.cartao_final);
+        }
+
+        // Definir valor do plano do usuário (user_valor_mensal)
+        if (userData.user_valor_mensal) {
+            let valStr = String(userData.user_valor_mensal).replace('R$', '').trim();
+            if (valStr.includes(',')) {
+                valStr = valStr.replace(/\./g, '').replace(',', '.');
+            }
+            const val = parseFloat(valStr);
+            if (!isNaN(val)) setUserPlanValue(val);
+        }
+
+        // Definir limite de leads (user_plano)
+        if (userData.user_plano) {
+            const limit = parseInt(String(userData.user_plano).replace(/\D/g, ''));
+            if (!isNaN(limit) && limit > 0) {
+                setUserPlanLimit(limit);
+            }
+        }
+        
+        // Calcular leads do mês atual
+        const now = new Date();
+        const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        
+        const { count: currentLeads } = await supabase
+            .from('leads')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .gte('created_at', `${startMonth}T00:00:00`)
+            .lte('created_at', `${endMonth}T23:59:59`);
+            
+        if (currentLeads !== null) setCurrentMonthLeads(currentLeads);
+
+        // Calcular dias para renovação
+        if (userData.dia_vencimento) {
+            const today = new Date();
+            const currentYear = today.getFullYear();
+            const currentMonth = today.getMonth(); // 0-11
+            const dueDay = parseInt(userData.dia_vencimento);
+
+            // Tentar criar a data de vencimento neste mês
+            let nextDueDate = new Date(currentYear, currentMonth, dueDay);
+
+            // Verificar se o dia solicitado existe neste mês (ex: 31 em Fevereiro)
+            // O objeto Date ajusta automaticamente (ex: 31 Fev -> 3 Mar), então precisamos corrigir se o mês mudou
+            if (nextDueDate.getMonth() !== currentMonth) {
+                 // Se pulou o mês, significa que o dia não existe neste mês (ex: 31/02), então pega o último dia do mês
+                 nextDueDate = new Date(currentYear, currentMonth + 1, 0);
+            }
+
+            // Se a data de vencimento já passou hoje (ou é hoje), a próxima é no mês que vem
+            // Definimos hoje sem hora para comparar apenas a data
+            const todayNoTime = new Date(currentYear, currentMonth, today.getDate());
+            
+            if (nextDueDate <= todayNoTime) {
+                 nextDueDate = new Date(currentYear, currentMonth + 1, dueDay);
+                 // Corrigir novamente caso o próximo mês não tenha o dia (ex: 31/04)
+                 if (nextDueDate.getMonth() !== (currentMonth + 1) % 12) {
+                    nextDueDate = new Date(currentYear, currentMonth + 2, 0);
+                 }
+            }
+
+            const diffTime = Math.abs(nextDueDate.getTime() - todayNoTime.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+            setRenewalDays(diffDays);
         }
 
         // Preencher formulário com dados existentes se o formulário estiver vazio
@@ -326,358 +466,481 @@ const Assinatura = () => {
     }
   };
 
-  // Se tudo estiver salvo (cliente e cartão)
-  if (isSaved && isCardSaved) {
-    return (
-      <div className="container mx-auto py-10 px-4 max-w-3xl flex flex-col items-center min-h-[50vh]">
-        <Card className="border-green-200 dark:border-green-900 bg-green-50/50 dark:bg-green-900/10 w-full max-w-md mb-8">
-          <CardContent className="pt-6 flex flex-col items-center text-center space-y-4">
-            <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">
-              <Check size={32} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-green-700 dark:text-green-400">Tudo Pronto!</h2>
-              <p className="text-muted-foreground mt-2">
-                Seus dados e cartão foram cadastrados com sucesso. Sua assinatura está ativa.
-              </p>
-              {cardFinal && (
-                <div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 inline-block">
-                   <div className="flex items-center gap-3 text-left">
-                      <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                        <CreditCard size={20} className="text-gray-600 dark:text-gray-300"/>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Cartão de Crédito</p>
-                        <p className="text-xs text-muted-foreground">Terminado em •••• {cardFinal}</p>
-                      </div>
-                   </div>
-                </div>
-              )}
-            </div>
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={() => {
-                // Opcional: permitir editar ou resetar
-                // setIsCardSaved(false);
-                // setIsSaved(false);
-                window.location.href = '/'; // Redirecionar para dashboard
-              }}
-            >
-              Voltar ao Início
-            </Button>
-          </CardContent>
-        </Card>
+  const setupStep = isSaved ? 2 : 1;
+  const isSetupComplete = isSaved && isCardSaved;
 
-        {/* Seção de Faturas */}
-        <Card className="w-full max-w-md border-muted/60">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <FileText size={20} />
-              </div>
-              <div>
-                <CardTitle>Histórico de Pagamentos</CardTitle>
-                <CardDescription>Visualize suas faturas e comprovantes.</CardDescription>
-              </div>
+  if (!isSetupComplete) {
+    return (
+      <div className="h-full flex items-center justify-center animate-in fade-in zoom-in duration-500 py-10">
+        <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl shadow-black/5 border border-gray-100 overflow-hidden">
+          {/* Stepper Header */}
+          <div className="bg-black p-8 text-white relative">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Configurar Assinatura</h2>
+              <span className="text-brand-primary text-sm font-bold bg-white/10 px-3 py-1 rounded-full">
+                Passo {setupStep} de 2
+              </span>
             </div>
-          </CardHeader>
-          <CardContent>
-            {isLoadingInvoices ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : invoices.length > 0 ? (
-              <div className="space-y-3">
-                {invoices.map((invoice) => (
-                  <div 
-                    key={invoice.id} 
-                    className="flex items-center justify-between p-3 rounded-lg border border-muted hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => window.open(invoice.invoiceUrl, '_blank')}
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-medium text-sm">
-                        {invoice.description || 'Assinatura'}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(invoice.clientPaymentDate || invoice.dateCreated).toLocaleDateString('pt-BR')}
-                      </span>
+            <div className="flex gap-2">
+              <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${setupStep >= 1 ? 'bg-brand-primary' : 'bg-white/20'}`}></div>
+              <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${setupStep >= 2 ? 'bg-brand-primary' : 'bg-white/20'}`}></div>
+            </div>
+          </div>
+
+          <div className="p-10">
+            {setupStep === 1 ? (
+              <div className="space-y-6 animate-in slide-in-from-right duration-300">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center text-black">
+                    <User size={20} />
+                  </div>
+                  <h3 className="text-lg font-bold">Dados Pessoais</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nome Completo</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ex: João Silva" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                      value={formData.nome}
+                      onChange={(e) => handleInputChange('nome', e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">CPF ou CNPJ</label>
+                    <input 
+                      type="text" 
+                      placeholder="000.000.000-00" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                      value={formData.documento}
+                      onChange={(e) => handleInputChange('documento', e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">E-mail Financeiro</label>
+                    <input 
+                      type="email" 
+                      placeholder="financeiro@empresa.com" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Celular</label>
+                        <input 
+                        type="tel" 
+                        placeholder="(00) 00000-0000" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                        value={formData.celular}
+                        onChange={(e) => handleInputChange('celular', e.target.value)}
+                        disabled={isLoading}
+                        />
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <span className="block font-medium text-sm">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(invoice.value)}
-                        </span>
-                        <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full ${
-                          invoice.status === 'CONFIRMED' || invoice.status === 'RECEIVED' 
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-                            : invoice.status === 'OVERDUE'
-                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                        }`}>
-                          {invoice.status === 'CONFIRMED' || invoice.status === 'RECEIVED' ? 'Pago' : 
-                           invoice.status === 'OVERDUE' ? 'Atrasado' : 'Pendente'}
-                        </span>
-                      </div>
-                      <ExternalLink size={14} className="text-muted-foreground" />
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">CEP</label>
+                        <input 
+                        type="text" 
+                        placeholder="00000-000" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                        value={formData.cep}
+                        onChange={(e) => handleInputChange('cep', e.target.value)}
+                        disabled={isLoading}
+                        />
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Nenhuma fatura encontrada.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container mx-auto py-10 px-4 max-w-3xl">
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Configuração de Assinatura</h1>
-        <p className="text-muted-foreground">
-          {isSaved ? 'Agora, cadastre seu cartão de crédito.' : 'Preencha seus dados para criar sua conta de faturamento.'}
-        </p>
-      </div>
-
-      {!isSaved ? (
-        <Card className="border-muted/60 shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <User size={20} />
-              </div>
-              <div>
-                <CardTitle>Dados do Cliente</CardTitle>
-                <CardDescription>Informações para emissão de notas fiscais e cobrança.</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="nome">Nome Completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="nome"
-                    placeholder="Seu nome completo"
-                    className="pl-9"
-                    value={formData.nome}
-                    onChange={(e) => handleInputChange('nome', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="documento">CPF / CNPJ</Label>
-                <div className="relative">
-                  <Building className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="documento"
-                    placeholder="000.000.000-00"
-                    className="pl-9"
-                    value={formData.documento}
-                    onChange={(e) => handleInputChange('documento', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    className="pl-9"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="celular">Celular</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="celular"
-                    type="tel"
-                    placeholder="(00) 00000-0000"
-                    className="pl-9"
-                    value={formData.celular}
-                    onChange={(e) => handleInputChange('celular', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cep">CEP</Label>
-                <div className="relative">
-                  <Building className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="cep"
-                    placeholder="00000-000"
-                    className="pl-9"
-                    value={formData.cep}
-                    onChange={(e) => handleInputChange('cep', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="numero">Número</Label>
-                <div className="relative">
-                  <Building className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="numero"
-                    placeholder="123"
-                    className="pl-9"
-                    value={formData.numero}
-                    onChange={(e) => handleInputChange('numero', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4">
-              <Button 
-                className="w-full md:w-auto min-w-[200px]" 
-                onClick={handleSave} 
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processando...
-                  </>
-                ) : (
-                  'Salvar e Continuar'
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="border-muted/60 shadow-lg animate-in fade-in slide-in-from-right-8 duration-500">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                <CreditCard size={20} />
-              </div>
-              <div>
-                <CardTitle>Dados do Cartão</CardTitle>
-                <CardDescription>Insira os dados do cartão para a assinatura.</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="holderName">Nome no Cartão</Label>
-                <Input
-                  id="holderName"
-                  placeholder="Como está impresso no cartão"
-                  value={cardData.holderName}
-                  onChange={(e) => handleCardChange('holderName', e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cardNumber">Número do Cartão</Label>
-                <div className="relative">
-                  <CreditCard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="cardNumber"
-                    placeholder="0000 0000 0000 0000"
-                    className="pl-9"
-                    value={cardData.number}
-                    onChange={(e) => handleCardChange('number', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="expiryMonth">Mês</Label>
-                  <Input
-                    id="expiryMonth"
-                    placeholder="MM"
-                    maxLength={2}
-                    value={cardData.expiryMonth}
-                    onChange={(e) => handleCardChange('expiryMonth', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="expiryYear">Ano</Label>
-                  <Input
-                    id="expiryYear"
-                    placeholder="AA"
-                    maxLength={4}
-                    value={cardData.expiryYear}
-                    onChange={(e) => handleCardChange('expiryYear', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ccv">CVV</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="ccv"
-                      placeholder="123"
-                      maxLength={4}
-                      className="pl-9"
-                      value={cardData.ccv}
-                      onChange={(e) => handleCardChange('ccv', e.target.value)}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Número</label>
+                    <input 
+                      type="text" 
+                      placeholder="123" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                      value={formData.numero}
+                      onChange={(e) => handleInputChange('numero', e.target.value)}
                       disabled={isLoading}
                     />
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-6 animate-in slide-in-from-right duration-300">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center text-black">
+                    <CreditCard size={20} />
+                  </div>
+                  <h3 className="text-lg font-bold">Dados do Cartão</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nome no Cartão</label>
+                    <input 
+                      type="text" 
+                      placeholder="Como está impresso no cartão" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                      value={cardData.holderName}
+                      onChange={(e) => handleCardChange('holderName', e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Número do Cartão</label>
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        placeholder="0000 0000 0000 0000" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                        value={cardData.number}
+                        onChange={(e) => handleCardChange('number', e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <div className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400">
+                        <CreditCard size={20} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Mês</label>
+                            <input 
+                                type="text" 
+                                placeholder="MM" 
+                                maxLength={2}
+                                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black transition-all"
+                                value={cardData.expiryMonth}
+                                onChange={(e) => handleCardChange('expiryMonth', e.target.value)}
+                                disabled={isLoading}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Ano</label>
+                            <input 
+                                type="text" 
+                                placeholder="AA" 
+                                maxLength={4}
+                                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black transition-all"
+                                value={cardData.expiryYear}
+                                onChange={(e) => handleCardChange('expiryYear', e.target.value)}
+                                disabled={isLoading}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">CVV</label>
+                      <input 
+                        type="text" 
+                        placeholder="000" 
+                        maxLength={4}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black transition-all"
+                        value={cardData.ccv}
+                        onChange={(e) => handleCardChange('ccv', e.target.value)}
+                        disabled={isLoading}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
-            <div className="pt-4 flex gap-3">
-               <Button 
-                variant="outline"
-                onClick={() => setIsSaved(false)}
-                disabled={isLoading}
-              >
-                Voltar
-              </Button>
-              <Button 
-                className="flex-1" 
-                onClick={handleSaveCard} 
+            <div className="mt-10 flex gap-4">
+              {setupStep === 2 && (
+                <button 
+                  onClick={() => cardFinal ? setIsCardSaved(true) : setIsSaved(false)}
+                  className="flex-1 py-4 text-sm font-bold text-gray-500 hover:text-black transition-colors"
+                  disabled={isLoading}
+                >
+                  {cardFinal ? 'Cancelar' : 'Voltar'}
+                </button>
+              )}
+              <button 
+                onClick={setupStep === 1 ? handleSave : handleSaveCard}
+                className="flex-[2] bg-brand-primary text-black py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black hover:text-brand-primary transition-all duration-300 group shadow-lg shadow-brand-primary/20"
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processando...
-                  </>
+                    <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processando...
+                    </>
                 ) : (
-                  'Finalizar Assinatura'
+                    <>
+                        {setupStep === 1 ? 'Continuar' : 'Confirmar e Ativar'} 
+                        <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                    </>
                 )}
-              </Button>
+              </button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+            
+            <p className="text-center text-[10px] text-gray-400 mt-6 uppercase font-bold tracking-widest">
+              Pagamento processado de forma segura via Asaas
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Active Subscription Dashboard View
+  return (
+    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12 py-10 px-4">
+      
+      {/* Header Section */}
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-3xl font-black text-black dark:text-white">Minha Assinatura</h2>
+          <p className="text-gray-500 mt-1">Gerencie seu plano, faturas e acompanhe o uso do sistema.</p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            className="px-6 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-bold hover:bg-gray-50 transition-all text-black"
+            onClick={() => setIsCardSaved(false)}
+          >
+            Editar Cartão
+          </button>
+          <button 
+            className="px-6 py-3 bg-black text-white rounded-2xl text-sm font-bold hover:bg-black/90 transition-all shadow-xl shadow-black/10 dark:bg-white dark:text-black"
+            onClick={() => window.open('https://w.app/worklivoo', '_blank')}
+          >
+            Suporte Financeiro
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-8">
+        
+        {/* Left Column: Card and Billing */}
+        <div className="col-span-12 lg:col-span-4 space-y-8">
+          
+          {/* Visual Credit Card */}
+          <div className="bg-black aspect-[1.58/1] rounded-[32px] p-8 text-white relative overflow-hidden shadow-2xl shadow-black/20 group">
+             <div className="absolute -top-10 -right-10 w-40 h-40 bg-brand-primary/10 rounded-full blur-3xl group-hover:bg-brand-primary/20 transition-all duration-700"></div>
+             <div className="flex justify-between items-start mb-12">
+                <div className="w-12 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md">
+                   <div className="w-8 h-6 bg-brand-primary/80 rounded-sm"></div>
+                </div>
+                <Zap size={24} className="text-brand-primary" />
+             </div>
+             <div>
+                <p className="text-lg font-mono tracking-widest mb-6">•••• •••• •••• {cardFinal || '0000'}</p>
+                <div className="flex justify-between items-end">
+                   <div>
+                      <p className="text-[10px] uppercase font-bold text-gray-500 mb-1">Titular</p>
+                      <p className="text-sm font-bold uppercase tracking-wide">{formData.nome || 'Cliente'}</p>
+                   </div>
+                   <div>
+                      <p className="text-[10px] uppercase font-bold text-gray-500 mb-1">Status</p>
+                      <p className="text-sm font-bold">Ativo</p>
+                   </div>
+                </div>
+             </div>
+          </div>
+
+          {/* Faturas Recentes */}
+          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm">
+             <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-gray-900">Faturas Recentes</h3>
+                <MoreVertical size={18} className="text-gray-400 cursor-pointer" />
+             </div>
+             <div className="space-y-4">
+                {isLoadingInvoices ? (
+                    <div className="flex justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                    </div>
+                ) : invoices.length > 0 ? (
+                    (showAllInvoices ? invoices : invoices.slice(0, 3)).map((inv, i) => (
+                    <div 
+                        key={inv.id || i} 
+                        className="flex justify-between items-center pb-4 border-b border-gray-50 last:border-0 last:pb-0 cursor-pointer group hover:opacity-70 transition-opacity"
+                        onClick={() => window.open(inv.invoiceUrl, '_blank')}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                inv.status === 'CONFIRMED' || inv.status === 'RECEIVED' 
+                                ? 'bg-green-100 text-green-600' 
+                                : inv.status === 'OVERDUE'
+                                ? 'bg-red-100 text-red-600'
+                                : 'bg-yellow-100 text-yellow-600'
+                            }`}>
+                                {inv.status === 'OVERDUE' ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-black">{new Date(inv.clientPaymentDate || inv.dateCreated).toLocaleDateString('pt-BR')}</p>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase">
+                                    {inv.status === 'CONFIRMED' || inv.status === 'RECEIVED' ? 'Pago' : 
+                                    inv.status === 'OVERDUE' ? 'Atrasado' : 'Pendente'}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs font-bold text-black">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(inv.value)}
+                            </p>
+                            <div className="flex items-center justify-end gap-1 text-gray-300 group-hover:text-brand-primary transition-colors">
+                                <span className="text-[10px] font-bold uppercase hidden group-hover:inline-block">Ver</span>
+                                <Download size={12} />
+                            </div>
+                        </div>
+                    </div>
+                    ))
+                ) : (
+                    <p className="text-center text-xs text-gray-400 py-4">Nenhuma fatura encontrada.</p>
+                )}
+             </div>
+                
+             {invoices.length > 3 && (
+                <button 
+                    onClick={() => setShowAllInvoices(!showAllInvoices)}
+                    className="w-full mt-6 py-3 text-xs font-bold text-gray-400 hover:text-black transition-colors uppercase tracking-widest"
+                >
+                    {showAllInvoices ? 'Ver menos' : 'Ver todas as faturas'}
+                </button>
+             )}
+          </div>
+        </div>
+
+        {/* Right Column: Usage Summary */}
+        <div className="col-span-12 lg:col-span-8 space-y-8">
+          
+          {/* Summary Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+             <div className="bg-brand-primary p-8 rounded-[32px] shadow-lg shadow-brand-primary/20 relative overflow-hidden group">
+                <TrendingUp size={40} className="absolute -right-2 -bottom-2 text-black/5 group-hover:scale-125 transition-transform duration-500" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-black/60 mb-2">Quantidade de Leads</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-4xl font-black text-black">{currentMonthLeads.toLocaleString()}</p>
+                  <p className="text-sm font-bold text-black/40">/ {userPlanLimit.toLocaleString()}</p>
+                </div>
+                <div className="mt-6 h-2 w-full bg-black/10 rounded-full overflow-hidden">
+                   <div 
+                     className={`h-full rounded-full transition-all duration-1000 ${currentMonthLeads > userPlanLimit ? 'bg-red-500' : 'bg-black'}`} 
+                     style={{width: `${Math.min(100, (currentMonthLeads / (userPlanLimit || 1)) * 100)}%`}}
+                   ></div>
+                </div>
+                <p className="text-xs font-bold text-black/60 mt-4 flex items-center gap-1">
+                    {currentMonthLeads > userPlanLimit ? (
+                        <>
+                            <AlertCircle size={14} className="text-red-600" />
+                            <span className="text-red-600">{currentMonthLeads - userPlanLimit} leads acima do plano base</span>
+                        </>
+                    ) : (
+                        <span>{Math.round((currentMonthLeads / (userPlanLimit || 1)) * 100)}% do plano base utilizado</span>
+                    )}
+                </p>
+             </div>
+
+             <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group">
+                <Layers size={40} className="absolute -right-2 -bottom-2 text-gray-100 group-hover:scale-125 transition-transform duration-500" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Plano Atual</p>
+                <p className="text-3xl font-black text-black uppercase">Business Pro</p>
+                <p className="text-xs font-bold text-brand-primary bg-black inline-block px-3 py-1 rounded-full mt-4">
+                  {renewalDays !== null ? `Renovação em ${renewalDays} dias` : 'Renovação Mensal'}
+                </p>
+             </div>
+
+             <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group">
+                <AlertCircle size={40} className="absolute -right-2 -bottom-2 text-gray-100 group-hover:scale-125 transition-transform duration-500" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Leads Excedidos</p>
+                <p className="text-4xl font-black text-black">{Math.max(0, currentMonthLeads - userPlanLimit)}</p>
+                <p className="text-xs font-bold text-gray-400 mt-4 italic">
+                  {currentMonthLeads > userPlanLimit ? 'Limite do plano excedido' : 'Sem custos adicionais este mês'}
+                </p>
+             </div>
+          </div>
+
+          {/* Main Content: Monthly Usage History */}
+          <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full">
+            <div className="p-10 pb-6">
+               <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-2xl font-black text-black">Histórico de Consumo</h3>
+                  <div className="flex gap-2">
+                     <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-bg rounded-full text-[10px] font-bold uppercase text-gray-500">
+                        <div className="w-1.5 h-1.5 bg-brand-primary rounded-full"></div> Leads Normais
+                     </div>
+                     <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-bg rounded-full text-[10px] font-bold uppercase text-gray-500">
+                        <div className="w-1.5 h-1.5 bg-black rounded-full"></div> Leads Excedidos
+                     </div>
+                  </div>
+               </div>
+               <p className="text-sm text-gray-400">Acompanhamento detalhado dos recursos utilizados em meses anteriores.</p>
+            </div>
+
+            {/* Usage Table Header */}
+            <div className="grid grid-cols-12 px-10 py-4 bg-gray-50 border-y border-gray-100">
+               <div className="col-span-3 text-[10px] font-black uppercase text-gray-400 tracking-widest">Mês Referência</div>
+               <div className="col-span-3 text-[10px] font-black uppercase text-gray-400 tracking-widest text-center">Total de Leads</div>
+               <div className="col-span-3 text-[10px] font-black uppercase text-gray-400 tracking-widest text-center">Leads Excedidos</div>
+               <div className="col-span-3 text-[10px] font-black uppercase text-gray-400 tracking-widest text-right">Custo Adicional</div>
+            </div>
+
+            {/* Usage Rows */}
+            <div className="flex-1 overflow-y-auto">
+               {usageHistory.length > 0 ? (
+                 usageHistory.map((item, index) => (
+                 <div 
+                   key={index} 
+                   className="grid grid-cols-12 px-10 py-6 items-center border-b border-gray-50 hover:bg-brand-bg/30 transition-all cursor-default group"
+                 >
+                   {/* Month & Icon */}
+                   <div className="col-span-3 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-black group-hover:bg-white transition-colors">
+                         <CalendarDays size={18} />
+                      </div>
+                      <div>
+                         <p className="text-sm font-bold text-black">{item.month}</p>
+                         <p className="text-[10px] text-gray-400 font-bold uppercase">{item.year}</p>
+                      </div>
+                   </div>
+
+                   {/* Total Leads */}
+                   <div className="col-span-3 text-center">
+                      <p className="text-lg font-black text-black">{item.leadsCount.toLocaleString()}</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">Capturados</p>
+                   </div>
+
+                   {/* Leads Excedidos */}
+                   <div className="col-span-3 text-center">
+                      <p className={`text-lg font-black ${item.leadsExceededCount > 0 ? 'text-red-500' : 'text-gray-300'}`}>{item.leadsExceededCount.toLocaleString()}</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">Excedentes</p>
+                   </div>
+
+                   {/* Extra Value */}
+                   <div className="col-span-3 text-right">
+                      <div className="flex flex-col items-end">
+                         <div className="flex items-center gap-1">
+                            <p className={`text-lg font-black ${item.exceeded > 0 ? 'text-black' : 'text-gray-300'}`}>{item.extraValue}</p>
+                            {item.exceeded > 0 && <ArrowUpRight size={14} className="text-brand-primary" />}
+                         </div>
+                         <p className="text-[10px] text-gray-400 font-bold uppercase">Referente ao excedente</p>
+                      </div>
+                   </div>
+                 </div>
+               ))
+               ) : (
+                 <div className="p-10 text-center text-gray-400 text-sm">
+                    Nenhum histórico de consumo disponível.
+                 </div>
+               )}
+            </div>
+
+            {/* Summary Footer Section */}
+            <div className="p-10 bg-gray-50/50 flex justify-between items-center border-t border-gray-100">
+               <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                     <AlertCircle size={16} className="text-gray-400" />
+                     <p className="text-xs text-gray-500 font-medium">Custo por lead excedente: <span className="text-black font-bold">R$ 2,00</span></p>
+                  </div>
+               </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 };

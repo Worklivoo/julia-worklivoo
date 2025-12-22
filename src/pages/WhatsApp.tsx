@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useCRM } from '@/contexts/CRMContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Loader2, Check, AlertTriangle, RefreshCw, Clock, QrCode, Smartphone } from 'lucide-react';
+import { Loader2, Check, AlertTriangle, RefreshCw, Clock, QrCode, Smartphone, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -568,189 +568,182 @@ const WhatsApp = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className={`flex flex-col items-center justify-center gap-8 max-w-md mx-auto ${
-        theme === 'dark' ? 'text-white' : 'text-black'
-      }`}>
+      <div className="bg-white p-10 rounded-3xl shadow-sm border border-gray-100 max-w-4xl w-full flex flex-col md:flex-row gap-12">
         
-        {/* Estado Inicial - Desconectado */}
-        {!isConnected && !qrCode && !phoneCode && !isLoading && !error && (
-          <div className="flex flex-col items-center gap-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 w-full">
-            <h1 className={`text-2xl font-light text-center ${
-              theme === 'dark' ? 'text-white' : 'text-black'
-            }`}>Conectar WhatsApp</h1>
-            
-            <Tabs 
-              defaultValue="qrcode" 
-              className="w-full" 
-              onValueChange={(value) => setConnectionMethod(value as 'qrcode' | 'phone')}
-            >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="qrcode" className="flex items-center gap-2">
-                  <QrCode className="w-4 h-4" />
-                  QR Code
-                </TabsTrigger>
-                <TabsTrigger value="phone" className="flex items-center gap-2">
-                  <Smartphone className="w-4 h-4" />
-                  Código por Telefone
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="qrcode" className="mt-4">
-                <div className="flex flex-col items-center">
-                  <Button 
-                    onClick={handleConnect}
-                    disabled={cooldownTimer > 0}
-                    className={`px-8 py-3 bg-[hsl(60,85%,73%)] hover:bg-[hsl(60,85%,68%)] text-black font-medium rounded-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-2px_hsl(60,85%,73%,0.3)] active:translate-y-0 active:shadow-[0_2px_8px_-2px_hsl(60,85%,73%,0.2)] ${cooldownTimer > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Gerar QR Code'}
-                  </Button>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="phone" className="mt-4">
-                <div className="flex flex-col gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone-number">Número de telefone (apenas DDD + número)</Label>
-                    <div className="flex items-center">
-                      <div className="bg-muted px-3 py-2 rounded-l-md border border-r-0 border-input">
-                        +55
-                      </div>
-                      <Input 
-                        id="phone-number" 
-                        type="tel" 
-                        placeholder="11999999999" 
-                        className="rounded-l-none" 
-                        value={phoneNumber}
-                        onChange={(e) => {
-                          // Permite apenas números
-                          const value = e.target.value.replace(/\D/g, '');
-                          setPhoneNumber(value);
-                        }}
-                        maxLength={11}
-                      />
+        {/* Left Side: Instructions */}
+        <div className="flex-1 space-y-8">
+            <div>
+                <h2 className="text-2xl font-bold mb-2">Conectar WhatsApp</h2>
+                <p className="text-gray-500">Escaneie o QR Code para conectar seu número e ativar o agente.</p>
+            </div>
+
+            <div className="space-y-6">
+                <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold flex-shrink-0">1</div>
+                    <div>
+                        <h3 className="font-bold text-gray-900">Abra o WhatsApp</h3>
+                        <p className="text-sm text-gray-500 mt-1">Abra o aplicativo no seu celular.</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">Ex: 11999999999 (sem o +55)</p>
-                  </div>
-                  
-                  <Button 
-                    onClick={handleConnect}
-                    disabled={cooldownTimer > 0 || !phoneNumber || phoneNumber.length < 10}
-                    className={`px-8 py-3 bg-[hsl(60,85%,73%)] hover:bg-[hsl(60,85%,68%)] text-black font-medium rounded-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-2px_hsl(60,85%,73%,0.3)] active:translate-y-0 active:shadow-[0_2px_8px_-2px_hsl(60,85%,73%,0.2)] ${(cooldownTimer > 0 || !phoneNumber || phoneNumber.length < 10) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Obter Código'}
-                  </Button>
                 </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
+                <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold flex-shrink-0">2</div>
+                    <div>
+                        <h3 className="font-bold text-gray-900">Acesse o Menu</h3>
+                        <p className="text-sm text-gray-500 mt-1">Toque em Configurações ou no menu de 3 pontos.</p>
+                    </div>
+                </div>
+                <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold flex-shrink-0">3</div>
+                    <div>
+                        <h3 className="font-bold text-gray-900">Aparelhos Conectados</h3>
+                        <p className="text-sm text-gray-500 mt-1">Selecione "Conectar um aparelho" e aponte a câmera.</p>
+                    </div>
+                </div>
+            </div>
 
-        {/* Estado de Carregamento */}
-        {isLoading && (
-          <div className="flex flex-col items-center gap-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            <Loader2 className={`w-12 h-12 animate-spin ${
-              theme === 'dark' ? 'text-white' : 'text-black'
-            }`} />
-            <p className={`text-sm ${
-              theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-            }`}>
-              {connectionMethod === 'qrcode' ? 'Gerando QR Code...' : 'Gerando código por telefone...'}
-            </p>
-          </div>
-        )}
+            <div className="bg-brand-bg p-4 rounded-xl flex items-start gap-3">
+                <AlertCircle className="text-black flex-shrink-0 mt-0.5" size={20} />
+                <p className="text-sm text-gray-600">
+                    Mantenha o celular conectado à internet para que o agente possa responder automaticamente.
+                </p>
+            </div>
+        </div>
 
-        {/* Estado de Exibição do QR Code */}
-        {qrCode && !isConnected && !error && (
-          <div className="flex flex-col items-center gap-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            <div className={`p-4 rounded-lg shadow-[0_10px_30px_-10px_hsl(0,0%,0%,0.3)] ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
-            }`}>
-              <img 
-                src={qrCode} 
-                alt="QR Code WhatsApp" 
-                className="w-64 h-64 rounded"
-              />
-              <div className="mt-2 flex items-center justify-center gap-2 text-sm font-medium">
-                <Clock className="w-4 h-4" />
-                <span className={`${qrCodeTimer <= 5 ? 'text-red-500' : ''}`}>
-                  Expira em {qrCodeTimer}s
-                </span>
+        {/* Right Side: Action Area */}
+        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-2xl p-8 border-2 border-dashed border-gray-200 relative min-h-[400px]">
+            
+            {/* Tabs for switching method - Only show if not connected */}
+            {!isConnected && (
+              <div className="w-full mb-6">
+                <Tabs defaultValue={connectionMethod} onValueChange={(v) => setConnectionMethod(v as 'qrcode' | 'phone')} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 bg-white/50 p-1 rounded-xl">
+                    <TabsTrigger value="qrcode" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">QR Code</TabsTrigger>
+                    <TabsTrigger value="phone" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Telefone</TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
-            </div>
-            <div className={`flex items-center gap-2 text-sm ${
-              theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-            }`}>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Aguardando escaneamento...</span>
-            </div>
-          </div>
-        )}
-        
-        {/* Estado de Exibição do Código por Telefone */}
-        {phoneCode && !isConnected && !error && (
-          <div className="flex flex-col items-center gap-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            <div className={`p-6 rounded-lg shadow-[0_10px_30px_-10px_hsl(0,0%,0%,0.3)] ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
-            } text-center`}>
-              <h2 className="text-lg font-medium mb-2">Seu código de conexão</h2>
-              <div className="text-4xl font-bold tracking-wider my-4 bg-muted/30 py-4 px-6 rounded-md">
-                {phoneCode}
-              </div>
-              <p className="text-sm mb-4">Digite este código no seu WhatsApp</p>
-              <div className="flex items-center justify-center gap-2 text-sm font-medium">
-                <Clock className="w-4 h-4" />
-                <span className={`${qrCodeTimer <= 5 ? 'text-red-500' : ''}`}>
-                  Expira em {qrCodeTimer}s
-                </span>
-              </div>
-            </div>
-            <div className={`flex items-center gap-2 text-sm ${
-              theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-            }`}>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Aguardando confirmação...</span>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Estado de Sucesso - Conectado */}
-        {isConnected && (
-          <div className="flex flex-col items-center gap-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            <Check 
-              className="w-16 h-16 text-[hsl(120,100%,50%)]" 
-              style={{ filter: 'drop-shadow(0 0 10px hsl(120, 100%, 50%, 0.3))' }}
-            />
-            <p className={`text-xl font-medium text-center ${
-              theme === 'dark' ? 'text-white' : 'text-black'
-            }`}>
-              WhatsApp Conectado
-            </p>
-          </div>
-        )}
+            {/* Content based on State */}
+            {isLoading ? (
+               <div className="flex flex-col items-center gap-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+                  <Loader2 className="w-12 h-12 animate-spin text-brand-primary" />
+                  <p className="text-gray-500 font-medium">
+                    {connectionMethod === 'qrcode' ? 'Gerando QR Code...' : 'Gerando código...'}
+                  </p>
+               </div>
+            ) : isConnected ? (
+               <div className="flex flex-col items-center gap-4 text-green-600 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-2">
+                      <CheckCircle2 size={40} />
+                  </div>
+                  <span className="text-xl font-bold">Conectado com sucesso</span>
+               </div>
+            ) : error ? (
+               <div className="flex flex-col items-center gap-4 text-center animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-2 text-red-500">
+                      <AlertTriangle size={32} />
+                  </div>
+                  <p className="text-red-500 text-sm font-medium max-w-xs">{error}</p>
+                  <Button 
+                    onClick={handleRetry} 
+                    disabled={cooldownTimer > 0}
+                    className="bg-black text-white hover:bg-gray-800 rounded-xl px-6 py-2 h-auto"
+                  >
+                      <RefreshCw className={`mr-2 w-4 h-4 ${cooldownTimer > 0 ? 'animate-spin' : ''}`} /> 
+                      {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Tentar Novamente'}
+                  </Button>
+               </div>
+            ) : (
+               <div className="w-full animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+                  {connectionMethod === 'qrcode' ? (
+                      <div className="flex flex-col items-center w-full">
+                          <div className="bg-white p-4 rounded-xl shadow-sm mb-6 relative group w-full max-w-[280px] aspect-square flex items-center justify-center">
+                              <div className="w-full h-full bg-gray-900 rounded-lg flex items-center justify-center relative overflow-hidden">
+                                  {qrCode ? (
+                                      <img src={qrCode} alt="QR Code" className="w-full h-full object-cover" />
+                                  ) : (
+                                      <div className="absolute inset-0 bg-gray-100 flex items-center justify-center text-gray-400">
+                                          <QrCode size={48} />
+                                      </div>
+                                  )}
+                                  
+                                  {/* Overlay for generation/regeneration */}
+                                  {(!qrCode || qrCodeTimer <= 0) && (
+                                      <div 
+                                          className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer hover:bg-white/90 transition-all z-10"
+                                          onClick={handleConnect}
+                                      >
+                                          <RefreshCw className="text-black mb-2" size={32} />
+                                          <span className="font-bold text-sm text-center px-4">
+                                            {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Gerar Novo Código'}
+                                          </span>
+                                      </div>
+                                  )}
+                              </div>
+                          </div>
+                          
+                          {qrCode && (
+                              <div className="flex items-center gap-2 text-orange-500 bg-orange-50 px-4 py-2 rounded-full">
+                                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                                  <span className="text-sm font-bold">Expira em {qrCodeTimer}s</span>
+                              </div>
+                          )}
+                          
+                          {!qrCode && (
+                             <div className="flex items-center gap-2 text-gray-400 bg-gray-100 px-4 py-2 rounded-full">
+                                <span className="text-sm font-bold">Aguardando geração...</span>
+                             </div>
+                          )}
+                      </div>
+                  ) : (
+                      <div className="w-full space-y-4">
+                          {phoneCode ? (
+                               <div className="bg-white p-6 rounded-xl shadow-sm text-center border border-gray-100">
+                                  <p className="text-sm text-gray-500 mb-2 font-medium">Seu código de conexão</p>
+                                  <div className="text-4xl font-black tracking-widest my-6 text-brand-primary bg-black py-4 rounded-xl">
+                                      {phoneCode}
+                                  </div>
+                                  <div className="flex items-center justify-center gap-2 text-orange-500 text-sm font-bold bg-orange-50 py-2 rounded-lg">
+                                      <Clock size={16} />
+                                      <span>Expira em {qrCodeTimer}s</span>
+                                  </div>
+                                  <p className="text-xs text-gray-400 mt-4">Digite este código no seu WhatsApp</p>
+                               </div>
+                          ) : (
+                              <div className="space-y-4 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                  <div className="space-y-2">
+                                      <Label className="font-bold text-gray-700">Número de WhatsApp</Label>
+                                      <div className="flex shadow-sm rounded-lg overflow-hidden">
+                                          <div className="bg-gray-100 border-r border-gray-200 px-4 py-3 flex items-center text-gray-600 text-sm font-bold">+55</div>
+                                          <Input 
+                                              value={phoneNumber}
+                                              onChange={(e) => {
+                                                  const value = e.target.value.replace(/\D/g, '');
+                                                  setPhoneNumber(value);
+                                              }}
+                                              placeholder="11999999999"
+                                              className="rounded-l-none border-0 ring-1 ring-gray-200 focus-visible:ring-2 focus-visible:ring-brand-primary h-auto py-3"
+                                              maxLength={11}
+                                          />
+                                      </div>
+                                      <p className="text-xs text-gray-400 font-medium">DDD + Número (Ex: 11999999999)</p>
+                                  </div>
+                                  <Button 
+                                      onClick={handleConnect} 
+                                      disabled={!phoneNumber || phoneNumber.length < 10 || cooldownTimer > 0}
+                                      className="w-full bg-black text-white hover:bg-gray-800 font-bold rounded-xl h-12 transition-all shadow-lg shadow-black/10"
+                                  >
+                                      {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Obter Código'}
+                                  </Button>
+                              </div>
+                          )}
+                      </div>
+                  )}
+               </div>
+            )}
 
-        {/* Estado de Erro */}
-        {error && (
-          <div className="flex flex-col items-center gap-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            <div className="flex items-center gap-3 text-[hsl(0,84%,60%)]">
-              <AlertTriangle className="w-6 h-6" />
-              <span className="text-base">Erro ao conectar</span>
-            </div>
-            <div className={`text-center text-sm max-w-sm ${
-              theme === 'dark' ? 'text-red-400' : 'text-red-600'
-            }`}>
-              {error}
-            </div>
-            <Button 
-              onClick={handleRetry}
-              disabled={cooldownTimer > 0}
-              className={`px-6 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white rounded-lg transition-all duration-300 flex items-center gap-2 ${cooldownTimer > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <RefreshCw className="w-4 h-4" />
-              {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Tentar Novamente'}
-            </Button>
-          </div>
-        )}
-
+        </div>
 
       </div>
     </div>

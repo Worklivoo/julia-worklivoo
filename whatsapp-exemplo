@@ -1,0 +1,84 @@
+import React from 'react';
+import { Smartphone, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+
+export const WhatsAppConnect: React.FC = () => {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <div className="bg-white p-10 rounded-3xl shadow-sm border border-gray-100 max-w-4xl w-full flex flex-col md:flex-row gap-12">
+        
+        {/* Left Side: Instructions */}
+        <div className="flex-1 space-y-8">
+            <div>
+                <h2 className="text-2xl font-bold mb-2">Conectar WhatsApp</h2>
+                <p className="text-gray-500">Escaneie o QR Code para conectar seu número e ativar o agente.</p>
+            </div>
+
+            <div className="space-y-6">
+                <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold flex-shrink-0">1</div>
+                    <div>
+                        <h3 className="font-bold text-gray-900">Abra o WhatsApp</h3>
+                        <p className="text-sm text-gray-500 mt-1">Abra o aplicativo no seu celular.</p>
+                    </div>
+                </div>
+                <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold flex-shrink-0">2</div>
+                    <div>
+                        <h3 className="font-bold text-gray-900">Acesse o Menu</h3>
+                        <p className="text-sm text-gray-500 mt-1">Toque em Configurações ou no menu de 3 pontos.</p>
+                    </div>
+                </div>
+                <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold flex-shrink-0">3</div>
+                    <div>
+                        <h3 className="font-bold text-gray-900">Aparelhos Conectados</h3>
+                        <p className="text-sm text-gray-500 mt-1">Selecione "Conectar um aparelho" e aponte a câmera.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-brand-bg p-4 rounded-xl flex items-start gap-3">
+                <AlertCircle className="text-black flex-shrink-0 mt-0.5" size={20} />
+                <p className="text-sm text-gray-600">
+                    Mantenha o celular conectado à internet para que o agente possa responder automaticamente.
+                </p>
+            </div>
+        </div>
+
+        {/* Right Side: QR Code Area */}
+        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-2xl p-8 border-2 border-dashed border-gray-200 relative">
+            
+            {/* Simulated QR Code */}
+            <div className="bg-white p-4 rounded-xl shadow-sm mb-6 relative group">
+                <div className="w-48 h-48 bg-gray-900 rounded-lg flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[url('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=WorklivooMockData')] bg-cover opacity-90"></div>
+                    <div className="w-10 h-10 bg-brand-primary rounded-full z-10 flex items-center justify-center">
+                        <Smartphone size={20} className="text-black" />
+                    </div>
+                </div>
+                
+                {/* Overlay for reloading */}
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl cursor-pointer">
+                    <RefreshCw className="text-black mb-2" size={32} />
+                    <span className="font-bold text-sm">Gerar Novo Código</span>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-orange-500 bg-orange-50 px-4 py-2 rounded-full">
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-bold">Aguardando leitura...</span>
+            </div>
+
+            {/* Simulated Connected State (Commented out logic for prototype visual) */}
+            {/* 
+            <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-2 rounded-full">
+                <CheckCircle2 size={16} />
+                <span className="text-sm font-bold">Conectado com sucesso</span>
+            </div> 
+            */}
+        </div>
+
+      </div>
+    </div>
+  );
+};
