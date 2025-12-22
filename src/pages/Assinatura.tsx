@@ -461,13 +461,48 @@ const Assinatura = () => {
 
       if (!creditCardToken) throw new Error('Token do cartão não retornado.');
 
+      // 1.5. Fazer cobrança do valor do plano (user_valor_mensal)
+      if (userPlanValue > 0) {
+        const paymentPayload = {
+          billingType: "CREDIT_CARD",
+          value: userPlanValue,
+          dueDate: new Date().toISOString().split('T')[0], // Vencimento hoje
+          customer: asaasCustomerId,
+          creditCardToken: creditCardToken,
+          remoteIp: remoteIp,
+          description: `Mensalidade Worklivoo`
+        };
+
+        console.log('Processando cobrança:', paymentPayload);
+
+        const paymentResponse = await fetch('/api/asaas/payments', {
+          method: 'POST',
+          headers: {
+            'accept': 'application/json',
+            'access_token': apiKey,
+            'content-type': 'application/json'
+          },
+          body: JSON.stringify(paymentPayload)
+        });
+
+        if (!paymentResponse.ok) {
+          const errorData = await paymentResponse.json();
+          console.error('Erro na cobrança:', errorData);
+          throw new Error(errorData.errors?.[0]?.description || 'Erro ao processar o pagamento inicial.');
+        }
+
+        const paymentData = await paymentResponse.json();
+        console.log('Cobrança realizada:', paymentData);
+        toast.success('Cobrança realizada com sucesso!');
+      }
+
       // 2. Calcular dia de vencimento
       const today = new Date();
       let dueDay = today.getDate();
       
       // Regra: se for dia 29, 30 ou 31, o vencimento será dia 1
       if (dueDay >= 29) {
-        dueDay = 1;
+        dueDay = 28;
       }
 
       // 3. Atualizar tabela usuarios
