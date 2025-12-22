@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api/asaas/(.*)",
-      "destination": "https://api.asaas.com/v3/$1"
+      "source": "/api/asaas/:match*",
+      "destination": "https://api.asaas.com/v3/:match*"
     },
     {
       "source": "/(.*)",

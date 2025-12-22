@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/supabase-utils';
 import { usePersistentState } from '@/hooks/use-persistent-state';
+import { getAsaasApiKey, getAsaasUrl } from '@/utils/asaas';
 
 interface Payment {
   id: string;
@@ -138,27 +139,14 @@ const Assinatura = () => {
     
     setIsLoadingInvoices(true);
     try {
-      let apiKey = import.meta.env.VITE_ASAAS_API_KEY;
+      const apiKey = getAsaasApiKey();
       if (!apiKey) return;
 
-      // Sanitização da API Key
-      if (apiKey) {
-        apiKey = apiKey.trim();
-        if ((apiKey.startsWith('"') && apiKey.endsWith('"')) || (apiKey.startsWith("'") && apiKey.endsWith("'"))) {
-           apiKey = apiKey.substring(1, apiKey.length - 1);
-        }
-        if (apiKey.startsWith('\\$')) {
-           apiKey = apiKey.replace('\\$', '$');
-        }
-      }
-
-      const cleanApiKey = apiKey;
-
-      const response = await fetch(`/api/asaas/payments?customer=${asaasCustomerId}&limit=12`, {
+      const response = await fetch(getAsaasUrl(`/payments?customer=${asaasCustomerId}&limit=12`), {
         method: 'GET',
         headers: {
           'accept': 'application/json',
-          'access_token': cleanApiKey
+          'access_token': apiKey
         }
       });
 
@@ -313,32 +301,7 @@ const Assinatura = () => {
     setIsLoading(true);
 
     try {
-      let apiKey = import.meta.env.VITE_ASAAS_API_KEY;
-      
-      // Sanitização da API Key para evitar erros comuns de cópia/cola
-      if (apiKey) {
-        apiKey = apiKey.trim();
-        // Remove aspas se houver (erro comum ao configurar env vars)
-        if ((apiKey.startsWith('"') && apiKey.endsWith('"')) || (apiKey.startsWith("'") && apiKey.endsWith("'"))) {
-           apiKey = apiKey.substring(1, apiKey.length - 1);
-        }
-        // Remove backslash inicial se houver (erro comum ao copiar de .env)
-        if (apiKey.startsWith('\\$')) {
-           apiKey = apiKey.replace('\\$', '$');
-        }
-      }
-
-      // Definir cleanApiKey para uso posterior
-      const cleanApiKey = apiKey;
-
-      // Debug API Key (apenas para verificação, remover em produção se necessário)
-      console.log('API Key definida:', !!apiKey);
-      console.log('API Key length:', apiKey ? apiKey.length : 0);
-      if (apiKey) {
-         console.log('API Key start:', apiKey.substring(0, 4) + '...');
-         console.log('API Key end:', '...' + apiKey.substring(apiKey.length - 4));
-      }
-      
+      const apiKey = getAsaasApiKey();
       if (!apiKey) throw new Error('Chave de API do Asaas não configurada.');
 
       // 1. Criar Cliente no Asaas
@@ -351,12 +314,11 @@ const Assinatura = () => {
 
       console.log('Payload Cliente Asaas:', asaasPayload);
 
-      // Usando o proxy configurado no vite.config.ts
-      const response = await fetch('/api/asaas/customers', {
+      const response = await fetch(getAsaasUrl('/customers'), {
         method: 'POST',
         headers: {
           'accept': 'application/json',
-          'access_token': cleanApiKey,
+          'access_token': apiKey,
           'content-type': 'application/json'
         },
         body: JSON.stringify(asaasPayload)
