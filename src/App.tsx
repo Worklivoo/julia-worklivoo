@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { CRMProvider, useCRM } from "@/contexts/CRMContext";
 import { useState, useEffect } from "react";
 import Auth from "./pages/Auth";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Pipeline from "./pages/Pipeline";
 import LeadDetail from "./pages/LeadDetail";
@@ -75,6 +76,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/auth" element={isAuthenticated ? <Navigate to="/inicio" replace /> : <Auth />} />
+      <Route path="/register" element={isAuthenticated ? <Navigate to="/inicio" replace /> : <Register />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<Navigate to={isAuthenticated ? "/inicio" : "/auth"} replace />} />
       <Route path="/inicio" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />

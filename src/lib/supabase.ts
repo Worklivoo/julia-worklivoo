@@ -69,6 +69,7 @@ export interface Database {
             user_telefone: string | null
             user_empresa: string | null
             user_plano: string | null
+            user_valor_mensal: string | null
             id_instancia_zapi: string | null
             token_instancia_zapi: string | null
             user_tipo: string | null
@@ -90,6 +91,7 @@ export interface Database {
             user_telefone?: string | null
             user_empresa?: string | null
             user_plano?: string | null
+            user_valor_mensal?: string | null
             id_instancia_zapi?: string | null
             token_instancia_zapi?: string | null
             user_tipo?: string | null
@@ -111,6 +113,7 @@ export interface Database {
             user_telefone?: string | null
             user_empresa?: string | null
             user_plano?: string | null
+            user_valor_mensal?: string | null
             id_instancia_zapi?: string | null
             token_instancia_zapi?: string | null
             user_tipo?: string | null

@@ -6,8 +6,11 @@ export const getAsaasApiKey = () => {
     return null;
   }
 
-  // Retorna a API Key exatamente como está na variável de ambiente
-  return apiKey;
+  // Sanitização da API Key (Remove aspas simples ou duplas extras caso existam)
+  const cleanApiKey = apiKey.trim().replace(/^['"]|['"]$/g, '');
+
+  // Retorna a API Key limpa
+  return cleanApiKey;
 };
 
 export const getAsaasUrl = (path: string) => {

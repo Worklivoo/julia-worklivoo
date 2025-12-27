@@ -20,7 +20,7 @@ interface CRMContextType {
   addNote: (leadId: string, content: string) => Promise<boolean>;
   getNotesByLead: (leadId: string) => Promise<Note[]>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (name: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string, leadsVolume?: number) => Promise<boolean>;
+  register: (name: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string, leadsVolume?: number, valorPlano?: string) => Promise<boolean>;
   logout: () => void;
   getDashboardMetrics: () => DashboardMetrics;
   updateUser: (updates: Partial<User>) => void;
@@ -266,7 +266,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Função de registro
-  const register = async (nome: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string, leadsVolume?: number): Promise<boolean> => {
+  const register = async (nome: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string, leadsVolume?: number, valorPlano?: string): Promise<boolean> => {
     try {
       // 1. Criar usuário no Supabase Auth
       const { data, error } = await supabase.auth.signUp({
@@ -288,6 +288,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user_empresa: empresa || null,
         user_tipo: user_tipo || null,
         user_plano: (leadsVolume !== undefined && leadsVolume !== null) ? String(leadsVolume) : null,
+        user_valor_mensal: valorPlano || null,
       });
 
       if (!profile) {

@@ -16,7 +16,8 @@ import {
   Lock,
   Loader2,
   CalendarDays,
-  ArrowUpRight
+  ArrowUpRight,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
@@ -57,6 +58,7 @@ const Assinatura = () => {
     email: '',
     celular: '',
     cep: '',
+    endereco: '',
     numero: ''
   });
 
@@ -140,9 +142,13 @@ const Assinatura = () => {
     setIsLoadingInvoices(true);
     try {
       const apiKey = getAsaasApiKey();
-      if (!apiKey) return;
+      if (!apiKey) {
+        console.error('API Key não encontrada');
+        return;
+      }
 
-      const response = await fetch(getAsaasUrl(`/payments?customer=${asaasCustomerId}&limit=12`), {
+      console.log('Buscando faturas para:', asaasCustomerId);
+      const response = await fetch(getAsaasUrl(`/payments?customer=${asaasCustomerId}&limit=12&sort=dateCreated&order=desc`), {
         method: 'GET',
         headers: {
           'accept': 'application/json',
@@ -152,9 +158,12 @@ const Assinatura = () => {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Faturas recebidas:', data);
         if (data.data && Array.isArray(data.data)) {
           setInvoices(data.data);
         }
+      } else {
+        console.error('Erro ao buscar faturas:', await response.text());
       }
     } catch (error) {
       console.error('Erro ao buscar faturas:', error);
@@ -309,7 +318,8 @@ const Assinatura = () => {
         name: formData.nome,
         cpfCnpj: formData.documento.replace(/\D/g, ''),
         email: formData.email,
-        mobilePhone: formData.celular.replace(/\D/g, '')
+        mobilePhone: formData.celular.replace(/\D/g, ''),
+        notificationDisabled: true
       };
 
       console.log('Payload Cliente Asaas:', asaasPayload);
@@ -488,11 +498,25 @@ const Assinatura = () => {
         .update({
           cartao_token: creditCardToken,
           cartao_final: lastFourDigits,
-          dia_vencimento: dueDay
+          dia_vencimento: dueDay,
+          tryout: 'NÃO'
         })
         .eq('user_id', userId);
 
       if (updateError) throw updateError;
+
+      // 4. Disparar webhook de ativação
+      try {
+        await fetch('https://primary-production-d442.up.railway.app/webhook/cartao-ativado', {
+            method: 'POST',
+            headers: {
+            'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ user_id: userId })
+        });
+      } catch (webhookError) {
+        console.error('Erro ao disparar webhook:', webhookError);
+      }
 
       setCardFinal(lastFourDigits);
       setIsCardSaved(true);
@@ -534,7 +558,7 @@ const Assinatura = () => {
                   <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center text-black">
                     <User size={20} />
                   </div>
-                  <h3 className="text-lg font-bold">Dados Pessoais</h3>
+                  <h3 className="text-lg font-bold">Dados de Faturamento</h3>
                 </div>
                 <div className="grid grid-cols-1 gap-5">
                   <div>
@@ -593,6 +617,17 @@ const Assinatura = () => {
                         disabled={isLoading}
                         />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Endereço (Rua e Bairro)</label>
+                    <input 
+                      type="text" 
+                      placeholder="Rua Exemplo, Bairro Centro" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                      value={formData.endereco}
+                      onChange={(e) => handleInputChange('endereco', e.target.value)}
+                      disabled={isLoading}
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Número</label>
@@ -784,7 +819,14 @@ const Assinatura = () => {
           <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm">
              <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-gray-900">Faturas Recentes</h3>
-                <MoreVertical size={18} className="text-gray-400 cursor-pointer" />
+                <button 
+                  onClick={fetchInvoices}
+                  disabled={isLoadingInvoices}
+                  className="p-2 hover:bg-gray-50 rounded-full transition-colors disabled:opacity-50"
+                  title="Atualizar faturas"
+                >
+                  <RefreshCw size={18} className={`text-gray-400 ${isLoadingInvoices ? 'animate-spin' : ''}`} />
+                </button>
              </div>
              <div className="space-y-4">
                 {isLoadingInvoices ? (
@@ -804,15 +846,19 @@ const Assinatura = () => {
                                 ? 'bg-green-100 text-green-600' 
                                 : inv.status === 'OVERDUE'
                                 ? 'bg-red-100 text-red-600'
+                                : inv.status === 'REFUNDED'
+                                ? 'bg-gray-100 text-gray-600'
                                 : 'bg-yellow-100 text-yellow-600'
                             }`}>
-                                {inv.status === 'OVERDUE' ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
+                                {inv.status === 'OVERDUE' ? <AlertCircle size={14} /> : 
+                                 inv.status === 'REFUNDED' ? <RefreshCw size={14} /> : <CheckCircle2 size={14} />}
                             </div>
                             <div>
-                                <p className="text-xs font-bold text-black">{new Date(inv.clientPaymentDate || inv.dateCreated).toLocaleDateString('pt-BR')}</p>
+                                <p className="text-xs font-bold text-black">{new Date(new Date(inv.clientPaymentDate || inv.dateCreated).getTime() + 86400000).toLocaleDateString('pt-BR')}</p>
                                 <p className="text-[10px] text-gray-400 font-bold uppercase">
                                     {inv.status === 'CONFIRMED' || inv.status === 'RECEIVED' ? 'Pago' : 
-                                    inv.status === 'OVERDUE' ? 'Atrasado' : 'Pendente'}
+                                    inv.status === 'OVERDUE' ? 'Atrasado' : 
+                                    inv.status === 'REFUNDED' ? 'Estornado' : 'Pendente'}
                                 </p>
                             </div>
                         </div>

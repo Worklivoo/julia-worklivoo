@@ -18,7 +18,8 @@ export const registerSchema = z.object({
   }),
   telefone: z.string().min(1, 'Telefone é obrigatório'),
   empresa: z.string().min(1, 'Empresa é obrigatória'),
-  leads_volume: z.coerce.number().min(1, 'Informe um volume válido')
+  leads_volume: z.coerce.number().min(1, 'Informe um volume válido'),
+  valor_plano: z.string().min(1, 'Valor do plano é obrigatório')
 })
 
 // Tipos TypeScript derivados dos schemas
