@@ -260,6 +260,41 @@ export interface Database {
           data_criacao?: string
           data_pagamento?: string | null
         }
+      },
+      feedbacks: {
+        Row: {
+          feedback_id: number
+          criado_em: string
+          user_id: string
+          mensagem_id: string
+          comentario_tipo: string
+          comentario_mensagem: string | null
+          dify_conversation: string
+          dify_user: string
+          status: string | null
+        }
+        Insert: {
+          feedback_id?: number
+          criado_em?: string
+          user_id: string
+          mensagem_id: string
+          comentario_tipo: string
+          comentario_mensagem?: string | null
+          dify_conversation: string
+          dify_user: string
+          status?: string | null
+        }
+        Update: {
+          feedback_id?: number
+          criado_em?: string
+          user_id?: string
+          mensagem_id?: string
+          comentario_tipo?: string
+          comentario_mensagem?: string | null
+          dify_conversation?: string
+          dify_user?: string
+          status?: string | null
+        }
       }
     }
   }

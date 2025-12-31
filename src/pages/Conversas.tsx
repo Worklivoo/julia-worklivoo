@@ -553,6 +553,39 @@ const TryOut = () => {
       const profile = await getUserProfile(userIdForData);
       const conv = conversations.find((c) => c.dify_conversation === selectedConvId) || conversations[0];
       const messageIdNormalized = normalizeMessageId(String(feedbackMessageId || ''));
+      
+      // 1. Criar registro no Supabase primeiro
+      let createdFeedbackId = '';
+      try {
+        const { data: insertedFeedback, error: dbError } = await supabase
+          .from('feedbacks')
+          .insert({
+            user_id: String(userIdForData || ''),
+            mensagem_id: messageIdNormalized,
+            comentario_tipo: 'negativo',
+            comentario_mensagem: String(feedbackText || ''),
+            dify_conversation: String(selectedConvId || conv?.dify_conversation || ''),
+            dify_user: String(conv?.dify_user || '')
+          })
+          .select() // Seleciona todas as colunas
+          .single();
+
+        if (dbError) {
+          console.error('Erro ao inserir feedback:', dbError);
+          throw new Error('Falha ao registrar feedback no banco de dados.');
+        }
+        if (insertedFeedback) {
+          // Tipagem segura baseada na definição atualizada
+          const feedbackData = insertedFeedback as any;
+          createdFeedbackId = String(feedbackData.feedback_id || feedbackData.id || '');
+        }
+      } catch (dbEx: any) {
+        toast({ title: 'Erro ao salvar', description: dbEx.message || 'Não foi possível salvar o feedback.' });
+        setSendingFeedback(false);
+        return;
+      }
+
+      // 2. Enviar Webhook com o ID gerado
       const idempotencyKey = `${String(userIdForData || '')}:${messageIdNormalized}:negativo`;
       const form = new URLSearchParams({
         user_id: String(userIdForData || ''),
@@ -561,8 +594,10 @@ const TryOut = () => {
         conversation_id: String(selectedConvId || conv?.dify_conversation || ''),
         dify_user: String(conv?.dify_user || ''),
         dify_conversation: String(conv?.dify_conversation || ''),
-        idempotency_key: idempotencyKey
+        idempotency_key: idempotencyKey,
+        feedback_id: createdFeedbackId // Campo adicionado
       });
+
       if (profile && typeof profile === 'object') {
         Object.entries(profile as any).forEach(([k, v]) => {
           try {
@@ -572,24 +607,14 @@ const TryOut = () => {
           } catch {}
         });
       }
+
       await fetch(url, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: form.toString()
       });
-      try {
-        await supabase
-          .from('feedbacks')
-          .insert({
-            user_id: String(userIdForData || ''),
-            mensagem_id: messageIdNormalized,
-            comentario_tipo: 'negativo',
-            comentario_mensagem: String(feedbackText || ''),
-            dify_conversation: String(selectedConvId || conv?.dify_conversation || ''),
-            dify_user: String(conv?.dify_user || '')
-          });
-      } catch {}
+
       setFeedback(String(feedbackMessageId || ''), 'down');
       toast({ title: 'Feedback enviado', description: 'Vamos analisar e revisar a IA.' });
       setFeedbackModalOpen(false);

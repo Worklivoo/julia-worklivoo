@@ -446,8 +446,8 @@ const Assinatura = () => {
 
       if (!creditCardToken) throw new Error('Token do cartão não retornado.');
 
-      // 1.5. Fazer cobrança do valor do plano (user_valor_mensal)
-      if (userPlanValue > 0) {
+      // 1.5. Fazer cobrança do valor do plano (user_valor_mensal) APENAS SE for a primeira vez (não tiver cartão salvo anteriormente)
+      if (userPlanValue > 0 && !cardFinal) {
         const paymentPayload = {
           billingType: "CREDIT_CARD",
           value: userPlanValue,
