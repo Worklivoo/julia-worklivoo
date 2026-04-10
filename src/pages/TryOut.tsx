@@ -183,14 +183,20 @@ const TryOut = () => {
             const raw: any[] = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
             const expanded: MessageItem[] = [];
               raw.forEach((it: any, idx: number) => {
-                const createdAt = it?.created_at ? String(it.created_at) : undefined;
-                if (typeof it?.query === 'string' && it.query.trim() !== '') {
-                  expanded.push({ id: `${it?.id || idx}-q`, role: 'user', content: it.query, created_at: createdAt });
-                }
-                if (typeof it?.answer === 'string' && it.answer.trim() !== '') {
-                  expanded.push({ id: `${it?.id || idx}-a`, role: 'assistant', content: it.answer, created_at: createdAt });
-                }
-              });
+            const createdAt = it?.created_at ? String(it.created_at) : undefined;
+            if (typeof it?.query === 'string' && it.query.trim() !== '') {
+              expanded.push({ id: `${it?.id || idx}-q`, role: 'user', content: it.query, created_at: createdAt });
+            }
+            
+            let answerContent = it?.answer;
+            if (typeof answerContent === 'string') {
+              answerContent = stripAiThinking(answerContent);
+            }
+
+            if (typeof answerContent === 'string' && answerContent.trim() !== '') {
+              expanded.push({ id: `${it?.id || idx}-a`, role: 'assistant', content: answerContent, created_at: createdAt });
+            }
+          });
             return { id: c.dify_conversation, items: expanded };
           } catch {
             return { id: c.dify_conversation, items: [] };
@@ -238,6 +244,23 @@ const TryOut = () => {
     if (!id) return id;
     if (id.endsWith('-q') || id.endsWith('-a')) return id.slice(0, -2);
     return id;
+  };
+
+  const stripAiThinking = (input: string) => {
+    let out = (input ?? '').toString();
+    const stripTag = (tag: string) => {
+      out = out.replace(new RegExp(`<\\s*${tag}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${tag}\\s*>`, 'gi'), '');
+      out = out.replace(new RegExp(`<\\s*${tag}\\b[^>]*>[\\s\\S]*$`, 'gi'), '');
+      out = out.replace(new RegExp(`&lt;\\s*${tag}\\b[^&]*&gt;[\\s\\S]*?(?:&lt;\\s*\\/\\s*${tag}\\s*&gt;|$)`, 'gi'), '');
+    };
+    stripTag('think');
+    stripTag('thinking');
+    out = out.replace(/<\s*\/\s*(think|thinking)\s*>/gi, '');
+    out = out.replace(/<\s*(think|thinking)\b[^>]*>/gi, '');
+    out = out.replace(/&lt;\s*\/\s*(think|thinking)\s*&gt;/gi, '');
+    out = out.replace(/&lt;\s*(think|thinking)\b[^&]*&gt;/gi, '');
+    out = out.replace(/^\s*(think|thinking)\s*:\s*[\s\S]*?(?=\n\s*\n|$)/gim, '');
+    return out.trim();
   };
 
   const formatMessage = (s: string) => {
@@ -379,8 +402,9 @@ const TryOut = () => {
           if (!convId && typeof ev?.conversation_id === 'string') convId = ev.conversation_id;
           if (typeof ev?.created_at !== 'undefined') { const t = Number(ev.created_at || 0); if (!Number.isNaN(t)) createdAt = t * 1000; }
           if (ev?.event === 'agent_message' && typeof ev?.answer === 'string') messageAnswer += ev.answer;
-          if (!messageAnswer && ev?.event === 'agent_thought' && typeof ev?.thought === 'string') messageAnswer = ev.thought;
         });
+        
+        messageAnswer = stripAiThinking(messageAnswer);
         if (convId) {
           try {
             await supabase
@@ -399,10 +423,8 @@ const TryOut = () => {
           });
           setMessagesByConv((prev) => {
             const next = { ...prev };
-            const items: MessageItem[] = [
-              { id: `${convId}-q`, role: 'user', content: body.query, created_at: String(createdAt) },
-              { id: `${convId}-a`, role: 'assistant', content: messageAnswer, created_at: String(createdAt) }
-            ];
+            const items: MessageItem[] = [{ id: `${convId}-q`, role: 'user', content: body.query, created_at: String(createdAt) }];
+            if (messageAnswer.trim()) items.push({ id: `${convId}-a`, role: 'assistant', content: messageAnswer, created_at: String(createdAt) });
             next[convId!] = items;
             const cacheKey = `tryout:messages:${userIdForData}`;
             try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
@@ -495,18 +517,21 @@ const TryOut = () => {
         events.forEach((ev) => {
           if (typeof ev?.created_at !== 'undefined') { const t = Number(ev.created_at || 0); if (!Number.isNaN(t)) createdAt = t * 1000; }
           if (ev?.event === 'agent_message' && typeof ev?.answer === 'string') messageAnswer += ev.answer;
-          if (!messageAnswer && ev?.event === 'agent_thought' && typeof ev?.thought === 'string') messageAnswer = ev.thought;
         });
-        const assistantMsg: MessageItem = { id: `${Date.now()}-a`, role: 'assistant', content: messageAnswer, created_at: String(createdAt) };
-        setMessagesByConv((prev) => {
-          const next = { ...prev };
-          const arr = next[conv.dify_conversation] ? [...next[conv.dify_conversation]] : [];
-          arr.push(assistantMsg);
-          next[conv.dify_conversation] = arr;
-          const cacheKey = `tryout:messages:${userIdForData}`;
-          try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
-          return next;
-        });
+        
+        messageAnswer = stripAiThinking(messageAnswer);
+        if (messageAnswer.trim()) {
+          const assistantMsg: MessageItem = { id: `${Date.now()}-a`, role: 'assistant', content: messageAnswer, created_at: String(createdAt) };
+          setMessagesByConv((prev) => {
+            const next = { ...prev };
+            const arr = next[conv.dify_conversation] ? [...next[conv.dify_conversation]] : [];
+            arr.push(assistantMsg);
+            next[conv.dify_conversation] = arr;
+            const cacheKey = `tryout:messages:${userIdForData}`;
+            try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
+            return next;
+          });
+        }
         setTimeout(scrollMessagesToBottom, 0);
         setTypingByConv((prev) => ({ ...prev, [conv.dify_conversation]: false }));
         setChatInput('');
@@ -643,7 +668,7 @@ const TryOut = () => {
     return byType.filter((c) => {
       const msgs = messagesByConv[c.dify_conversation] || [];
       const last = msgs[msgs.length - 1];
-      const preview = (last?.content || last?.answer || '').toString().toLowerCase();
+      const preview = stripAiThinking((last?.content || last?.answer || '').toString()).toLowerCase();
       const title = typeof c.treinamento_id !== 'undefined' ? `Conversa ${c.treinamento_id}` : 'Conversa';
       return title.toLowerCase().includes(term) || preview.includes(term);
     });
@@ -707,7 +732,7 @@ const TryOut = () => {
                 {filteredConversations.map((c) => {
                   const msgs = messagesByConv[c.dify_conversation] || [];
                   const last = msgs[msgs.length - 1];
-                  const preview = (last?.content || last?.answer || '').toString();
+                  const preview = stripAiThinking((last?.content || last?.answer || '').toString());
                   const initials = typeof c.treinamento_id !== 'undefined' ? String(c.treinamento_id) : 'WL';
                   const title = typeof c.treinamento_id !== 'undefined' ? `TryOut ${c.treinamento_id}` : 'TryOut';
                   const isManual = typeof c.dify_user === 'string' && c.dify_user.startsWith('worklivoo-manual-');
@@ -768,7 +793,7 @@ const TryOut = () => {
                   return ca - cb;
                 }).map((m, idx) => {
                   const isAssistant = m.role === 'assistant' || m.role === 'bot';
-                  const text = (m.content || m.answer || '') as string;
+                  const text = stripAiThinking((m.content || m.answer || '') as string);
                   const baseId = normalizeMessageId(String(m.id || idx));
                   return (
                     <div key={(m.id || idx).toString()} className="space-y-1">

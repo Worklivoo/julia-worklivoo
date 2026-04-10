@@ -13,14 +13,15 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useCRM } from '@/contexts/CRMContext';
 import { useLeadOrigins } from '@/hooks/use-lead-origins';
-import { Note } from '@/types';
+import { getMembrosByUser } from '@/lib/membros';
+import { Note, Membro } from '@/types';
 import { ArrowLeft, Calendar, Mail, Phone, User, Edit, Check, X, Plus, UserPlus, PhoneCall, FileText, Handshake, CheckCircle, Trash2, AlertTriangle, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const LeadDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { leads, updateLead, addNote, getNotesByLead, deleteLead } = useCRM();
+  const { leads, updateLead, addNote, getNotesByLead, deleteLead, user, loadingLeads, hasLoadedLeads } = useCRM();
   const { origins } = useLeadOrigins();
   const isMobile = useIsMobile();
   const [isEditing, setIsEditing] = useState(false);
@@ -35,9 +36,62 @@ const LeadDetail = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
+  const [membros, setMembros] = useState<Membro[]>([]);
+  const [isLoadingMembros, setIsLoadingMembros] = useState(false);
+  const [isEditingIAAtiva, setIsEditingIAAtiva] = useState(false);
+  const [iaAtivaValue, setIaAtivaValue] = useState<'Sim' | 'Não'>('Sim');
+  const [isUpdatingIAAtiva, setIsUpdatingIAAtiva] = useState(false);
 
   const lead = leads.find(l => l.id === id);
   const [editedLead, setEditedLead] = useState(lead);
+
+  // Helper para normalizar o valor de ativo_ia
+  const normalizeAtivoIA = (value: string | null | undefined): 'Sim' | 'Não' => {
+    if (!value) return 'Sim'; // Padrão é Sim se for null/undefined
+    const normalized = value.toString().toUpperCase().trim();
+    // Verifica todas as variações de NÃO
+    if (['NÃO', 'NAO', 'NO', 'FALSE', '0', 'N', 'NAO'].includes(normalized)) {
+      return 'Não';
+    }
+    return 'Sim';
+  };
+
+  useEffect(() => {
+    if (lead) {
+      setEditedLead(lead);
+    }
+  }, [lead]);
+
+  useEffect(() => {
+    if (!lead) return;
+    setIaAtivaValue(normalizeAtivoIA(lead.ativo_ia));
+  }, [lead]);
+
+  // Carregar membros (para visualização e seleção)
+  useEffect(() => {
+    const loadMembros = async () => {
+      if (user) {
+        setIsLoadingMembros(true);
+        try {
+          // Se for membro, busca os membros da empresa do dono (user_id_empresa)
+          // Se for admin, busca seus próprios membros (id)
+          const targetUserId = user.isMembro ? user.user_id_empresa : user.id;
+          
+          if (targetUserId) {
+            const { data } = await getMembrosByUser(targetUserId);
+            if (data) {
+              setMembros(data);
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao carregar membros:', error);
+        } finally {
+          setIsLoadingMembros(false);
+        }
+      }
+    };
+    loadMembros();
+  }, [user]);
 
   // Carregar anotações do lead quando o componente montar
   useEffect(() => {
@@ -59,6 +113,15 @@ const LeadDetail = () => {
   }, [id, getNotesByLead]);
 
   if (!lead) {
+    if (!hasLoadedLeads || loadingLeads) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-primary mb-2 light-title">Carregando...</h1>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="text-center">
         <h1 className="text-2xl font-bold text-primary mb-4 light-title">Lead não encontrado</h1>
@@ -136,6 +199,7 @@ const LeadDetail = () => {
       updateLead(id!, {
         opportunityName: editedLead.opportunityName,
         source: editedLead.source,
+        membro_id: editedLead.membro_id,
       });
       setIsEditingNegotiation(false);
     }
@@ -155,6 +219,17 @@ const LeadDetail = () => {
 
   const handleResumeNegotiation = () => {
     updateLead(id!, { status: 'active' });
+  };
+
+  const handleSaveIAAtiva = async () => {
+    if (!id) return;
+    setIsUpdatingIAAtiva(true);
+    try {
+      await Promise.resolve(updateLead(id, { ativo_ia: iaAtivaValue }) as any);
+      setIsEditingIAAtiva(false);
+    } finally {
+      setIsUpdatingIAAtiva(false);
+    }
   };
 
   const handleDeleteLead = async () => {
@@ -449,39 +524,69 @@ const LeadDetail = () => {
                   <p className="mt-1">{new Date(lead.createdAt).toLocaleDateString('pt-BR')}</p>
                 </div>
                 <div>
-                                      <label className="text-sm font-medium text-muted-foreground">Canal de Origem</label>
-                    {isEditingNegotiation ? (
-                      <div className="relative">
-                        <Input
-                          value={editedLead?.source || ''}
-                          onChange={(e) => setEditedLead(prev => prev ? {...prev, source: e.target.value} : null)}
-                          className="mt-1 bg-background border-border"
-                          placeholder="Digite ou selecione uma origem"
-                          onFocus={() => setShowOriginSuggestions(true)}
-                          onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 200)}
-                        />
-                        {showOriginSuggestions && origins.length > 0 && (
-                          <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-40 overflow-y-auto" style={{maxHeight: '160px', minWidth: '100%'}}>
-                            {origins.map((origin, index) => (
-                              <button
-                                key={index}
-                                type="button"
-                                onClick={() => setEditedLead(prev => prev ? {...prev, source: origin} : null)}
-                                className="w-full text-left px-3 py-2 hover:bg-accent text-sm"
-                              >
-                                {origin}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {showOriginSuggestions && origins.length > 0 && (
-                          <div style={{height: '48px'}}></div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="mt-1">{lead.source}</p>
-                    )}
+                  <label className="text-sm font-medium text-muted-foreground">Canal de Origem</label>
+                  {isEditingNegotiation ? (
+                    <div className="relative">
+                      <Input
+                        value={editedLead?.source || ''}
+                        onChange={(e) => setEditedLead(prev => prev ? {...prev, source: e.target.value} : null)}
+                        className="mt-1 bg-background border-border"
+                        placeholder="Digite ou selecione uma origem"
+                        onFocus={() => setShowOriginSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 200)}
+                      />
+                      {showOriginSuggestions && origins.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-40 overflow-y-auto" style={{maxHeight: '160px', minWidth: '100%'}}>
+                          {origins.map((origin, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              onClick={() => setEditedLead(prev => prev ? {...prev, source: origin} : null)}
+                              className="w-full text-left px-3 py-2 hover:bg-accent text-sm"
+                            >
+                              {origin}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {showOriginSuggestions && origins.length > 0 && (
+                        <div style={{height: '48px'}}></div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-1">{lead.source}</p>
+                  )}
                 </div>
+
+                {user && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Membro Responsável</label>
+                    {isEditingNegotiation && !user.isMembro ? (
+                      <Select
+                        value={editedLead?.membro_id || "unassigned"}
+                        onValueChange={(value) => setEditedLead(prev => prev ? {...prev, membro_id: value === "unassigned" ? null : value} : null)}
+                      >
+                        <SelectTrigger className="mt-1 bg-background border-border">
+                          <SelectValue placeholder="Selecione um responsável" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Sem responsável</SelectItem>
+                          {membros.map((membro) => (
+                            <SelectItem key={membro.membro_id} value={membro.membro_id}>
+                              {membro.membro_nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="mt-1">
+                        {lead.membro_id 
+                          ? membros.find(m => m.membro_id === lead.membro_id)?.membro_nome || 'Membro não encontrado'
+                          : 'Sem responsável'}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               {isEditingNegotiation && (
                 <div className="flex gap-2 mt-4 pt-4 border-t border-border/50">
@@ -635,10 +740,26 @@ const LeadDetail = () => {
 
           <Card className="bg-gradient-to-br from-card via-card to-card/95 border-border/50 shadow-lg">
             <CardHeader className="bg-gradient-to-r from-primary/5 via-transparent to-primary/5">
-              <CardTitle className="flex items-center gap-2">
-                <FileText size={20} className="text-foreground" />
-                Informações Adicionais
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <FileText size={20} className="text-foreground" />
+                  Informações Adicionais
+                </CardTitle>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setIsEditingIAAtiva((v) => !v)}
+                      className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full hover:bg-muted"
+                      disabled={isUpdatingIAAtiva}
+                    >
+                      <Edit size={16} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Editar IA está Ativa?</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4 mt-4">
               <div>
@@ -660,9 +781,56 @@ const LeadDetail = () => {
                   <CheckCircle size={14} />
                   IA está Ativa?
                 </label>
-                <p className="text-foreground font-medium mt-1">
-                  {!lead.ativo_ia || lead.ativo_ia === '' ? 'Sim' : lead.ativo_ia === 'Não' ? 'Não' : 'Sim'}
-                </p>
+                {isEditingIAAtiva ? (
+                  <div className="mt-2 space-y-3">
+                    <Select value={iaAtivaValue} onValueChange={(value) => setIaAtivaValue(value as 'Sim' | 'Não')}>
+                      <SelectTrigger className="bg-background border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Sim">Sim</SelectItem>
+                        <SelectItem value="Não">Não</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex gap-2 pt-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={handleSaveIAAtiva}
+                            disabled={isUpdatingIAAtiva}
+                            className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg disabled:opacity-50"
+                          >
+                            <Check size={16} className="mr-2" />
+                            {isUpdatingIAAtiva ? 'Salvando...' : 'Salvar'}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Salvar IA está Ativa?</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            onClick={() => { setIsEditingIAAtiva(false); setIaAtivaValue(normalizeAtivoIA(lead.ativo_ia)); }}
+                            disabled={isUpdatingIAAtiva}
+                            className="border-border/50 hover:bg-muted/50 disabled:opacity-50"
+                          >
+                            <X size={16} className="mr-2" />
+                            Cancelar
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Cancelar edição</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-foreground font-medium mt-1">
+                    {normalizeAtivoIA(lead.ativo_ia)}
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -1,6 +1,12 @@
 RewriteEngine On
+
+# Forçar HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
 RewriteBase /
 RewriteRule ^index\.html$ - [L]
+RewriteRule ^api/asaas/(.*)$ /asaas-proxy.php?path=$1 [L,QSA]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule . /index.html [L]

@@ -72,6 +72,7 @@ export interface Database {
             user_valor_mensal: string | null
             id_instancia_zapi: string | null
             token_instancia_zapi: string | null
+            token_instancia_uazapi: string | null
             user_tipo: string | null
             conhecimento_id: string | null
             documento_id: string | null
@@ -94,6 +95,7 @@ export interface Database {
             user_valor_mensal?: string | null
             id_instancia_zapi?: string | null
             token_instancia_zapi?: string | null
+            token_instancia_uazapi?: string | null
             user_tipo?: string | null
             conhecimento_id?: string | null
             documento_id?: string | null
@@ -116,6 +118,7 @@ export interface Database {
             user_valor_mensal?: string | null
             id_instancia_zapi?: string | null
             token_instancia_zapi?: string | null
+            token_instancia_uazapi?: string | null
             user_tipo?: string | null
             conhecimento_id?: string | null
             documento_id?: string | null

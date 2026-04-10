@@ -17,7 +17,10 @@ import {
   Loader2,
   CalendarDays,
   ArrowUpRight,
-  RefreshCw
+  RefreshCw,
+  QrCode,
+  Banknote,
+  Copy
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
@@ -42,6 +45,7 @@ const Assinatura = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [asaasCustomerId, setAsaasCustomerId] = useState<string | null>(null);
   const [cardFinal, setCardFinal] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'CREDIT_CARD' | 'PIX' | null>(null);
   
   const [invoices, setInvoices] = useState<Payment[]>([]);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
@@ -70,6 +74,9 @@ const Assinatura = () => {
     expiryYear: '',
     ccv: ''
   });
+
+  // Estado para pagamento PIX (Persistente)
+  const [pixPaymentData, setPixPaymentData] = usePersistentState('assinatura-pix-data', null);
 
   useEffect(() => {
     loadInitialData();
@@ -295,6 +302,174 @@ const Assinatura = () => {
     setCardData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Effect para polling do PIX
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (pixPaymentData && !isCardSaved) {
+        interval = setInterval(checkPixStatus, 3000); // Checa a cada 3s
+    }
+    return () => {
+        if (interval) clearInterval(interval);
+    };
+  }, [pixPaymentData, isCardSaved]);
+
+  const generatePixCharge = async (customerId: string) => {
+    try {
+      setIsLoading(true);
+      const apiKey = getAsaasApiKey();
+      if (!apiKey) throw new Error('Chave de API não configurada');
+
+      // 1. Criar cobrança
+      // Usa o valor do plano do usuário ou 1.00 como fallback de segurança
+      const valueToCharge = userPlanValue > 0 ? userPlanValue : 1.00;
+      
+      // Ajuste de data local para evitar problemas de fuso horário (UTC vs Local)
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      const localDueDate = `${year}-${month}-${day}`;
+
+      const paymentResponse = await fetch(getAsaasUrl('/payments'), {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'access_token': apiKey,
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          customer: customerId,
+          billingType: "PIX",
+          value: valueToCharge,
+          dueDate: localDueDate,
+          description: "Ativação Assinatura Worklivoo"
+        })
+      });
+
+      if (!paymentResponse.ok) {
+        const err = await paymentResponse.json();
+        throw new Error(err.errors?.[0]?.description || 'Erro ao gerar cobrança PIX');
+      }
+
+      const paymentData = await paymentResponse.json();
+      const paymentId = paymentData.id;
+
+      // 2. Obter QR Code
+      const qrResponse = await fetch(getAsaasUrl(`/payments/${paymentId}/pixQrCode`), {
+        method: 'GET',
+        headers: {
+            'accept': 'application/json',
+            'access_token': apiKey
+        }
+      });
+
+      if (!qrResponse.ok) throw new Error('Erro ao gerar QR Code');
+
+      const qrData = await qrResponse.json();
+
+      // 3. Atualizar dia de vencimento no Supabase (Igual ao cartão)
+      const dateForUpdate = new Date();
+      let dueDay = dateForUpdate.getDate();
+      
+      // Regra: se for dia 29, 30 ou 31, ajusta para 28 para evitar problemas com meses mais curtos
+      if (dueDay >= 29) {
+        dueDay = 28;
+      }
+
+      const { error: updateError } = await supabase
+        .from('usuarios')
+        .update({ dia_vencimento: dueDay })
+        .eq('user_id', userId);
+
+      if (updateError) {
+        console.error('Erro ao atualizar dia de vencimento:', updateError);
+        // Não vamos interromper o fluxo se falhar isso, mas logamos o erro
+      }
+
+      setPixPaymentData({
+        id: paymentId,
+        payload: qrData.payload,
+        encodedImage: qrData.encodedImage,
+        value: paymentData.value,
+        expirationDate: paymentData.dueDate
+      });
+
+      toast.success('Cobrança PIX gerada com sucesso! Realize o pagamento para ativar.');
+
+    } catch (error: any) {
+        console.error('Erro PIX:', error);
+        toast.error(error.message || 'Erro ao gerar PIX');
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  const checkPixStatus = async () => {
+      // Se não tiver dados do PIX ou já tiver cartão salvo (fluxo completo), não faz nada
+      if (!pixPaymentData || isCardSaved) return;
+      
+      try {
+          const apiKey = getAsaasApiKey();
+          if (!apiKey) return;
+
+          const response = await fetch(getAsaasUrl(`/payments/${pixPaymentData.id}`), {
+              method: 'GET',
+              headers: {
+                  'accept': 'application/json',
+                  'access_token': apiKey
+              }
+          });
+
+          if (response.ok) {
+              const data = await response.json();
+              if (data.status === 'RECEIVED' || data.status === 'CONFIRMED') {
+                  await handlePixSuccess();
+              }
+          }
+      } catch (error) {
+          console.error('Erro ao verificar status PIX:', error);
+      }
+  };
+
+  const handlePixSuccess = async () => {
+      // Evita chamadas múltiplas se já estiver salvando
+      if (isCardSaved) return;
+
+      setIsLoading(true);
+      try {
+          // Atualizar usuário
+          const { error } = await supabase
+            .from('usuarios')
+            .update({
+                cartao_token: 'PIX',
+                cartao_final: 'PIX',
+                tryout: 'NÃO'
+            })
+            .eq('user_id', userId);
+
+          if (error) throw error;
+          
+          setCardFinal('PIX');
+          setIsCardSaved(true);
+          setPixPaymentData(null); 
+          toast.success('Pagamento confirmado! Assinatura ativa.');
+          
+          try {
+            await fetch('https://primary-production-d442.up.railway.app/webhook/cartao-ativado', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            });
+          } catch (e) { console.error(e); }
+
+      } catch (error) {
+          console.error('Erro ao ativar assinatura PIX:', error);
+          toast.error('Pagamento identificado, mas erro ao ativar.');
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
   const handleSave = async () => {
     // Validação básica
     if (!formData.nome || !formData.documento || !formData.email || !formData.celular) {
@@ -345,19 +520,30 @@ const Assinatura = () => {
 
       if (!asaasId) throw new Error('ID do cliente não retornado pelo Asaas');
 
-      // 2. Salvar ID na tabela usuarios (apenas o ID, sem atualizar outros dados)
+      // 2. Salvar ID na tabela usuarios
+      const updateData: any = {
+        id_cliente_asaas: asaasId
+      };
+
+      // No caso de PIX, não atualizamos cartao_token/final ainda.
+      // Esperamos o pagamento ser confirmado.
+
       const { error: updateError } = await supabase
         .from('usuarios')
-        .update({
-          id_cliente_asaas: asaasId
-        })
+        .update(updateData)
         .eq('user_id', userId);
 
       if (updateError) throw updateError;
 
       setAsaasCustomerId(asaasId);
       setIsSaved(true);
-      toast.success('Cliente cadastrado com sucesso!');
+      
+      if (paymentMethod === 'PIX') {
+         // Iniciar fluxo de pagamento PIX
+         await generatePixCharge(asaasId);
+      } else {
+         toast.success('Cliente cadastrado com sucesso!');
+      }
 
     } catch (error: any) {
       console.error('Erro ao salvar:', error);
@@ -369,7 +555,8 @@ const Assinatura = () => {
 
   const handleSaveCard = async () => {
     // Validação básica do cartão
-    if (!cardData.holderName || !cardData.number || !cardData.expiryMonth || !cardData.expiryYear || !cardData.ccv) {
+    const holderNameToSend = (cardData.holderName || formData.nome || '').trim();
+    if (!holderNameToSend || !cardData.number || !cardData.expiryMonth || !cardData.expiryYear || !cardData.ccv) {
       toast.error('Por favor, preencha todos os dados do cartão.');
       return;
     }
@@ -404,14 +591,14 @@ const Assinatura = () => {
       const tokenPayload = {
         customer: asaasCustomerId,
         creditCard: {
-          holderName: cardData.holderName,
+          holderName: holderNameToSend,
           number: cardData.number.replace(/\s/g, ''),
           expiryMonth: cardData.expiryMonth,
           expiryYear: cardData.expiryYear,
           ccv: cardData.ccv
         },
         creditCardHolderInfo: {
-          name: formData.nome,
+          name: (formData.nome || holderNameToSend).trim(),
           email: formData.email,
           cpfCnpj: formData.documento.replace(/\D/g, ''),
           postalCode: formData.cep.replace(/\D/g, ''),
@@ -425,7 +612,7 @@ const Assinatura = () => {
 
       // Usando o proxy para tokenização
       // Endpoint correto para tokenizar: /api/v3/creditCard/tokenize
-      const response = await fetch('/api/asaas/creditCard/tokenize', {
+      const response = await fetch(getAsaasUrl('/creditCard/tokenize'), {
         method: 'POST',
         headers: {
           'accept': 'application/json',
@@ -460,7 +647,7 @@ const Assinatura = () => {
 
         console.log('Processando cobrança:', paymentPayload);
 
-        const paymentResponse = await fetch('/api/asaas/payments', {
+        const paymentResponse = await fetch(getAsaasUrl('/payments'), {
           method: 'POST',
           headers: {
             'accept': 'application/json',
@@ -534,6 +721,111 @@ const Assinatura = () => {
   const isSetupComplete = isSaved && isCardSaved;
 
   if (!isSetupComplete) {
+    if (!isSetupComplete && !paymentMethod) {
+        return (
+            <div className="h-full flex items-center justify-center animate-in fade-in zoom-in duration-500 py-10">
+                <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl shadow-black/5 border border-gray-100 overflow-hidden p-10 text-center">
+                    <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-6 text-white">
+                        <Banknote size={32} />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2">Escolha a forma de pagamento</h2>
+                    <p className="text-gray-500 mb-8">Como você prefere realizar o pagamento da sua assinatura?</p>
+                    
+                    <div className="grid grid-cols-1 gap-4">
+                        <button 
+                            onClick={() => setPaymentMethod('CREDIT_CARD')}
+                            className="group relative flex items-center gap-4 p-6 rounded-2xl border-2 border-gray-100 hover:border-black transition-all text-left"
+                        >
+                            <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
+                                <CreditCard size={24} />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg">Cartão de Crédito</h3>
+                                <p className="text-xs text-gray-400">Cobrança automática mensal</p>
+                            </div>
+                            <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <ArrowUpRight size={20} />
+                            </div>
+                        </button>
+
+                        <button 
+                            onClick={() => {
+                                setPaymentMethod('PIX');
+                                if (isSaved && asaasCustomerId) {
+                                    generatePixCharge(asaasCustomerId);
+                                }
+                            }}
+                            className="group relative flex items-center gap-4 p-6 rounded-2xl border-2 border-gray-100 hover:border-brand-primary transition-all text-left"
+                        >
+                            <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center group-hover:bg-brand-primary group-hover:text-black transition-colors">
+                                <QrCode size={24} />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg">PIX</h3>
+                                <p className="text-xs text-gray-400">Pagamento via código ou QR Code</p>
+                            </div>
+                            <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <ArrowUpRight size={20} />
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (pixPaymentData && !isCardSaved) {
+        return (
+            <div className="h-full flex items-center justify-center animate-in fade-in zoom-in duration-500 py-10">
+                <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl shadow-black/5 border border-gray-100 overflow-hidden p-10 text-center">
+                    <div className="w-16 h-16 bg-brand-primary rounded-2xl flex items-center justify-center mx-auto mb-6 text-black animate-pulse">
+                        <QrCode size={32} />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2">Pagamento via PIX</h2>
+                    <p className="text-gray-500 mb-8">Escaneie o QR Code ou copie o código abaixo para ativar sua assinatura.</p>
+                    
+                    <div className="bg-white border-2 border-brand-primary/20 p-4 rounded-2xl mb-8 inline-block shadow-lg shadow-brand-primary/10">
+                        <img 
+                            src={`data:image/png;base64,${pixPaymentData.encodedImage}`} 
+                            alt="QR Code PIX" 
+                            className="w-48 h-48 mix-blend-multiply"
+                        />
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="bg-gray-50 p-4 rounded-xl flex items-center gap-3 border border-gray-100">
+                            <input 
+                                readOnly 
+                                value={pixPaymentData.payload} 
+                                className="bg-transparent flex-1 text-xs font-mono text-gray-500 outline-none"
+                            />
+                            <button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(pixPaymentData.payload);
+                                    toast.success('Código PIX copiado!');
+                                }}
+                                className="p-2 hover:bg-white rounded-lg transition-colors text-black"
+                                title="Copiar código"
+                            >
+                                <Copy size={16} />
+                            </button>
+                        </div>
+                        
+                        <div className="bg-blue-50 text-blue-600 px-4 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+                             <Loader2 size={16} className="animate-spin" />
+                             Aguardando pagamento...
+                        </div>
+                        
+                        <p className="text-xs text-gray-400 mt-4">
+                            Valor: {pixPaymentData.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}<br/>
+                            Vencimento: {pixPaymentData.expirationDate.split('-').reverse().join('/')}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
       <div className="h-full flex items-center justify-center animate-in fade-in zoom-in duration-500 py-10">
         <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl shadow-black/5 border border-gray-100 overflow-hidden">
@@ -542,12 +834,14 @@ const Assinatura = () => {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Configurar Assinatura</h2>
               <span className="text-brand-primary text-sm font-bold bg-white/10 px-3 py-1 rounded-full">
-                Passo {setupStep} de 2
+                Passo {setupStep} de {paymentMethod === 'PIX' ? 1 : 2}
               </span>
             </div>
             <div className="flex gap-2">
               <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${setupStep >= 1 ? 'bg-brand-primary' : 'bg-white/20'}`}></div>
-              <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${setupStep >= 2 ? 'bg-brand-primary' : 'bg-white/20'}`}></div>
+              {paymentMethod !== 'PIX' && (
+                  <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${setupStep >= 2 ? 'bg-brand-primary' : 'bg-white/20'}`}></div>
+              )}
             </div>
           </div>
 
@@ -775,11 +1069,11 @@ const Assinatura = () => {
             className="px-6 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-bold hover:bg-gray-50 transition-all text-black"
             onClick={() => setIsCardSaved(false)}
           >
-            Editar Cartão
+            {cardFinal === 'PIX' ? 'Alterar Pagamento' : 'Editar Cartão'}
           </button>
           <button 
             className="px-6 py-3 bg-black text-white rounded-2xl text-sm font-bold hover:bg-black/90 transition-all shadow-xl shadow-black/10 dark:bg-white dark:text-black"
-            onClick={() => window.open('https://w.app/worklivoo', '_blank')}
+            onClick={() => window.open('https://wa.me/5512997079459?text=Estava%20na%20gerenciamento%20minha%20assinatura%20e%20me%20surgiu%20uma%20d%C3%BAvida.%20Preciso%20de%20ajuda!', '_blank')}
           >
             Suporte Financeiro
           </button>
@@ -792,28 +1086,61 @@ const Assinatura = () => {
         <div className="col-span-12 lg:col-span-4 space-y-8">
           
           {/* Visual Credit Card */}
-          <div className="bg-black aspect-[1.58/1] rounded-[32px] p-8 text-white relative overflow-hidden shadow-2xl shadow-black/20 group">
-             <div className="absolute -top-10 -right-10 w-40 h-40 bg-brand-primary/10 rounded-full blur-3xl group-hover:bg-brand-primary/20 transition-all duration-700"></div>
-             <div className="flex justify-between items-start mb-12">
-                <div className="w-12 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md">
-                   <div className="w-8 h-6 bg-brand-primary/80 rounded-sm"></div>
-                </div>
-                <Zap size={24} className="text-brand-primary" />
-             </div>
-             <div>
-                <p className="text-lg font-mono tracking-widest mb-6">•••• •••• •••• {cardFinal || '0000'}</p>
-                <div className="flex justify-between items-end">
-                   <div>
-                      <p className="text-[10px] uppercase font-bold text-gray-500 mb-1">Titular</p>
-                      <p className="text-sm font-bold uppercase tracking-wide">{formData.nome || 'Cliente'}</p>
-                   </div>
-                   <div>
-                      <p className="text-[10px] uppercase font-bold text-gray-500 mb-1">Status</p>
-                      <p className="text-sm font-bold">Ativo</p>
-                   </div>
-                </div>
-             </div>
-          </div>
+          {cardFinal === 'PIX' ? (
+              <div className="bg-brand-primary aspect-[1.58/1] rounded-[32px] p-8 text-black relative overflow-hidden shadow-2xl shadow-brand-primary/20 group">
+                 <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full blur-3xl group-hover:bg-white/30 transition-all duration-700"></div>
+                 <div className="flex justify-between items-start mb-8">
+                    <div className="w-12 h-10 bg-black/10 rounded-lg flex items-center justify-center backdrop-blur-md">
+                       <QrCode size={20} className="text-black" />
+                    </div>
+                    <Banknote size={24} className="text-black" />
+                 </div>
+                 <div>
+                    <p className="text-xl font-black uppercase tracking-widest mb-2">PAGAMENTO VIA PIX</p>
+                    <p className="text-xs font-bold opacity-60 mb-6">As faturas são enviadas mensalmente.</p>
+                    
+                    <div className="flex justify-between items-end">
+                       <div>
+                          <p className="text-[10px] uppercase font-bold opacity-50 mb-1">Titular</p>
+                          <p className="text-sm font-bold uppercase tracking-wide truncate max-w-[150px]">{formData.nome || 'Cliente'}</p>
+                       </div>
+                       <div className="text-right">
+                          <p className="text-[10px] uppercase font-bold opacity-50 mb-1">Status</p>
+                          <p className="text-sm font-bold">ATIVO</p>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+          ) : (
+              <div className="bg-black aspect-[1.58/1] rounded-[32px] p-8 text-white relative overflow-hidden shadow-2xl shadow-black/20 group">
+                 <div className="absolute -top-10 -right-10 w-40 h-40 bg-brand-primary/10 rounded-full blur-3xl group-hover:bg-brand-primary/20 transition-all duration-700"></div>
+                 <div className="flex justify-between items-start mb-12">
+                    <div className="w-12 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md">
+                       <div className="w-8 h-6 bg-brand-primary/80 rounded-sm"></div>
+                    </div>
+                    <Zap size={24} className="text-brand-primary" />
+                 </div>
+                 <div>
+                    <p className="text-lg font-mono tracking-widest mb-6">•••• •••• •••• {cardFinal || '0000'}</p>
+                    <div className="flex justify-between items-end">
+                       <div>
+                          <p className="text-[10px] uppercase font-bold text-gray-500 mb-1">Titular</p>
+                          <p className="text-sm font-bold uppercase tracking-wide">
+                            {formData.nome ? (
+                              formData.nome.trim().split(/\s+/).length > 2 
+                                ? `${formData.nome.trim().split(/\s+/)[0]} ${formData.nome.trim().split(/\s+/)[1]}...` 
+                                : formData.nome
+                            ) : 'Cliente'}
+                          </p>
+                       </div>
+                       <div>
+                          <p className="text-[10px] uppercase font-bold text-gray-500 mb-1">Status</p>
+                          <p className="text-sm font-bold">Ativo</p>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+          )}
 
           {/* Faturas Recentes */}
           <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm">
@@ -922,7 +1249,7 @@ const Assinatura = () => {
              <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden group">
                 <Layers size={40} className="absolute -right-2 -bottom-2 text-gray-100 group-hover:scale-125 transition-transform duration-500" />
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Plano Atual</p>
-                <p className="text-3xl font-black text-black uppercase">Business Pro</p>
+                <p className="text-xl font-black text-black uppercase">Worklivoo Empresarial</p>
                 <p className="text-xs font-bold text-brand-primary bg-black inline-block px-3 py-1 rounded-full mt-4">
                   {renewalDays !== null ? `Renovação em ${renewalDays} dias` : 'Renovação Mensal'}
                 </p>

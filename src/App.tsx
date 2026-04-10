@@ -20,6 +20,7 @@ import BaseDeConhecimento from "./pages/BaseDeConhecimento";
 import TryOut from "./pages/TryOut";
 import Conversas from "./pages/Conversas";
 import Assinatura from "./pages/Assinatura";
+import IndiqueGanhe from "./pages/IndiqueGanhe";
 
 
 import ClientPage from "./pages/ClientPage";
@@ -87,6 +88,7 @@ const AppRoutes = () => {
       <Route path="/base-de-conhecimento" element={<ProtectedRoute><Layout><BaseDeConhecimento /></Layout></ProtectedRoute>} />
       <Route path="/configuracoes" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
       <Route path="/conversas" element={<ProtectedRoute><Layout><Conversas /></Layout></ProtectedRoute>} />
+      <Route path="/indique-ganhe" element={<ProtectedRoute><Layout><IndiqueGanhe /></Layout></ProtectedRoute>} />
       <Route path="/assinatura" element={<ProtectedRoute><Layout><Assinatura /></Layout></ProtectedRoute>} />
       <Route path="/try-out" element={<ProtectedRoute><Layout><TryOut /></Layout></ProtectedRoute>} />
 

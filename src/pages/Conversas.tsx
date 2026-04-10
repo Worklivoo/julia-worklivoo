@@ -300,8 +300,14 @@ const TryOut = () => {
             if (typeof it?.query === 'string' && it.query.trim() !== '') {
               expanded.push({ id: `${it?.id || idx}-q`, role: 'user', content: it.query, created_at: createdAt });
             }
-            if (typeof it?.answer === 'string' && it.answer.trim() !== '') {
-              expanded.push({ id: `${it?.id || idx}-a`, role: 'assistant', content: it.answer, created_at: createdAt });
+            
+            let answerContent = it?.answer;
+            if (typeof answerContent === 'string') {
+              answerContent = stripAiThinking(answerContent);
+            }
+
+            if (typeof answerContent === 'string' && answerContent.trim() !== '') {
+              expanded.push({ id: `${it?.id || idx}-a`, role: 'assistant', content: answerContent, created_at: createdAt });
             }
           });
           console.log('Debug fetch messages response:', { conversation_id: c.dify_conversation, items: expanded.length });
@@ -355,6 +361,23 @@ const TryOut = () => {
     if (!id) return id;
     if (id.endsWith('-q') || id.endsWith('-a')) return id.slice(0, -2);
     return id;
+  };
+
+  const stripAiThinking = (input: string) => {
+    let out = (input ?? '').toString();
+    const stripTag = (tag: string) => {
+      out = out.replace(new RegExp(`<\\s*${tag}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${tag}\\s*>`, 'gi'), '');
+      out = out.replace(new RegExp(`<\\s*${tag}\\b[^>]*>[\\s\\S]*$`, 'gi'), '');
+      out = out.replace(new RegExp(`&lt;\\s*${tag}\\b[^&]*&gt;[\\s\\S]*?(?:&lt;\\s*\\/\\s*${tag}\\s*&gt;|$)`, 'gi'), '');
+    };
+    stripTag('think');
+    stripTag('thinking');
+    out = out.replace(/<\s*\/\s*(think|thinking)\s*>/gi, '');
+    out = out.replace(/<\s*(think|thinking)\b[^>]*>/gi, '');
+    out = out.replace(/&lt;\s*\/\s*(think|thinking)\s*&gt;/gi, '');
+    out = out.replace(/&lt;\s*(think|thinking)\b[^&]*&gt;/gi, '');
+    out = out.replace(/^\s*(think|thinking)\s*:\s*[\s\S]*?(?=\n\s*\n|$)/gim, '');
+    return out.trim();
   };
 
   const formatMessage = (s: string) => {
@@ -425,7 +448,7 @@ const TryOut = () => {
         .single();
       const apiKey = (keyRow as any)?.api_agente_dify || null;
       if (!apiKey) {
-        toast({ title: 'Configuração ausente', description: 'Chave da API do agente Dify não encontrada.' });
+        toast({ title: 'Configuração ausente', description: 'Chave da API não encontrada.' });
         return;
       }
       const conv = conversations.find((c) => c.dify_conversation === selectedConvId);
@@ -483,8 +506,9 @@ const TryOut = () => {
         events.forEach((ev) => {
           if (typeof ev?.created_at !== 'undefined') { const t = Number(ev.created_at || 0); if (!Number.isNaN(t)) createdAt = t * 1000; }
           if (ev?.event === 'agent_message' && typeof ev?.answer === 'string') messageAnswer += ev.answer;
-          if (!messageAnswer && ev?.event === 'agent_thought' && typeof ev?.thought === 'string') messageAnswer = ev.thought;
         });
+        
+        messageAnswer = stripAiThinking(messageAnswer);
         const assistantMsg: MessageItem = { id: `${Date.now()}-a`, role: 'assistant', content: messageAnswer, created_at: String(createdAt) };
         setMessagesByConv((prev) => {
           const next = { ...prev };
@@ -643,7 +667,7 @@ const TryOut = () => {
     return orderedConversations.filter((c) => {
       const msgs = messagesByConv[c.dify_conversation] || [];
       const last = msgs[msgs.length - 1];
-      const preview = (last?.content || last?.answer || '').toString().toLowerCase();
+      const preview = stripAiThinking((last?.content || last?.answer || '').toString()).toLowerCase();
       const phoneTitle = formatPhone(c.dify_user || '');
       return phoneTitle.toLowerCase().includes(term) || preview.includes(term);
     });
@@ -683,7 +707,7 @@ const TryOut = () => {
                 {filteredConversations.map((c) => {
                   const msgs = messagesByConv[c.dify_conversation] || [];
                   const last = msgs[msgs.length - 1];
-                  const preview = (last?.content || last?.answer || '').toString();
+                  const preview = stripAiThinking((last?.content || last?.answer || '').toString());
                   const title = formatPhone(c.dify_user || '');
                   const isManual = typeof c.dify_user === 'string' && c.dify_user.startsWith('worklivoo-manual-');
                   return (
@@ -739,7 +763,7 @@ const TryOut = () => {
                   return ca - cb;
                 }).map((m, idx) => {
                   const isAssistant = m.role === 'assistant' || m.role === 'bot';
-                  const text = (m.content || m.answer || '') as string;
+                  const text = stripAiThinking((m.content || m.answer || '') as string);
                   const baseId = normalizeMessageId(String(m.id || idx));
                   return (
                     <div key={(m.id || idx).toString()} className="space-y-1">

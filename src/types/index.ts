@@ -17,6 +17,7 @@ export interface Lead {
   lead_notas?: string;
   thread_dify?: string;
   ativo_ia?: string;
+  membro_id?: string | null;
 }
 
 export interface Note {
@@ -44,6 +45,7 @@ export interface User {
   plano?: string | null;
   id_instancia_zapi?: string | null;
   token_instancia_zapi?: string | null;
+  token_instancia_uazapi?: string | null;
   tipo?: string | null;
   // Campos específicos para membros
   isMembro?: boolean;

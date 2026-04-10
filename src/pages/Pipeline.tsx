@@ -101,7 +101,7 @@ const Pipeline = () => {
     
     // Filtro por período usando DateRange
     let matchesDate = true;
-    if (dateRange.from && dateRange.to) {
+    if (dateRange?.from && dateRange?.to) {
       const createdAt = new Date(lead.createdAt);
       const fromDate = new Date(dateRange.from);
       const toDate = new Date(dateRange.to);
