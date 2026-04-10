@@ -490,8 +490,8 @@ const Dashboard = () => {
                          <div className="flex items-center gap-3">
                            <Avatar className="h-8 w-8 flex-shrink-0">
                              <AvatarFallback className="text-xs font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
-                               {lead.leadName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                             </AvatarFallback>
+                                {(lead.leadName || '?').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                              </AvatarFallback>
                            </Avatar>
                            <div className="flex-1 min-w-0">
                              <h4 className="font-medium text-foreground text-sm leading-relaxed break-words">
@@ -505,7 +505,7 @@ const Dashboard = () => {
                           <div className="flex items-center gap-4">
                             <Avatar className="h-10 w-10 flex-shrink-0">
                               <AvatarFallback className="text-sm font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
-                                {lead.leadName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                {(lead.leadName || '?').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1">

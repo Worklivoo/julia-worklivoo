@@ -2,30 +2,24 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCRM } from '@/contexts/CRMContext';
-import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Phone, Building, ArrowLeft, HelpCircle } from 'lucide-react';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { useNavigate, Link } from 'react-router-dom';
+import { Eye, EyeOff, Mail, Lock, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { usePersistentTab } from '@/hooks/use-persistent-state';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { loginSchema, registerSchema, LoginFormData, RegisterFormData } from '@/schemas/auth';
+import { loginSchema, LoginFormData } from '@/schemas/auth';
 
 const Auth = () => {
-  const [activeTab, setActiveTab] = usePersistentTab('auth', 'login');
   const [resetEmail, setResetEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetMessage, setResetMessage] = useState('');
   const [resetError, setResetError] = useState('');
   const [loginError, setLoginError] = useState('');
-  const { login, register } = useCRM();
+  const { login } = useCRM();
   const navigate = useNavigate();
 
   // Configuração do formulário de login com validação
@@ -45,50 +39,6 @@ const Auth = () => {
       navigate('/inicio');
     } else {
       setLoginError(result.error || 'Falha ao entrar. Verifique suas credenciais.');
-    }
-    setIsLoading(false);
-  };
-
-  // Configuração do formulário de registro com validação
-  const registerForm = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      name: '',
-      email: '',
-      password: '',
-      user_tipo: 'Imobiliaria',
-      telefone: '',
-      empresa: '',
-      leads_volume: 100
-    }
-  });
-
-  const handleRegister = async (data: RegisterFormData) => {
-    // Verificar senha de autenticação
-    const authPassword = import.meta.env.VITE_AUTH_PASSWORD;
-    const authPasswordInput = (document.getElementById('auth-password') as HTMLInputElement)?.value;
-    if (authPasswordInput !== authPassword) {
-      alert('Senha de autenticação inválida. Entre em contato com o administrador.');
-      return;
-    }
-    
-    setIsLoading(true);
-    const success = await register(
-      data.name,
-      data.email,
-      data.password,
-      data.telefone,
-      data.empresa,
-      data.user_tipo,
-      data.leads_volume
-    );
-    if (success) {
-      // Após registro bem-sucedido, redirecionar para login
-      alert('Usuário registrado com sucesso! Faça login para continuar.');
-      setActiveTab('login'); // Muda para a aba de login
-      registerForm.reset(); // Limpa o formulário de registro
-    } else {
-      alert('Erro ao registrar usuário. Tente novamente.');
     }
     setIsLoading(false);
   };
@@ -119,7 +69,7 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{backgroundColor: '#F6F6F6'}}>
-      <div className={`w-full ${!showForgotPassword && activeTab === 'register' ? 'max-w-4xl' : 'max-w-md'}`}>
+      <div className="w-full max-w-md">
         {/* Logo e Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
@@ -135,14 +85,12 @@ const Auth = () => {
         <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-3xl">
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-center text-2xl font-semibold text-slate-900">
-              {showForgotPassword ? 'Recuperar senha' : activeTab === 'register' ? 'Registrar Novo Cliente' : 'Acesse sua conta'}
+              {showForgotPassword ? 'Recuperar senha' : 'Acesse sua conta'}
             </CardTitle>
             <CardDescription className="text-center text-slate-600">
               {showForgotPassword
                 ? 'Digite seu email para receber o link de recuperação'
-                : activeTab === 'register'
-                  ? 'Preencha os dados do novo cliente para criar acesso.'
-                  : 'Entre com suas credenciais ou crie uma nova conta'}
+                : 'Entre com suas credenciais'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -211,23 +159,7 @@ const Auth = () => {
                 </form>
               </div>
             ) : (
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 p-1 rounded-lg" style={{backgroundColor: 'rgba(235, 245, 125, 0.3)'}}>
-                  <TabsTrigger 
-                    value="login" 
-                    className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
-                  >
-                    Entrar
-                  </TabsTrigger>
-                  <TabsTrigger 
-                      value="register" 
-                      className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
-                    >
-                      Registrar
-                    </TabsTrigger>
-                </TabsList>
-
-              <TabsContent value="login" className="space-y-6 mt-6">
+              <>
                 <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5">
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-medium text-slate-700">
@@ -295,7 +227,7 @@ const Auth = () => {
                       "Entrar na conta"
                     )}
                   </Button>
-                  <div className="flex justify-center mt-4">
+                  <div className="flex flex-col items-center gap-2 mt-4">
                     <button
                       type="button"
                       onClick={() => setShowForgotPassword(true)}
@@ -305,190 +237,7 @@ const Auth = () => {
                     </button>
                   </div>
                 </form>
-              </TabsContent>
-
-              <TabsContent value="register" className="space-y-6 mt-6">
-                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name" className="text-sm font-medium text-slate-700">Nome completo <span className="text-red-500">*</span></Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                        <Input
-                          id="name"
-                          type="text"
-                          placeholder="Seu nome completo"
-                          {...registerForm.register('name')}
-                          required
-                          className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.name ? 'border-red-500' : ''}`}
-                        />
-                      </div>
-                      {registerForm.formState.errors.name && (
-                        <p className="text-sm text-red-600">{registerForm.formState.errors.name.message}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-email" className="text-sm font-medium text-slate-700">E-mail <span className="text-red-500">*</span></Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                        <Input
-                          id="register-email"
-                          type="email"
-                          placeholder="seu@email.com"
-                          {...registerForm.register('email')}
-                          required
-                          className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.email ? 'border-red-500' : ''}`}
-                        />
-                      </div>
-                      {registerForm.formState.errors.email && (
-                        <p className="text-sm text-red-600">{registerForm.formState.errors.email.message}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="register-password" className="text-sm font-medium text-slate-700">Senha <span className="text-red-500">*</span></Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                        <Input
-                          id="register-password"
-                          type={showRegisterPassword ? 'text' : 'password'}
-                          placeholder="Crie uma senha segura"
-                          {...registerForm.register('password')}
-                          required
-                          className={`pl-10 pr-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.password ? 'border-red-500' : ''}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        >
-                          {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      {registerForm.formState.errors.password && (
-                        <p className="text-sm text-red-600">{registerForm.formState.errors.password.message}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="auth-password" className="text-sm font-medium text-slate-700">Senha de Autenticação <span className="text-red-500">*</span></Label>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <HelpCircle className="h-4 w-4 text-slate-400 hover:text-slate-600 cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Senha usada internamente pela equipe da Worklivoo, entre em contato conosco</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                        <Input
-                          id="auth-password"
-                          type="password"
-                          placeholder="Digite a senha de autenticação"
-                          className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
-                          required
-                        />
-                      </div>
-                      <p className="text-xs text-slate-500">Entre em contato com o administrador para obter a senha de autenticação</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="user-tipo" className="text-sm font-medium text-slate-700">Escolha o tipo de cliente <span className="text-red-500">*</span></Label>
-                      <Select value={registerForm.watch('user_tipo')} onValueChange={(v) => registerForm.setValue('user_tipo', v as RegisterFormData['user_tipo'])}>
-                        <SelectTrigger className="w-full h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900">
-                          <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Imobiliaria" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Imobiliaria</SelectItem>
-                          <SelectItem value="Carro" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Carro</SelectItem>
-                          <SelectItem value="Outro" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Outro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {registerForm.formState.errors.user_tipo && (
-                        <p className="text-sm text-red-600">{registerForm.formState.errors.user_tipo.message as string}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="leads-volume" className="text-sm font-medium text-slate-700">Volume de Leads/mês <span className="text-red-500">*</span></Label>
-                      <div className="relative">
-                        <Input
-                          id="leads-volume"
-                          type="number"
-                          min={1}
-                          placeholder="Ex.: 100"
-                          {...registerForm.register('leads_volume', { valueAsNumber: true })}
-                          required
-                          className={`h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.leads_volume ? 'border-red-500' : ''}`}
-                        />
-                      </div>
-                      {registerForm.formState.errors.leads_volume && (
-                        <p className="text-sm text-red-600">{registerForm.formState.errors.leads_volume.message as string}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-sm font-medium text-slate-700">Telefone <span className="text-red-500">*</span></Label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                        <Input
-                          id="phone"
-                          type="text"
-                          placeholder="(11) 99999-9999"
-                          {...registerForm.register('telefone')}
-                          required
-                          className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.telefone ? 'border-red-500' : ''}`}
-                        />
-                      </div>
-                      {registerForm.formState.errors.telefone && (
-                        <p className="text-sm text-red-600">{registerForm.formState.errors.telefone.message}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="company" className="text-sm font-medium text-slate-700">Empresa <span className="text-red-500">*</span></Label>
-                      <div className="relative">
-                        <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                        <Input
-                          id="company"
-                          type="text"
-                          placeholder="Nome da empresa"
-                          {...registerForm.register('empresa')}
-                          required
-                          className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${registerForm.formState.errors.empresa ? 'border-red-500' : ''}`}
-                        />
-                      </div>
-                      {registerForm.formState.errors.empresa && (
-                        <p className="text-sm text-red-600">{registerForm.formState.errors.empresa.message}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full h-11 bg-black hover:bg-gray-800 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 mt-4 transform hover:scale-[1.02]"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Criando conta...
-                      </div>
-                    ) : (
-                      'Criar minha conta'
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+              </>
             )}
           </CardContent>
         </Card>

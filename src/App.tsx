@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { CRMProvider, useCRM } from "@/contexts/CRMContext";
 import { useState, useEffect } from "react";
 import Auth from "./pages/Auth";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Pipeline from "./pages/Pipeline";
 import LeadDetail from "./pages/LeadDetail";
@@ -18,6 +19,8 @@ import BaseDeConhecimento from "./pages/BaseDeConhecimento";
 
 import TryOut from "./pages/TryOut";
 import Conversas from "./pages/Conversas";
+import Assinatura from "./pages/Assinatura";
+import IndiqueGanhe from "./pages/IndiqueGanhe";
 
 
 import ClientPage from "./pages/ClientPage";
@@ -74,6 +77,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/auth" element={isAuthenticated ? <Navigate to="/inicio" replace /> : <Auth />} />
+      <Route path="/register" element={isAuthenticated ? <Navigate to="/inicio" replace /> : <Register />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<Navigate to={isAuthenticated ? "/inicio" : "/auth"} replace />} />
       <Route path="/inicio" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
@@ -84,6 +88,8 @@ const AppRoutes = () => {
       <Route path="/base-de-conhecimento" element={<ProtectedRoute><Layout><BaseDeConhecimento /></Layout></ProtectedRoute>} />
       <Route path="/configuracoes" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
       <Route path="/conversas" element={<ProtectedRoute><Layout><Conversas /></Layout></ProtectedRoute>} />
+      <Route path="/indique-ganhe" element={<ProtectedRoute><Layout><IndiqueGanhe /></Layout></ProtectedRoute>} />
+      <Route path="/assinatura" element={<ProtectedRoute><Layout><Assinatura /></Layout></ProtectedRoute>} />
       <Route path="/try-out" element={<ProtectedRoute><Layout><TryOut /></Layout></ProtectedRoute>} />
 
       <Route path="/404" element={<NotFound />} />

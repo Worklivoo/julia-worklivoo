@@ -173,8 +173,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ leads }) => {
                                  <div className="flex items-center gap-3">
                                    <Avatar className="h-10 w-10 flex-shrink-0">
                                       <AvatarFallback className="text-sm font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
-                                        {lead.leadName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                                      </AvatarFallback>
+                                       {(lead.leadName || '?').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                     </AvatarFallback>
                                     </Avatar>
                                    <div className="flex-1 min-w-0">
                                      <CardTitle className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-tight mb-1">

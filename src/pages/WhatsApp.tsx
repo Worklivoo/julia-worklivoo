@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useCRM } from '@/contexts/CRMContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Loader2, Check, AlertTriangle, RefreshCw, Clock, QrCode, Smartphone } from 'lucide-react';
+import { Loader2, Check, AlertTriangle, RefreshCw, Clock, QrCode, Smartphone, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSecureStorage } from '@/hooks/use-secure-storage';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const WhatsApp = () => {
   const { user } = useCRM();
@@ -16,6 +17,7 @@ const WhatsApp = () => {
   const [phoneCode, setPhoneCode] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>('');
   const [isConnected, setIsConnected] = useState(false);
+  const [connectedInfo, setConnectedInfo] = useState<{ owner?: string, name?: string, profilePicUrl?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qrCodeTimer, setQrCodeTimer] = useState<number>(20);
@@ -39,8 +41,8 @@ const WhatsApp = () => {
 
 
   const connectWhatsAppQR = async () => {
-    if (!user?.id_instancia_zapi || !user?.token_instancia_zapi) {
-      setError('Dados de instância do WhatsApp não configurados. Entre em contato com o suporte.');
+    if (!user?.token_instancia_uazapi) {
+      setError('ERRO. Entre em contato com o suporte.');
       return;
     }
     
@@ -56,13 +58,15 @@ const WhatsApp = () => {
 
     try {
       const response = await fetch(
-        `https://api.z-api.io/instances/${user.id_instancia_zapi}/token/${user.token_instancia_zapi}/qr-code/image`,
+        `https://worklivoo.uazapi.com/instance/connect`,
         {
-          method: 'GET',
+          method: 'POST',
           headers: {
-            'Client-Token': 'F1096638c0ef44b2f87649958def457ebS',
+            'Accept': 'application/json',
             'Content-Type': 'application/json',
+            'token': user.token_instancia_uazapi,
           },
+          body: JSON.stringify({})
         }
       );
 
@@ -73,17 +77,13 @@ const WhatsApp = () => {
       const data = await response.json();
       
       // Log da resposta completa para debug
-      console.log('Resposta completa da API Z-API:', data);
+      console.log('Resposta completa da API:', data);
       
       if (data.error) {
         throw new Error(data.error);
       }
 
-      // A Z-API pode retornar o QR code em diferentes formatos:
-      // 1. Diretamente como string base64
-      // 2. Em um objeto com propriedade 'base64', 'qrcode', 'image', etc.
-      // 3. Como resposta de bytes que precisa ser convertida
-      
+      // A API retorna o QR code (base64)
       let qrCodeData = null;
       
       // Verifica se a resposta é uma string (base64 direto)
@@ -91,14 +91,15 @@ const WhatsApp = () => {
         qrCodeData = data;
       }
       // Verifica se tem propriedades conhecidas para QR code
-       else if (data.qrcode || data.image || data.base64 || data.qr || data.qr_code || data.value) {
-         qrCodeData = data.qrcode || data.image || data.base64 || data.qr || data.qr_code || data.value;
-       }
-       // Se a resposta tem uma propriedade 'data'
-       else if (data.data) {
-         qrCodeData = data.data;
-       }
-      
+      // Suporte para resposta UAZAPI onde o QR Code está dentro do objeto instance
+      else if (data.instance?.qrcode) {
+        qrCodeData = data.instance.qrcode;
+      }
+      // Outros formatos possíveis
+      else if (data.qrcode || data.base64 || data.qr) {
+        qrCodeData = data.qrcode || data.base64 || data.qr;
+      }
+       
       if (qrCodeData) {
         // Remove possíveis prefixos se já existirem
         let cleanBase64 = qrCodeData;
@@ -114,8 +115,15 @@ const WhatsApp = () => {
         // Inicia o temporizador de 20 segundos para o QR Code
         startTimer('QR Code expirado. Aguarde para solicitar um novo.');
       } else {
+        // Se não retornou QR Code, pode ser que já esteja conectando
+        console.log('Nenhum QR Code retornado. Verificando status...');
+        const isConnected = await checkConnectionStatus();
+        if (isConnected) {
+            setIsConnected(true);
+            return;
+        }
         console.error('Estrutura da resposta não reconhecida:', data);
-        throw new Error('QR Code não encontrado na resposta da API. Verifique os logs do console para mais detalhes.');
+        throw new Error('QR Code não encontrado na resposta da API.');
       }
     } catch (err) {
       console.error('Erro ao conectar WhatsApp:', err);
@@ -127,21 +135,21 @@ const WhatsApp = () => {
 
   // Verificar status da conexão
   const checkConnectionStatus = async () => {
-    if (!user?.id_instancia_zapi || !user?.token_instancia_zapi) {
-      console.log('Dados de instância Z-API não configurados');
+    if (!user?.token_instancia_uazapi) {
+      console.log('Erro');
       return false;
     }
 
     try {
-      console.log(`Verificando status da instância ${user.id_instancia_zapi}...`);
+      console.log(`Verificando status da instância...`);
       
       const response = await fetch(
-        `https://api.z-api.io/instances/${user.id_instancia_zapi}/token/${user.token_instancia_zapi}/status`,
+        `https://worklivoo.uazapi.com/instance/status`,
         {
           method: 'GET',
           headers: {
-            'Client-Token': 'F1096638c0ef44b2f87649958def457ebS',
             'Content-Type': 'application/json',
+            'token': user.token_instancia_uazapi,
           },
         }
       );
@@ -155,16 +163,44 @@ const WhatsApp = () => {
       console.log('Resposta completa do status da conexão:', data);
       
       // Verifica se está conectado (diferentes formatos possíveis)
-      const isConnectedStatus = data.connected || data.status === 'connected' || 
-                               data.state === 'connected' || data.instance?.status === 'connected';
+      // Ajustando para UAZAPI (geralmente open ou connected)
+      // IMPORTANTE: Garantir que 'connecting' não seja considerado conectado
       
+      const status = data.instance?.status || data.status?.status || data.status;
+      const state = data.instance?.state || data.state;
+      const isConnectedBool = data.connected === true || data.status?.connected === true;
+
+      // Lista de status que indicam conexão bem sucedida
+      const connectedStatuses = ['connected', 'open'];
+      
+      // Lista de status que indicam que NÃO está conectado
+      const disconnectedStatuses = ['connecting', 'disconnected', 'close', 'closed'];
+
+      let isConnectedStatus = false;
+
+      if (isConnectedBool) {
+        isConnectedStatus = true;
+      } else if (status && typeof status === 'string' && connectedStatuses.includes(status)) {
+        isConnectedStatus = true;
+      } else if (state && typeof state === 'string' && connectedStatuses.includes(state)) {
+        isConnectedStatus = true;
+      }
+
+      // Salvaguarda explícita contra status de "conectando"
+      if (status === 'connecting' || state === 'connecting') {
+        isConnectedStatus = false;
+      }
+      
+      if (isConnectedStatus && data.instance) {
+        setConnectedInfo({
+          owner: data.instance.owner,
+          name: data.instance.profileName || data.instance.name,
+          profilePicUrl: data.instance.profilePicUrl
+        });
+      }
+
       console.log('Status da conexão detectado:', isConnectedStatus ? 'Conectado' : 'Desconectado');
-      console.log('Detalhes do status:', {
-        connected: data.connected,
-        status: data.status,
-        state: data.state,
-        instanceStatus: data.instance?.status
-      });
+      console.log('Detalhes do status:', { status, state, isConnectedBool, isConnectedStatus });
       
       return isConnectedStatus;
     } catch (error) {
@@ -291,8 +327,8 @@ const WhatsApp = () => {
   // Verificação automática de status ao carregar o componente
   useEffect(() => {
     const verifyInitialStatus = async () => {
-      if (!user?.id_instancia_zapi || !user?.token_instancia_zapi) {
-        setError('Dados de instância do WhatsApp não configurados. Entre em contato com o suporte.');
+      if (!user?.token_instancia_uazapi) {
+        setError('ERRO. Entre em contato com o suporte.');
         return;
       }
 
@@ -301,9 +337,9 @@ const WhatsApp = () => {
       setIsLoading(true);
       
       try {
-        console.log('Verificando status atual da instância Z-API...');
+        console.log('Verificando status atual da instância UAZAPI...');
         connected = await checkConnectionStatus();
-        console.log('Status da conexão Z-API:', connected ? 'Conectado' : 'Desconectado');
+        console.log('Status da conexão:', connected ? 'Conectado' : 'Desconectado');
         setIsConnected(connected);
         
         // Se estiver conectado, não precisamos restaurar o estado
@@ -317,7 +353,7 @@ const WhatsApp = () => {
           return;
         }
       } catch (err) {
-        console.error('Erro ao verificar status inicial:', err);
+        console.log('Erro ao verificar status inicial:', err);
         // Em caso de erro na verificação, assume como desconectado
         setIsConnected(false);
       } finally {
@@ -332,7 +368,7 @@ const WhatsApp = () => {
     };
 
     verifyInitialStatus();
-  }, [user?.id_instancia_zapi, user?.token_instancia_zapi]);
+  }, [user?.token_instancia_uazapi]);
 
   // Função para iniciar o temporizador (usado tanto para QR Code quanto para código de telefone)
   const startTimer = (expirationMessage: string) => {
@@ -379,8 +415,8 @@ const WhatsApp = () => {
 
   // Função para conectar via código de telefone
   const connectWhatsAppPhone = async () => {
-    if (!user?.id_instancia_zapi || !user?.token_instancia_zapi) {
-      setError('Dados de instância do WhatsApp não configurados. Entre em contato com o suporte.');
+    if (!user?.token_instancia_uazapi) {
+      setError('ERRO. Entre em contato com o suporte.');
       return;
     }
     
@@ -402,13 +438,16 @@ const WhatsApp = () => {
 
     try {
       const response = await fetch(
-        `https://api.z-api.io/instances/${user.id_instancia_zapi}/token/${user.token_instancia_zapi}/phone-code/55${phoneNumber}`,
+        `https://worklivoo.uazapi.com/instance/connect`,
         {
-          method: 'GET',
+          method: 'POST',
           headers: {
-            'Client-Token': 'F1096638c0ef44b2f87649958def457ebS',
             'Content-Type': 'application/json',
+            'token': user.token_instancia_uazapi,
           },
+          body: JSON.stringify({
+            phone: `55${phoneNumber}`
+          })
         }
       );
 
@@ -424,12 +463,14 @@ const WhatsApp = () => {
         throw new Error(data.error);
       }
 
-      // Extrai o código da resposta (pode variar dependendo da estrutura da resposta)
+      // Extrai o código da resposta
+      // A documentação diz: "Gera código de pareamento se passar o o campo phone"
+      // Assumindo que o código vem em 'code', 'pairingCode' ou similar
       let code = null;
-      if (data.code || data.phoneCode || data.value) {
-        code = data.code || data.phoneCode || data.value;
-      } else if (data.data) {
-        code = data.data;
+      if (data.instance?.paircode) {
+        code = data.instance.paircode;
+      } else if (data.code || data.pairingCode || data.pairing_code || data.value) {
+        code = data.code || data.pairingCode || data.pairing_code || data.value;
       }
       
       if (code) {
@@ -437,6 +478,8 @@ const WhatsApp = () => {
         // Inicia o temporizador de 20 segundos para o código
         startTimer('Código expirado. Aguarde para solicitar um novo.');
       } else {
+        // Se não retornou código, pode ser um erro ou formato inesperado
+        console.error('Código não encontrado na resposta:', data);
         throw new Error('Código não encontrado na resposta da API.');
       }
     } catch (err) {
@@ -453,7 +496,7 @@ const WhatsApp = () => {
     
     // Sempre verifica o status, independentemente do estado atual
     // Isso permite detectar tanto conexões quanto desconexões
-    if (user?.id_instancia_zapi && user?.token_instancia_zapi) {
+    if (user?.token_instancia_uazapi) {
       interval = setInterval(async () => {
         console.log('Verificando status da conexão...');
         const connected = await checkConnectionStatus();
@@ -493,7 +536,7 @@ const WhatsApp = () => {
         clearInterval(interval);
       }
     };
-  }, [user?.id_instancia_zapi, user?.token_instancia_zapi, isConnected]);
+  }, [user?.token_instancia_uazapi, isConnected]);
   
   // Limpa os temporizadores quando o componente é desmontado
   useEffect(() => {
@@ -505,6 +548,56 @@ const WhatsApp = () => {
 
 
 
+  // Função para desconectar o WhatsApp
+  const disconnectWhatsApp = async () => {
+    if (!user?.token_instancia_uazapi) {
+      setError('ERRO. Entre em contato com o suporte.');
+      return;
+    }
+
+    if (!window.confirm('Tem certeza que deseja desconectar o WhatsApp?')) {
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch(
+        `https://worklivoo.uazapi.com/instance/disconnect`,
+        {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'token': user.token_instancia_uazapi,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Erro na API: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Resultado da desconexão:', data);
+      
+      // Se desconectou com sucesso ou já estava desconectado
+      setIsConnected(false);
+      setConnectedInfo(null);
+      clearStoredState();
+      
+      // Força uma verificação de status após um breve delay para garantir
+      setTimeout(() => {
+        checkConnectionStatus();
+      }, 1000);
+      
+    } catch (err) {
+      console.error('Erro ao desconectar:', err);
+      setError('Erro ao desconectar. Tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleRetry = async () => {
     // Só permite tentar novamente se não estiver em cooldown
     if (cooldownTimer === 0) {
@@ -514,8 +607,8 @@ const WhatsApp = () => {
       setIsLoading(true);
       
       // Primeiro verifica se os dados da instância estão configurados
-      if (!user?.id_instancia_zapi || !user?.token_instancia_zapi) {
-        setError('Dados de instância do WhatsApp não configurados. Entre em contato com o suporte.');
+      if (!user?.token_instancia_uazapi) {
+        setError('ERRO. Entre em contato com o suporte.');
         setIsLoading(false);
         return;
       }
@@ -567,193 +660,215 @@ const WhatsApp = () => {
   }, [qrCode, phoneCode, phoneNumber, isConnected, error, qrCodeTimer, cooldownTimer, connectionMethod]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className={`flex flex-col items-center justify-center gap-8 max-w-md mx-auto ${
-        theme === 'dark' ? 'text-white' : 'text-black'
-      }`}>
-        
-        {/* Estado Inicial - Desconectado */}
-        {!isConnected && !qrCode && !phoneCode && !isLoading && !error && (
-          <div className="flex flex-col items-center gap-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 w-full">
-            <h1 className={`text-2xl font-light text-center ${
-              theme === 'dark' ? 'text-white' : 'text-black'
-            }`}>Conectar WhatsApp</h1>
-            
-            <Tabs 
-              defaultValue="qrcode" 
-              className="w-full" 
-              onValueChange={(value) => setConnectionMethod(value as 'qrcode' | 'phone')}
-            >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="qrcode" className="flex items-center gap-2">
-                  <QrCode className="w-4 h-4" />
-                  QR Code
-                </TabsTrigger>
-                <TabsTrigger value="phone" className="flex items-center gap-2">
-                  <Smartphone className="w-4 h-4" />
-                  Código por Telefone
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="qrcode" className="mt-4">
-                <div className="flex flex-col items-center">
-                  <Button 
-                    onClick={handleConnect}
-                    disabled={cooldownTimer > 0}
-                    className={`px-8 py-3 bg-[hsl(60,85%,73%)] hover:bg-[hsl(60,85%,68%)] text-black font-medium rounded-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-2px_hsl(60,85%,73%,0.3)] active:translate-y-0 active:shadow-[0_2px_8px_-2px_hsl(60,85%,73%,0.2)] ${cooldownTimer > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Gerar QR Code'}
-                  </Button>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="phone" className="mt-4">
-                <div className="flex flex-col gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone-number">Número de telefone (apenas DDD + número)</Label>
-                    <div className="flex items-center">
-                      <div className="bg-muted px-3 py-2 rounded-l-md border border-r-0 border-input">
-                        +55
-                      </div>
-                      <Input 
-                        id="phone-number" 
-                        type="tel" 
-                        placeholder="11999999999" 
-                        className="rounded-l-none" 
-                        value={phoneNumber}
-                        onChange={(e) => {
-                          // Permite apenas números
-                          const value = e.target.value.replace(/\D/g, '');
-                          setPhoneNumber(value);
-                        }}
-                        maxLength={11}
-                      />
+    <Card className="border-border bg-card shadow-sm">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-xl font-semibold">Conectar WhatsApp</CardTitle>
+        <CardDescription>Escaneie o QR Code para conectar seu número e ativar o agente.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex flex-col md:flex-row gap-8">
+          
+          {/* Left Side: Instructions */}
+          <div className="flex-1 space-y-8">
+            <div className="space-y-6">
+                <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold flex-shrink-0 text-sm">1</div>
+                    <div>
+                        <h3 className="font-bold text-foreground">Abra o WhatsApp</h3>
+                        <p className="text-sm text-muted-foreground mt-1">Abra o aplicativo no seu celular.</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">Ex: 11999999999 (sem o +55)</p>
-                  </div>
-                  
-                  <Button 
-                    onClick={handleConnect}
-                    disabled={cooldownTimer > 0 || !phoneNumber || phoneNumber.length < 10}
-                    className={`px-8 py-3 bg-[hsl(60,85%,73%)] hover:bg-[hsl(60,85%,68%)] text-black font-medium rounded-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_-2px_hsl(60,85%,73%,0.3)] active:translate-y-0 active:shadow-[0_2px_8px_-2px_hsl(60,85%,73%,0.2)] ${(cooldownTimer > 0 || !phoneNumber || phoneNumber.length < 10) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Obter Código'}
-                  </Button>
                 </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
-
-        {/* Estado de Carregamento */}
-        {isLoading && (
-          <div className="flex flex-col items-center gap-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            <Loader2 className={`w-12 h-12 animate-spin ${
-              theme === 'dark' ? 'text-white' : 'text-black'
-            }`} />
-            <p className={`text-sm ${
-              theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-            }`}>
-              {connectionMethod === 'qrcode' ? 'Gerando QR Code...' : 'Gerando código por telefone...'}
-            </p>
-          </div>
-        )}
-
-        {/* Estado de Exibição do QR Code */}
-        {qrCode && !isConnected && !error && (
-          <div className="flex flex-col items-center gap-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            <div className={`p-4 rounded-lg shadow-[0_10px_30px_-10px_hsl(0,0%,0%,0.3)] ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
-            }`}>
-              <img 
-                src={qrCode} 
-                alt="QR Code WhatsApp" 
-                className="w-64 h-64 rounded"
-              />
-              <div className="mt-2 flex items-center justify-center gap-2 text-sm font-medium">
-                <Clock className="w-4 h-4" />
-                <span className={`${qrCodeTimer <= 5 ? 'text-red-500' : ''}`}>
-                  Expira em {qrCodeTimer}s
-                </span>
-              </div>
+                <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold flex-shrink-0 text-sm">2</div>
+                    <div>
+                        <h3 className="font-bold text-foreground">Acesse o Menu</h3>
+                        <p className="text-sm text-muted-foreground mt-1">Toque em Configurações ou no menu de 3 pontos.</p>
+                    </div>
+                </div>
+                <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold flex-shrink-0 text-sm">3</div>
+                    <div>
+                        <h3 className="font-bold text-foreground">Aparelhos Conectados</h3>
+                        <p className="text-sm text-muted-foreground mt-1">Selecione "Conectar um aparelho" e aponte a câmera.</p>
+                    </div>
+                </div>
             </div>
-            <div className={`flex items-center gap-2 text-sm ${
-              theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-            }`}>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Aguardando escaneamento...</span>
+
+            <div className="bg-muted p-4 rounded-xl flex items-start gap-3">
+                <AlertCircle className="text-muted-foreground flex-shrink-0 mt-0.5" size={20} />
+                <p className="text-sm text-muted-foreground">
+                    Se por algum motivo você não estiver conseguindo conectar por QR Code, selecione a opção por Código.
+                </p>
             </div>
           </div>
-        )}
-        
-        {/* Estado de Exibição do Código por Telefone */}
-        {phoneCode && !isConnected && !error && (
-          <div className="flex flex-col items-center gap-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            <div className={`p-6 rounded-lg shadow-[0_10px_30px_-10px_hsl(0,0%,0%,0.3)] ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
-            } text-center`}>
-              <h2 className="text-lg font-medium mb-2">Seu código de conexão</h2>
-              <div className="text-4xl font-bold tracking-wider my-4 bg-muted/30 py-4 px-6 rounded-md">
-                {phoneCode}
-              </div>
-              <p className="text-sm mb-4">Digite este código no seu WhatsApp</p>
-              <div className="flex items-center justify-center gap-2 text-sm font-medium">
-                <Clock className="w-4 h-4" />
-                <span className={`${qrCodeTimer <= 5 ? 'text-red-500' : ''}`}>
-                  Expira em {qrCodeTimer}s
-                </span>
-              </div>
-            </div>
-            <div className={`flex items-center gap-2 text-sm ${
-              theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-            }`}>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Aguardando confirmação...</span>
-            </div>
+
+          {/* Right Side: Action Area */}
+          <div className="flex-1 flex flex-col items-center justify-center bg-muted/20 rounded-2xl p-6 border-2 border-dashed border-border relative min-h-[400px]">
+              
+              {/* Tabs for switching method - Only show if not connected */}
+              {!isConnected && (
+                <div className="w-full mb-6 max-w-sm">
+                  <Tabs defaultValue={connectionMethod} onValueChange={(v) => setConnectionMethod(v as 'qrcode' | 'phone')} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="qrcode">QR Code</TabsTrigger>
+                      <TabsTrigger value="phone">Código</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+              )}
+
+              {/* Content based on State */}
+              {isLoading ? (
+                 <div className="flex flex-col items-center gap-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+                    <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                    <p className="text-muted-foreground font-medium">
+                      {connectionMethod === 'qrcode' ? 'Gerando QR Code...' : 'Gerando código...'}
+                    </p>
+                 </div>
+              ) : isConnected ? (
+                 <div className="flex flex-col items-center gap-4 text-green-600 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+                    <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-2 overflow-hidden relative shadow-sm border-2 border-green-200">
+                        {connectedInfo?.profilePicUrl ? (
+                            <img src={connectedInfo.profilePicUrl} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                            <CheckCircle2 size={48} />
+                        )}
+                    </div>
+                    <div className="text-center">
+                      <span className="text-xl font-bold block text-foreground">Conectado com sucesso</span>
+                      {connectedInfo?.name && (
+                          <p className="text-foreground font-medium mt-2">{connectedInfo.name}</p>
+                      )}
+                      {connectedInfo?.owner && (
+                          <p className="text-sm text-muted-foreground font-mono mt-1">
+                              {connectedInfo.owner.replace(/^55/, '')}
+                          </p>
+                      )}
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={disconnectWhatsApp}
+                        disabled={isLoading}
+                        className="mt-6"
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Desconectando...
+                          </>
+                        ) : (
+                          'Desconectar'
+                        )}
+                      </Button>
+                    </div>
+                 </div>
+              ) : error ? (
+                 <div className="flex flex-col items-center gap-4 text-center animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-2 text-red-500">
+                        <AlertTriangle size={32} />
+                    </div>
+                    <p className="text-red-500 text-sm font-medium max-w-xs">{error}</p>
+                    <Button 
+                      onClick={handleRetry} 
+                      disabled={cooldownTimer > 0}
+                      className="px-6"
+                    >
+                        <RefreshCw className={`mr-2 w-4 h-4 ${cooldownTimer > 0 ? 'animate-spin' : ''}`} /> 
+                        {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Tentar Novamente'}
+                    </Button>
+                 </div>
+              ) : (
+                 <div className="w-full animate-in fade-in-0 slide-in-from-bottom-2 duration-300 flex flex-col items-center">
+                    {connectionMethod === 'qrcode' ? (
+                        <div className="flex flex-col items-center w-full">
+                            <div className="bg-white p-4 rounded-xl shadow-sm mb-6 relative group w-full max-w-[260px] aspect-square flex items-center justify-center border border-border">
+                                <div className="w-full h-full bg-muted/50 rounded-lg flex items-center justify-center relative overflow-hidden">
+                                    {qrCode ? (
+                                        <img src={qrCode} alt="QR Code" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                                            <QrCode size={48} />
+                                        </div>
+                                    )}
+                                    
+                                    {/* Overlay for generation/regeneration */}
+                                    {(!qrCode || qrCodeTimer <= 0) && (
+                                        <div 
+                                            className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer hover:bg-background/90 transition-all z-10"
+                                            onClick={handleConnect}
+                                        >
+                                            <RefreshCw className="text-primary mb-2" size={32} />
+                                            <span className="font-bold text-sm text-center px-4 text-foreground">
+                                              {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Gerar Novo Código'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            {qrCode && (
+                                <div className="flex items-center gap-2 text-orange-600 bg-orange-50 border border-orange-100 px-4 py-2 rounded-full">
+                                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                                    <span className="text-sm font-bold">Expira em {qrCodeTimer}s</span>
+                                </div>
+                            )}
+                            
+                            {!qrCode && (
+                               <div className="flex items-center gap-2 text-muted-foreground bg-muted px-4 py-2 rounded-full">
+                                  <span className="text-sm font-medium">Aguardando geração...</span>
+                               </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="w-full max-w-sm space-y-4">
+                            {phoneCode ? (
+                                 <div className="bg-card p-6 rounded-xl shadow-sm text-center border border-border">
+                                    <p className="text-sm text-muted-foreground mb-2 font-medium">Seu código de conexão</p>
+                                    <div className="text-4xl font-black tracking-widest my-6 text-primary bg-muted/50 py-4 rounded-xl">
+                                        {phoneCode}
+                                    </div>
+                                    <div className="flex items-center justify-center gap-2 text-orange-600 text-sm font-bold bg-orange-50 border border-orange-100 py-2 rounded-lg">
+                                        <Clock size={16} />
+                                        <span>Expira em {qrCodeTimer}s</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-4">Digite este código no seu WhatsApp</p>
+                                 </div>
+                            ) : (
+                                <div className="space-y-4 bg-card p-6 rounded-xl shadow-sm border border-border">
+                                    <div className="space-y-2">
+                                        <Label>Número de WhatsApp</Label>
+                                        <div className="flex shadow-sm rounded-lg overflow-hidden border border-input focus-within:ring-2 focus-within:ring-ring">
+                                            <div className="bg-muted px-4 py-2 flex items-center text-muted-foreground text-sm font-medium border-r border-input">+55</div>
+                                            <Input 
+                                                value={phoneNumber}
+                                                onChange={(e) => {
+                                                    const value = e.target.value.replace(/\D/g, '');
+                                                    setPhoneNumber(value);
+                                                }}
+                                                placeholder="11999999999"
+                                                className="rounded-l-none border-0 focus-visible:ring-0 h-auto py-2"
+                                                maxLength={11}
+                                            />
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">DDD + Número (Ex: 11999999999)</p>
+                                    </div>
+                                    <Button 
+                                        onClick={handleConnect} 
+                                        disabled={!phoneNumber || phoneNumber.length < 10 || cooldownTimer > 0}
+                                        className="w-full h-10"
+                                    >
+                                        {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Obter Código'}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                 </div>
+              )}
           </div>
-        )}
-
-        {/* Estado de Sucesso - Conectado */}
-        {isConnected && (
-          <div className="flex flex-col items-center gap-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            <Check 
-              className="w-16 h-16 text-[hsl(120,100%,50%)]" 
-              style={{ filter: 'drop-shadow(0 0 10px hsl(120, 100%, 50%, 0.3))' }}
-            />
-            <p className={`text-xl font-medium text-center ${
-              theme === 'dark' ? 'text-white' : 'text-black'
-            }`}>
-              WhatsApp Conectado
-            </p>
-          </div>
-        )}
-
-        {/* Estado de Erro */}
-        {error && (
-          <div className="flex flex-col items-center gap-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
-            <div className="flex items-center gap-3 text-[hsl(0,84%,60%)]">
-              <AlertTriangle className="w-6 h-6" />
-              <span className="text-base">Erro ao conectar</span>
-            </div>
-            <div className={`text-center text-sm max-w-sm ${
-              theme === 'dark' ? 'text-red-400' : 'text-red-600'
-            }`}>
-              {error}
-            </div>
-            <Button 
-              onClick={handleRetry}
-              disabled={cooldownTimer > 0}
-              className={`px-6 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white rounded-lg transition-all duration-300 flex items-center gap-2 ${cooldownTimer > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <RefreshCw className="w-4 h-4" />
-              {cooldownTimer > 0 ? `Aguarde ${cooldownTimer}s` : 'Tentar Novamente'}
-            </Button>
-          </div>
-        )}
-
-
-      </div>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

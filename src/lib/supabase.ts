@@ -69,8 +69,10 @@ export interface Database {
             user_telefone: string | null
             user_empresa: string | null
             user_plano: string | null
+            user_valor_mensal: string | null
             id_instancia_zapi: string | null
             token_instancia_zapi: string | null
+            token_instancia_uazapi: string | null
             user_tipo: string | null
             conhecimento_id: string | null
             documento_id: string | null
@@ -78,6 +80,10 @@ export interface Database {
             scrapper_tipo: string | null
             scrapper_link: string | null
             scrapper_body: string | null
+            id_cliente_asaas: string | null
+            cartao_token: string | null
+            cartao_final: string | null
+            dia_vencimento: number | null
           }
           Insert: {
             user_id: string
@@ -86,8 +92,10 @@ export interface Database {
             user_telefone?: string | null
             user_empresa?: string | null
             user_plano?: string | null
+            user_valor_mensal?: string | null
             id_instancia_zapi?: string | null
             token_instancia_zapi?: string | null
+            token_instancia_uazapi?: string | null
             user_tipo?: string | null
             conhecimento_id?: string | null
             documento_id?: string | null
@@ -95,6 +103,10 @@ export interface Database {
             scrapper_tipo?: string | null
             scrapper_link?: string | null
             scrapper_body?: string | null
+            id_cliente_asaas?: string | null
+            cartao_token?: string | null
+            cartao_final?: string | null
+            dia_vencimento?: number | null
           }
           Update: {
             user_id?: string
@@ -103,8 +115,10 @@ export interface Database {
             user_telefone?: string | null
             user_empresa?: string | null
             user_plano?: string | null
+            user_valor_mensal?: string | null
             id_instancia_zapi?: string | null
             token_instancia_zapi?: string | null
+            token_instancia_uazapi?: string | null
             user_tipo?: string | null
             conhecimento_id?: string | null
             documento_id?: string | null
@@ -112,6 +126,10 @@ export interface Database {
             scrapper_tipo?: string | null
             scrapper_link?: string | null
             scrapper_body?: string | null
+            id_cliente_asaas?: string | null
+            cartao_token?: string | null
+            cartao_final?: string | null
+            dia_vencimento?: number | null
           }
       },
       leads: {
@@ -194,6 +212,91 @@ export interface Database {
           created_at?: string
           lead_id?: number
           historico_lead?: string
+        }
+      }
+      clientes_pagamento: {
+        Row: {
+          id: string
+          user_id: string
+          id_cliente_asaas: string
+          id_cobranca_asaas: string | null
+          valor_total: number
+          data_vencimento: string
+          status_pagamento: string | null
+          url_fatura: string | null
+          url_comprovante: string | null
+          cartao_token: string | null
+          cartao_final: string | null
+          cartao_bandeira: string | null
+          data_criacao: string
+          data_pagamento: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          id_cliente_asaas: string
+          id_cobranca_asaas?: string | null
+          valor_total: number
+          data_vencimento: string
+          status_pagamento?: string | null
+          url_fatura?: string | null
+          url_comprovante?: string | null
+          cartao_token?: string | null
+          cartao_final?: string | null
+          cartao_bandeira?: string | null
+          data_criacao?: string
+          data_pagamento?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          id_cliente_asaas?: string
+          id_cobranca_asaas?: string | null
+          valor_total?: number
+          data_vencimento?: string
+          status_pagamento?: string | null
+          url_fatura?: string | null
+          url_comprovante?: string | null
+          cartao_token?: string | null
+          cartao_final?: string | null
+          cartao_bandeira?: string | null
+          data_criacao?: string
+          data_pagamento?: string | null
+        }
+      },
+      feedbacks: {
+        Row: {
+          feedback_id: number
+          criado_em: string
+          user_id: string
+          mensagem_id: string
+          comentario_tipo: string
+          comentario_mensagem: string | null
+          dify_conversation: string
+          dify_user: string
+          status: string | null
+        }
+        Insert: {
+          feedback_id?: number
+          criado_em?: string
+          user_id: string
+          mensagem_id: string
+          comentario_tipo: string
+          comentario_mensagem?: string | null
+          dify_conversation: string
+          dify_user: string
+          status?: string | null
+        }
+        Update: {
+          feedback_id?: number
+          criado_em?: string
+          user_id?: string
+          mensagem_id?: string
+          comentario_tipo?: string
+          comentario_mensagem?: string | null
+          dify_conversation?: string
+          dify_user?: string
+          status?: string | null
         }
       }
     }

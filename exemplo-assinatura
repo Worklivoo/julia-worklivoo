@@ -1,0 +1,354 @@
+import React, { useState } from 'react';
+import { 
+  CreditCard, 
+  User, 
+  CheckCircle2, 
+  ChevronRight, 
+  AlertCircle, 
+  Download, 
+  TrendingUp, 
+  Layers, 
+  Zap,
+  MoreVertical,
+  CalendarDays,
+  ArrowUpRight
+} from 'lucide-react';
+
+export const Subscriptions: React.FC = () => {
+  const [isSetupComplete, setIsSetupComplete] = useState(false);
+  const [setupStep, setSetupStep] = useState(1);
+  const [formData, setFormData] = useState({
+    name: '',
+    document: '',
+    email: '',
+    cardNumber: '',
+    expiry: '',
+    cvv: ''
+  });
+
+  const handleNextStep = () => {
+    if (setupStep === 1) setSetupStep(2);
+    else setIsSetupComplete(true);
+  };
+
+  // Mock de histórico de meses anteriores
+  const USAGE_HISTORY = [
+    { month: 'Dezembro', year: '2024', totalLeads: 2450, exceeded: 450, extraValue: 'R$ 225,00', status: 'Faturado' },
+    { month: 'Novembro', year: '2024', totalLeads: 1980, exceeded: 0, extraValue: 'R$ 0,00', status: 'Fechado' },
+    { month: 'Outubro', year: '2024', totalLeads: 2100, exceeded: 100, extraValue: 'R$ 50,00', status: 'Fechado' },
+    { month: 'Setembro', year: '2024', totalLeads: 1850, exceeded: 0, extraValue: 'R$ 0,00', status: 'Fechado' },
+  ];
+
+  if (!isSetupComplete) {
+    return (
+      <div className="h-full flex items-center justify-center animate-in fade-in zoom-in duration-500">
+        <div className="bg-white w-full max-w-xl rounded-[40px] shadow-2xl shadow-black/5 border border-gray-100 overflow-hidden">
+          <div className="bg-black p-8 text-white relative">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Configurar Assinatura</h2>
+              <span className="text-brand-primary text-sm font-bold bg-white/10 px-3 py-1 rounded-full">
+                Passo {setupStep} de 2
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${setupStep >= 1 ? 'bg-brand-primary' : 'bg-white/20'}`}></div>
+              <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${setupStep >= 2 ? 'bg-brand-primary' : 'bg-white/20'}`}></div>
+            </div>
+          </div>
+
+          <div className="p-10">
+            {setupStep === 1 ? (
+              <div className="space-y-6 animate-in slide-in-from-right duration-300">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center text-black">
+                    <User size={20} />
+                  </div>
+                  <h3 className="text-lg font-bold">Dados Pessoais</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nome Completo</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ex: João Silva" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">CPF ou CNPJ</label>
+                    <input 
+                      type="text" 
+                      placeholder="000.000.000-00" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                      onChange={(e) => setFormData({...formData, document: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">E-mail Financeiro</label>
+                    <input 
+                      type="email" 
+                      placeholder="financeiro@empresa.com" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6 animate-in slide-in-from-right duration-300">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-xl bg-brand-bg flex items-center justify-center text-black">
+                    <CreditCard size={20} />
+                  </div>
+                  <h3 className="text-lg font-bold">Dados do Cartão</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Número do Cartão</label>
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        placeholder="0000 0000 0000 0000" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black focus:ring-4 focus:ring-black/5 transition-all"
+                      />
+                      <div className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400">
+                        <CreditCard size={20} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Vencimento</label>
+                      <input 
+                        type="text" 
+                        placeholder="MM/AA" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-2">CVV</label>
+                      <input 
+                        type="text" 
+                        placeholder="000" 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-black transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-10 flex gap-4">
+              {setupStep === 2 && (
+                <button 
+                  onClick={() => setSetupStep(1)}
+                  className="flex-1 py-4 text-sm font-bold text-gray-500 hover:text-black transition-colors"
+                >
+                  Voltar
+                </button>
+              )}
+              <button 
+                onClick={handleNextStep}
+                className="flex-[2] bg-brand-primary text-black py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black hover:text-brand-primary transition-all duration-300 group shadow-lg shadow-brand-primary/20"
+              >
+                {setupStep === 1 ? 'Continuar' : 'Confirmar e Ativar'} 
+                <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+            
+            <p className="text-center text-[10px] text-gray-400 mt-6 uppercase font-bold tracking-widest">
+              Pagamento processado de forma segura via SSL
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
+      
+      {/* Header Section */}
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-3xl font-black text-black">Minha Assinatura</h2>
+          <p className="text-gray-500 mt-1">Gestão financeira e histórico de consumo de leads.</p>
+        </div>
+        <div className="flex gap-3">
+          <button className="px-6 py-3 bg-white border border-gray-200 rounded-2xl text-sm font-bold hover:bg-gray-50 transition-all">
+            Alterar Plano
+          </button>
+          <button className="px-6 py-3 bg-black text-white rounded-2xl text-sm font-bold hover:bg-black/90 transition-all shadow-xl shadow-black/10">
+            Suporte Financeiro
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-8">
+        
+        {/* Left Column: Card and Billing */}
+        <div className="col-span-12 lg:col-span-4 space-y-8">
+          
+          {/* Visual Credit Card */}
+          <div className="bg-black aspect-[1.58/1] rounded-[32px] p-8 text-white relative overflow-hidden shadow-2xl shadow-black/20 group">
+             <div className="absolute -top-10 -right-10 w-40 h-40 bg-brand-primary/10 rounded-full blur-3xl group-hover:bg-brand-primary/20 transition-all duration-700"></div>
+             <div className="flex justify-between items-start mb-12">
+                <div className="w-12 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-md">
+                   <div className="w-8 h-6 bg-brand-primary/80 rounded-sm"></div>
+                </div>
+                <Zap size={24} className="text-brand-primary" />
+             </div>
+             <div>
+                <p className="text-lg font-mono tracking-widest mb-6">•••• •••• •••• 4592</p>
+                <div className="flex justify-between items-end">
+                   <div>
+                      <p className="text-[10px] uppercase font-bold text-gray-500 mb-1">Titular</p>
+                      <p className="text-sm font-bold uppercase tracking-wide">Alex Design Studio</p>
+                   </div>
+                   <div>
+                      <p className="text-[10px] uppercase font-bold text-gray-500 mb-1">Expira</p>
+                      <p className="text-sm font-bold">12/28</p>
+                   </div>
+                </div>
+             </div>
+          </div>
+
+          {/* Billing Summary (Current) */}
+          <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm">
+             <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-gray-900">Resumo do Plano</h3>
+                <Layers size={18} className="text-gray-400" />
+             </div>
+             <div className="space-y-4">
+                <div className="flex justify-between items-center pb-4 border-b border-gray-50">
+                    <span className="text-xs text-gray-500 uppercase font-bold">Plano</span>
+                    <span className="text-sm font-bold text-black">BUSINESS PRO</span>
+                </div>
+                <div className="flex justify-between items-center pb-4 border-b border-gray-50">
+                    <span className="text-xs text-gray-500 uppercase font-bold">Mensalidade</span>
+                    <span className="text-sm font-bold text-black">R$ 299,00</span>
+                </div>
+                <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-500 uppercase font-bold">Franquia Leads</span>
+                    <span className="text-sm font-bold text-black">2.000 / mês</span>
+                </div>
+             </div>
+          </div>
+        </div>
+
+        {/* Right Column: Usage History Section */}
+        <div className="col-span-12 lg:col-span-8 space-y-8">
+          
+          {/* Main Content: Monthly Usage History */}
+          <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full">
+            <div className="p-10 pb-6">
+               <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-2xl font-black text-black">Histórico de Consumo</h3>
+                  <div className="flex gap-2">
+                     <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-bg rounded-full text-[10px] font-bold uppercase text-gray-500">
+                        <div className="w-1.5 h-1.5 bg-brand-primary rounded-full"></div> Leads Normais
+                     </div>
+                     <div className="flex items-center gap-1.5 px-3 py-1 bg-brand-bg rounded-full text-[10px] font-bold uppercase text-gray-500">
+                        <div className="w-1.5 h-1.5 bg-black rounded-full"></div> Leads Excedidos
+                     </div>
+                  </div>
+               </div>
+               <p className="text-sm text-gray-400">Acompanhamento detalhado dos recursos utilizados em meses anteriores.</p>
+            </div>
+
+            {/* Usage Table Header */}
+            <div className="grid grid-cols-12 px-10 py-4 bg-gray-50 border-y border-gray-100">
+               <div className="col-span-3 text-[10px] font-black uppercase text-gray-400 tracking-widest">Mês Referência</div>
+               <div className="col-span-3 text-[10px] font-black uppercase text-gray-400 tracking-widest text-center">Total de Leads</div>
+               <div className="col-span-3 text-[10px] font-black uppercase text-gray-400 tracking-widest text-center">Leads Excedidos</div>
+               <div className="col-span-3 text-[10px] font-black uppercase text-gray-400 tracking-widest text-right">Custo Adicional</div>
+            </div>
+
+            {/* Usage Rows */}
+            <div className="flex-1 overflow-y-auto">
+               {USAGE_HISTORY.map((item, index) => (
+                 <div 
+                   key={index} 
+                   className="grid grid-cols-12 px-10 py-6 items-center border-b border-gray-50 hover:bg-brand-bg/30 transition-all cursor-default group"
+                 >
+                   {/* Month & Icon */}
+                   <div className="col-span-3 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-black group-hover:bg-white transition-colors">
+                         <CalendarDays size={18} />
+                      </div>
+                      <div>
+                         <p className="text-sm font-bold text-black">{item.month}</p>
+                         <p className="text-[10px] text-gray-400 font-bold uppercase">{item.year}</p>
+                      </div>
+                   </div>
+
+                   {/* Total Leads */}
+                   <div className="col-span-3 text-center">
+                      <p className="text-lg font-black text-black">{item.totalLeads.toLocaleString()}</p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase">Capturados</p>
+                   </div>
+
+                   {/* Exceeded Leads */}
+                   <div className="col-span-3 text-center">
+                      <div className={`inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full ${item.exceeded > 0 ? 'bg-black text-white' : 'bg-gray-100 text-gray-400'}`}>
+                         <p className="text-xs font-black">{item.exceeded > 0 ? `+${item.exceeded}` : 'Nenhum'}</p>
+                      </div>
+                   </div>
+
+                   {/* Extra Value */}
+                   <div className="col-span-3 text-right">
+                      <div className="flex flex-col items-end">
+                         <div className="flex items-center gap-1">
+                            <p className={`text-lg font-black ${item.exceeded > 0 ? 'text-black' : 'text-gray-300'}`}>{item.extraValue}</p>
+                            {item.exceeded > 0 && <ArrowUpRight size={14} className="text-brand-primary" />}
+                         </div>
+                         <p className="text-[10px] text-gray-400 font-bold uppercase">Referente ao excedente</p>
+                      </div>
+                   </div>
+                 </div>
+               ))}
+            </div>
+
+            {/* Summary Footer Section */}
+            <div className="p-10 bg-gray-50/50 flex justify-between items-center border-t border-gray-100">
+               <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                     <AlertCircle size={16} className="text-gray-400" />
+                     <p className="text-xs text-gray-500 font-medium">Custo por lead excedente: <span className="text-black font-bold">R$ 0,50</span></p>
+                  </div>
+               </div>
+               <button className="flex items-center gap-2 text-xs font-black uppercase text-black hover:bg-brand-primary px-4 py-2 rounded-xl transition-all">
+                  Exportar Relatório Completo <Download size={14} />
+               </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics for Current Awareness */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="bg-black p-8 rounded-[32px] text-white relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+                   <TrendingUp size={60} />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Média de Leads / Mês</p>
+                <p className="text-4xl font-black text-brand-primary">2.095</p>
+                <p className="text-xs text-gray-400 mt-4 leading-relaxed">Você está utilizando <span className="text-white">104%</span> da sua capacidade contratada nos últimos 4 meses.</p>
+             </div>
+             
+             <div className="bg-brand-primary p-8 rounded-[32px] text-black relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+                   <Zap size={60} />
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-black/60 mb-2">Total Gasto em Excedentes</p>
+                <p className="text-4xl font-black text-black uppercase tracking-tighter">R$ 275,00</p>
+                <button className="mt-4 text-[10px] font-black uppercase border-b-2 border-black pb-0.5 hover:opacity-70 transition-opacity">
+                   Ver faturas correspondentes
+                </button>
+             </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};

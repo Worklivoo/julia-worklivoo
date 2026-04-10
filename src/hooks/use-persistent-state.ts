@@ -91,6 +91,9 @@ export function usePersistentDateRange(
       const item = localStorage.getItem(key);
       if (item) {
         const parsed = JSON.parse(item);
+        if (!parsed || typeof parsed !== 'object') {
+          return defaultValue;
+        }
         // Converter strings de volta para objetos Date
         return {
           from: parsed.from ? new Date(parsed.from) : undefined,
@@ -107,7 +110,11 @@ export function usePersistentDateRange(
   // Função para atualizar o estado e salvar no localStorage
   const setPersistentDateRange = (value: { from?: Date; to?: Date } | ((prevState: { from?: Date; to?: Date }) => { from?: Date; to?: Date })) => {
     try {
-      const newValue = typeof value === 'function' ? value(state) : value;
+      const nextValue = typeof value === 'function' ? value(state) : value;
+      const newValue =
+        nextValue && typeof nextValue === 'object'
+          ? nextValue
+          : { from: undefined, to: undefined };
       setState(newValue);
       // Serializar datas como ISO strings
       const serializable = {
@@ -126,6 +133,10 @@ export function usePersistentDateRange(
       if (e.key === key && e.newValue !== null) {
         try {
           const parsed = JSON.parse(e.newValue);
+          if (!parsed || typeof parsed !== 'object') {
+            setState(defaultValue);
+            return;
+          }
           const newValue = {
             from: parsed.from ? new Date(parsed.from) : undefined,
             to: parsed.to ? new Date(parsed.to) : undefined

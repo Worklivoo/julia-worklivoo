@@ -92,8 +92,8 @@ const Pipeline = () => {
   };
 
   const filteredLeads = leads.filter(lead => {
-    const matchesSearch = lead.opportunityName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.leadName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (lead.opportunityName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (lead.leadName || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' ||
                          (statusFilter === 'open' && lead.status === 'active') ||
                          (statusFilter === 'lost' && lead.status === 'lost') ||
@@ -101,7 +101,7 @@ const Pipeline = () => {
     
     // Filtro por período usando DateRange
     let matchesDate = true;
-    if (dateRange.from && dateRange.to) {
+    if (dateRange?.from && dateRange?.to) {
       const createdAt = new Date(lead.createdAt);
       const fromDate = new Date(dateRange.from);
       const toDate = new Date(dateRange.to);

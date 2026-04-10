@@ -14,13 +14,15 @@ interface CRMContextType {
   user: User | null;
   isAuthenticated: boolean;
   loadingUser: boolean;
+  loadingLeads: boolean;
+  hasLoadedLeads: boolean;
   addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'notes'> & { company?: string; notes?: string }) => Promise<{ success: boolean; error?: string }>;
   updateLead: (id: string, updates: Partial<Lead>) => void;
   deleteLead: (id: string) => Promise<boolean>;
   addNote: (leadId: string, content: string) => Promise<boolean>;
   getNotesByLead: (leadId: string) => Promise<Note[]>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (name: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string, leadsVolume?: number) => Promise<boolean>;
+  register: (name: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string, leadsVolume?: number, valorPlano?: string) => Promise<boolean>;
   logout: () => void;
   getDashboardMetrics: () => DashboardMetrics;
   updateUser: (updates: Partial<User>) => void;
@@ -41,6 +43,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [hasLoadedLeads, setHasLoadedLeads] = useState(false);
 
   // Função auxiliar para buscar perfil do usuário (usuarios ou membros)
   const getCompleteUserProfile = async (userId: string, userEmail?: string) => {
@@ -56,6 +60,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         plano: profile.user_plano,
         id_instancia_zapi: profile.id_instancia_zapi,
         token_instancia_zapi: profile.token_instancia_zapi,
+        token_instancia_uazapi: profile.token_instancia_uazapi,
         tipo: profile.user_tipo,
         isMembro: false
       };
@@ -74,6 +79,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           plano: null,
           id_instancia_zapi: null,
           token_instancia_zapi: null,
+          token_instancia_uazapi: null,
           isMembro: true,
           membroId: membro.membro_id,
           membro_cargo: membro.membro_cargo,
@@ -94,7 +100,15 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
       
-      setLoadingUser(true);
+      // Determina se deve mostrar o loading
+      // Apenas mostra loading no carregamento inicial ou em eventos críticos como logout
+      // Para atualizações de sessão em background (como ao focar na aba), fazemos silenciosamente
+      const shouldShowLoading = isInitialLoad || event === 'SIGNED_OUT';
+      
+      if (shouldShowLoading) {
+        setLoadingUser(true);
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const userProfile = await getCompleteUserProfile(session.user.id, session.user.email);
@@ -115,7 +129,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUser(null);
         setIsAuthenticated(false);
       }
-      setLoadingUser(false);
+      
+      if (shouldShowLoading) {
+        setLoadingUser(false);
+      }
       isInitialLoad = false;
     };
     getSessionAndProfile();
@@ -133,12 +150,19 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let isMounted = true;
     const fetchLeads = async () => {
       if (!user) {
-        if (isMounted) setLeads([]);
+        if (isMounted) {
+          setLeads([]);
+          setLoadingLeads(false);
+          setHasLoadedLeads(true);
+        }
         return;
       }
       
       // Evita múltiplas chamadas simultâneas
       if (loadingUser) {
+        if (isMounted) {
+          setLoadingLeads(false);
+        }
         return;
       }
       
@@ -147,66 +171,79 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const userIdForLeads = user.isMembro ? user.user_id_empresa : user.id;
       
       if (!userIdForLeads) {
-        if (isMounted) setLeads([]);
+        if (isMounted) {
+          setLeads([]);
+          setLoadingLeads(false);
+          setHasLoadedLeads(true);
+        }
         return;
       }
-      
-      // PRIMEIRO: Remover leads de teste se existirem
-      await supabase
-        .from('leads')
-        .delete()
-        .eq('user_id', userIdForLeads)
-        .like('lead_nome_pessoa', '%Teste%');
-      
-      // Determinar se deve aplicar filtro por membro_id
-      // Se for membro com cargo 'Usuario', filtra apenas os leads dele
-      let membroIdFilter: string | undefined;
-      if (user.isMembro && user.membro_cargo === 'Usuario') {
-        membroIdFilter = user.membroId;
-      }
-      
-      const { data, error } = await getLeadsByUser(userIdForLeads, membroIdFilter);
-      
-      if (error || !data) {
-        if (isMounted) setLeads([]);
-        return;
-      }
-      
-      // Mapear os campos do Supabase para o tipo Lead do frontend
-      const mappedLeads: Lead[] = await Promise.all(data.map(async (lead: any) => {
-          // Buscar anotações para cada lead
-          const notes = await getNotesByLead(lead.lead_id?.toString() || '');
-          
-          
-          
-          const mappedLead = {
-          id: lead.lead_id?.toString(),
-          opportunityName: lead.lead_nome_oportunidade,
-          leadName: lead.lead_nome_pessoa,
-          email: lead.lead_email,
-          phone: lead.lead_telefone,
-          stage: mapLeadEtapaToStage(lead.lead_etapa),
-          status: mapLeadStatus(lead.lead_status),
-          createdAt: lead.created_at ? new Date(lead.created_at) : new Date(),
-          updatedAt: lead.updated_at ? new Date(lead.updated_at) : new Date(),
-          source: lead.lead_canal_origem,
-          value: 0, // Ajuste se houver campo de valor
-          notes: notes, // Carregar anotações do banco
-          priority: 'medium' as const,
-          expectedCloseDate: undefined,
-          lead_notas: lead.lead_notas,
-          thread_dify: lead.thread_dify,
-          ativo_ia: lead.ativo_ia,
-          };
-          
-          return mappedLead;
-      }));
-      
 
-      
-       if (isMounted) {
-         setLeads(mappedLeads);
-       }
+      if (isMounted) {
+        setLoadingLeads(true);
+        setHasLoadedLeads(false);
+      }
+
+      try {
+        // PRIMEIRO: Remover leads de teste se existirem
+        await supabase
+          .from('leads')
+          .delete()
+          .eq('user_id', userIdForLeads)
+          .like('lead_nome_pessoa', '%Teste%');
+        
+        // Determinar se deve aplicar filtro por membro_id
+        // Se for membro com cargo 'Usuario', filtra apenas os leads dele
+        let membroIdFilter: string | undefined;
+        if (user.isMembro && user.membro_cargo === 'Usuario') {
+          membroIdFilter = user.membroId;
+        }
+        
+        const { data, error } = await getLeadsByUser(userIdForLeads, membroIdFilter);
+        
+        if (error || !data) {
+          if (isMounted) setLeads([]);
+          return;
+        }
+        
+        // Mapear os campos do Supabase para o tipo Lead do frontend
+        const mappedLeads: Lead[] = await Promise.all(data.map(async (lead: any) => {
+            // Buscar anotações para cada lead
+            const notes = await getNotesByLead(lead.lead_id?.toString() || '');
+            
+            const mappedLead = {
+            id: lead.lead_id?.toString(),
+            opportunityName: lead.lead_nome_oportunidade,
+            leadName: lead.lead_nome_pessoa,
+            email: lead.lead_email,
+            phone: lead.lead_telefone,
+            stage: mapLeadEtapaToStage(lead.lead_etapa),
+            status: mapLeadStatus(lead.lead_status),
+            createdAt: lead.created_at ? new Date(lead.created_at) : new Date(),
+            updatedAt: lead.updated_at ? new Date(lead.updated_at) : new Date(),
+            source: lead.lead_canal_origem,
+            value: 0, // Ajuste se houver campo de valor
+            notes: notes, // Carregar anotações do banco
+            priority: 'medium' as const,
+            expectedCloseDate: undefined,
+            lead_notas: lead.lead_notas,
+            thread_dify: lead.thread_dify,
+            ativo_ia: lead.ativo_ia,
+            membro_id: lead.membro_id,
+            };
+            
+            return mappedLead;
+        }));
+        
+         if (isMounted) {
+           setLeads(mappedLeads);
+         }
+      } finally {
+        if (isMounted) {
+          setLoadingLeads(false);
+          setHasLoadedLeads(true);
+        }
+      }
     };
     
     fetchLeads();
@@ -238,6 +275,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       case 'Perdido':
         return 'lost';
       case 'Ganho':
+      case 'Vendido':
         return 'won';
       default:
         return 'active';
@@ -266,7 +304,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Função de registro
-  const register = async (nome: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string, leadsVolume?: number): Promise<boolean> => {
+  const register = async (nome: string, email: string, password: string, telefone?: string, empresa?: string, user_tipo?: string, leadsVolume?: number, valorPlano?: string): Promise<boolean> => {
     try {
       // 1. Criar usuário no Supabase Auth
       const { data, error } = await supabase.auth.signUp({
@@ -288,6 +326,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user_empresa: empresa || null,
         user_tipo: user_tipo || null,
         user_plano: (leadsVolume !== undefined && leadsVolume !== null) ? String(leadsVolume) : null,
+        user_valor_mensal: valorPlano || null,
       });
 
       if (!profile) {
@@ -430,7 +469,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       case 'lost':
         return 'Perdido';
       case 'won':
-        return 'Ganho';
+        return 'Vendido';
       default:
         return 'Aberto';
     }
@@ -468,7 +507,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     if (updates.status) {
       if (updates.status === 'won') {
-        supabaseUpdates.lead_status = 'Ganho';
+        supabaseUpdates.lead_status = 'Vendido';
       } else if (updates.status === 'lost') {
         supabaseUpdates.lead_status = 'Perdido';
       } else if (updates.status === 'active') {
@@ -494,9 +533,29 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (updates.expectedCloseDate) {
       supabaseUpdates.lead_data_fechamento_esperada = updates.expectedCloseDate instanceof Date ? updates.expectedCloseDate.toISOString() : updates.expectedCloseDate;
     }
+    
+    if (updates.membro_id !== undefined) {
+      supabaseUpdates.membro_id = updates.membro_id;
+    }
+    
+    if (updates.ativo_ia !== undefined) {
+      supabaseUpdates.ativo_ia = updates.ativo_ia;
+      if (updates.ativo_ia === 'Não') {
+        supabaseUpdates.etapa_fluxo_followup = 'FIM';
+        supabaseUpdates.ativo_fluxo_cadencia = 'NAO';
+      }
+    }
+
     // Adicione outros campos se necessário
     if (Object.keys(supabaseUpdates).length > 0) {
-      await updateLeadSupabase(id, supabaseUpdates);
+      const { error } = await updateLeadSupabase(id, supabaseUpdates);
+      
+      if (error) {
+        console.error('Erro ao atualizar lead no Supabase:', error);
+        // Não atualizar localmente se falhar no banco (ou mostrar aviso)
+        // Mas para manter consistência otimista, talvez manter, mas logar erro é crucial.
+      }
+      
       // Atualizar localmente também
       setLeads(prev => prev.map(lead => 
         lead.id === id 
@@ -635,6 +694,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       user,
       isAuthenticated,
       loadingUser,
+      loadingLeads,
+      hasLoadedLeads,
       addLead,
       updateLead,
       deleteLead,

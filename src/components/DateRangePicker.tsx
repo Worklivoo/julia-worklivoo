@@ -20,7 +20,7 @@ export interface DateRange {
 
 interface DateRangePickerProps {
   dateRange?: DateRange
-  onDateRangeChange?: (dateRange: DateRange | undefined) => void
+  onDateRangeChange?: (dateRange: DateRange) => void
   placeholder?: string
   className?: string
 }
@@ -59,7 +59,7 @@ export function DateRangePicker({
   const handleClear = () => {
     setStartDate("")
     setEndDate("")
-    onDateRangeChange?.(undefined)
+    onDateRangeChange?.({ from: undefined, to: undefined })
     setIsOpen(false)
   }
 

@@ -6,7 +6,6 @@ import { useCRM } from '@/contexts/CRMContext';
 import './Sidebar.css';
 import { 
   Home, 
-  MessageCircle, 
   MessageSquare,
   Settings, 
   ChevronLeft, 
@@ -16,7 +15,9 @@ import {
   Moon,
   LogOut,
   Contact,
-  Sparkles
+  Sparkles,
+  CreditCard,
+  Gift
 } from 'lucide-react';
 
 interface NavigationItem {
@@ -24,6 +25,7 @@ interface NavigationItem {
   path: string;
   icon: React.ComponentType<any>;
   tooltip: string;
+  highlight?: boolean;
 }
 
 const Sidebar = () => {
@@ -53,12 +55,6 @@ const Sidebar = () => {
       tooltip: 'Funil de Leads'
     },
     {
-      name: 'WhatsApp',
-      path: '/whatsapp',
-      icon: MessageCircle,
-      tooltip: 'WhatsApp'
-    },
-    {
       name: 'Conversas',
       path: '/conversas',
       icon: MessageSquare,
@@ -69,6 +65,19 @@ const Sidebar = () => {
       path: '/try-out',
       icon: Sparkles,
       tooltip: 'Try-Out'
+    },
+    {
+      name: 'Assinatura',
+      path: '/assinatura',
+      icon: CreditCard,
+      tooltip: 'Assinatura'
+    },
+    {
+      name: 'Indique e Ganhe',
+      path: '/indique-ganhe',
+      icon: Gift,
+      tooltip: 'Indique e Ganhe',
+      highlight: true
     },
     {
       name: 'Configurações',
@@ -155,7 +164,15 @@ const Sidebar = () => {
                   to={item.path}
                   className={`nav-link ${isActiveLink(item.path) ? 'active' : ''}`}
                 >
-                  <IconComponent className="nav-icon material-symbols-rounded" />
+                  <div className="relative flex items-center justify-center">
+                    <IconComponent className="nav-icon material-symbols-rounded" />
+                    {item.highlight && (
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      </span>
+                    )}
+                  </div>
                   <span className="nav-label">{item.name}</span>
                 </Link>
                 <span className="nav-tooltip">{item.tooltip}</span>
