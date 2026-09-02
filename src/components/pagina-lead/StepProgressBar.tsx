@@ -1,12 +1,12 @@
 import React from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { CheckCircle, UserPlus, PhoneCall, MessageCircle, Handshake } from 'lucide-react';
+import { CheckCircle, UserPlus, PhoneCall, MessageCircle, Handshake, CircleDollarSign, type LucideIcon } from 'lucide-react';
 import { Lead } from '@/types';
 
 interface Stage {
   id: string;
   name: string;
-  icon: React.ComponentType<{ size?: number }>;
+  icon: LucideIcon;
 }
 
 interface StepProgressBarProps {
@@ -19,6 +19,8 @@ const stages: Stage[] = [
   { id: 'tentando-contato', name: 'Tentando Contato', icon: PhoneCall },
   { id: 'contato-realizado', name: 'Contato Realizado', icon: MessageCircle },
   { id: 'qualificada', name: 'Oportunidade Qualificada', icon: Handshake },
+  { id: 'orcamento-negociacao', name: 'Orçamento/Negociação', icon: Handshake },
+  { id: 'venda', name: 'Venda', icon: CircleDollarSign },
 ];
 
 export const StepProgressBar: React.FC<StepProgressBarProps> = ({ lead, onStageChange }) => {

@@ -1,26 +1,31 @@
 import { supabase } from './supabase';
 import { createClient } from '@supabase/supabase-js';
 
+const normalizePhone = (value?: string | null) => {
+  return String(value || '').replace(/\D/g, '');
+};
+
 // Interface para a tabela de membros
 export interface Membro {
+  idx?: number | null;
   membro_id: string;
   user_id: string;
   membro_nome: string;
   membro_email: string;
-  membro_telefone?: string;
-  membro_cargo: 'Usuario';
-  membro_status: 'Ativo' | 'Desativado';
-  created_at?: string;
+  membro_telefone?: string | null;
+  membro_tipo: 'Administrador' | 'Usuario';
+  membro_status: 'Ativado' | 'Desativado';
+  created_at?: string | null;
 }
 
 // Função para obter todos os membros de uma empresa (user_id)
 export const getMembrosByUser = async (userId: string) => {
   try {
     const { data, error } = await supabase
-      .from('membros')
+      .from('membros_v2')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .order('membro_nome', { ascending: true });
 
     if (error) throw error;
     return { data, error: null };
@@ -33,10 +38,15 @@ export const getMembrosByUser = async (userId: string) => {
 // Função para adicionar um novo membro
 export const addMembro = async (membro: Omit<Membro, 'membro_id' | 'created_at'>) => {
   try {
-    console.log('Enviando para Supabase:', membro);
+    const normalizedMembro = {
+      ...membro,
+      membro_email: String(membro.membro_email || '').trim().toLowerCase(),
+      membro_telefone: normalizePhone(membro.membro_telefone),
+    };
+    console.log('Enviando para Supabase:', normalizedMembro);
     const { data, error } = await supabase
-      .from('membros')
-      .insert(membro)
+      .from('membros_v2')
+      .insert(normalizedMembro)
       .select();
 
     console.log('Resposta do Supabase:', { data, error });
@@ -57,13 +67,14 @@ export const createUserAndAddMembro = async (
   password: string,
   nome: string,
   telefone: string,
-  cargo: 'Usuario',
-  status: 'Ativo' | 'Desativado',
+  cargo: 'Administrador' | 'Usuario',
+  status: 'Ativado' | 'Desativado',
   userId: string // ID do usuário principal que está adicionando o membro
 ) => {
   try {
+    const normalizedPhone = normalizePhone(telefone);
     console.log('Iniciando criação de usuário e membro...');
-    console.log('Dados recebidos:', { email, nome, telefone, cargo, status, userId });
+    console.log('Dados recebidos:', { email, nome, telefone: normalizedPhone, cargo, status, userId });
 
     // 1. Criar uma instância isolada do Supabase para criação de usuários
     // Isso evita interferir na sessão atual do admin
@@ -114,7 +125,7 @@ export const createUserAndAddMembro = async (
     // 4. Verificar se o userId principal existe na tabela usuarios
     console.log('Verificando se userId principal existe na tabela usuarios:', userId);
     const { data: userExists, error: userCheckError } = await supabase
-      .from('usuarios')
+      .from('usuarios_v2')
       .select('user_id')
       .eq('user_id', userId)
       .single();
@@ -126,23 +137,20 @@ export const createUserAndAddMembro = async (
 
     console.log('Usuário principal encontrado:', userExists);
 
-    // 5. Adicionar como membro (usando Auth User ID como membro_id)
+    // 5. Adicionar como membro
     const newMembro = {
-      membro_id: authData.user.id, // ID do usuário criado no Supabase Auth
       user_id: userId, // ID do usuário principal da empresa
       membro_nome: nome,
-      membro_email: email,
-      membro_telefone: telefone,
-      membro_cargo: cargo,
+      membro_email: String(email || '').trim().toLowerCase(),
+      membro_telefone: normalizedPhone,
+      membro_tipo: cargo,
       membro_status: status
     };
-
-    console.log('Auth User ID sendo usado como membro_id:', authData.user.id);
 
     console.log('Inserindo membro na tabela:', newMembro);
 
     const { data, error } = await supabase
-      .from('membros')
+      .from('membros_v2')
       .insert(newMembro)
       .select();
 
@@ -170,9 +178,18 @@ export const createUserAndAddMembro = async (
 // Função para atualizar um membro existente
 export const updateMembro = async (membroId: string, updates: Partial<Omit<Membro, 'membro_id' | 'user_id'>>) => {
   try {
+    const normalizedUpdates = {
+      ...updates,
+      ...(Object.prototype.hasOwnProperty.call(updates, 'membro_email')
+        ? { membro_email: String(updates.membro_email || '').trim().toLowerCase() }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(updates, 'membro_telefone')
+        ? { membro_telefone: normalizePhone(updates.membro_telefone) || null }
+        : {}),
+    };
     const { data, error } = await supabase
-      .from('membros')
-      .update(updates)
+      .from('membros_v2')
+      .update(normalizedUpdates)
       .eq('membro_id', membroId)
       .select();
 
@@ -184,15 +201,16 @@ export const updateMembro = async (membroId: string, updates: Partial<Omit<Membr
   }
 };
 
-// Função para buscar membro por email
+// Função para buscar membro por email (case-insensitive)
 export const getMembroByEmail = async (email: string) => {
   try {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
     const { data, error } = await supabase
-      .from('membros')
+      .from('membros_v2')
       .select('*')
-      .eq('membro_email', email)
-      .eq('membro_status', 'Ativo')
-      .single();
+      .ilike('membro_email', normalizedEmail)
+      .eq('membro_status', 'Ativado')
+      .maybeSingle();
 
     if (error) {
       console.error('Erro ao buscar membro por email:', error);
@@ -209,7 +227,7 @@ export const getMembroByEmail = async (email: string) => {
 export const deleteMembro = async (membroId: string) => {
   try {
     const { error } = await supabase
-      .from('membros')
+      .from('membros_v2')
       .delete()
       .eq('membro_id', membroId);
 
@@ -228,7 +246,7 @@ export const deleteMembroComplete = async (membroId: string, membroEmail: string
 
     // Primeiro, buscar o membro para obter informações
     const { data: membro, error: fetchError } = await supabase
-      .from('membros')
+      .from('membros_v2')
       .select('*')
       .eq('membro_id', membroId)
       .single();
@@ -240,10 +258,10 @@ export const deleteMembroComplete = async (membroId: string, membroEmail: string
 
     console.log('Membro encontrado:', membro);
 
-    // Excluir da tabela membros primeiro
-    console.log('Excluindo membro da tabela membros...');
+    // Excluir da tabela membros_v2 primeiro
+    console.log('Excluindo membro da tabela membros_v2...');
     const { error: deleteError } = await supabase
-      .from('membros')
+      .from('membros_v2')
       .delete()
       .eq('membro_id', membroId);
 
@@ -254,10 +272,28 @@ export const deleteMembroComplete = async (membroId: string, membroEmail: string
 
     console.log('Membro excluído da tabela com sucesso');
 
-    // Excluir do Supabase Auth usando o membro_id (que é o ID do Auth)
-    console.log('Excluindo usuário do Supabase Auth com ID:', membroId);
+    // Excluir do Supabase Auth pelo email (membro_id não é o ID do Auth em membros_v2)
+    console.log('Excluindo usuário do Supabase Auth pelo email:', membroEmail);
     try {
-      const { error: authError } = await supabase.auth.admin.deleteUser(membroId);
+      const { data: listData, error: listError } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      if (listError) {
+        return {
+          success: true,
+          error: null,
+          warning: 'Membro excluído da tabela, mas houve erro ao listar usuários do Auth: ' + listError.message
+        };
+      }
+
+      const authUser = (listData?.users || []).find((u) => (u.email || '').toLowerCase() === (membroEmail || '').toLowerCase());
+      if (!authUser) {
+        return {
+          success: true,
+          error: null,
+          warning: 'Membro excluído da tabela, mas o usuário não foi encontrado no Auth para exclusão.'
+        };
+      }
+
+      const { error: authError } = await supabase.auth.admin.deleteUser(authUser.id);
       
       if (authError) {
         console.error('Erro ao excluir do Supabase Auth:', authError);

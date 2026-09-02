@@ -5,6 +5,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DateRange, DateRangePicker } from "@/components/DateRangePicker";
 import { startOfMonth, endOfMonth } from "date-fns";
@@ -13,15 +22,21 @@ import { usePersistentDateRange } from '@/hooks/use-persistent-state';
 import { useLeadOrigins } from '@/hooks/use-lead-origins';
 import { useIsMobile } from '@/hooks/use-mobile';
 import KanbanBoard from '@/components/KanbanBoard';
-import { Search, Plus, Filter, Activity, FileDown } from 'lucide-react';
+import { Search, Plus, Filter, Activity, FileDown, ChevronDown, Users } from 'lucide-react';
 import { getLeadsByUser } from '@/lib/leads';
+import { getMembrosByUser, type Membro } from '@/lib/membros';
+
+type MemberFilterOption = {
+  id: string;
+  name: string;
+};
 
 const Pipeline = () => {
   const { leads, addLead, user } = useCRM();
   const { origins } = useLeadOrigins();
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('open');
+  const [statusFilter, setStatusFilter] = useState<string>('open-won');
   const [dateRange, setDateRange] = usePersistentDateRange(
     'pipeline-date-range',
     {
@@ -38,7 +53,7 @@ const Pipeline = () => {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportStatus, setExportStatus] = useState<string>('all');
   const [exportStage, setExportStage] = useState<string>('all');
-  const [exportDateRange, setExportDateRange] = useState<DateRange>({ from: undefined as any, to: undefined as any });
+  const [exportDateRange, setExportDateRange] = useState<DateRange>({ from: undefined, to: undefined });
   const formatDateForInput = (date?: Date) => {
     if (!date) return '';
     const y = date.getFullYear();
@@ -54,9 +69,14 @@ const Pipeline = () => {
   }, [exportDateRange]);
   const [exportLoading, setExportLoading] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [companyMembers, setCompanyMembers] = useState<Membro[]>([]);
+  const [memberOptions, setMemberOptions] = useState<MemberFilterOption[]>([]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
   const allColumns = [
     { key: 'lead_id', label: 'ID' },
     { key: 'created_at', label: 'DATA DE CRIAÇÃO' },
+    { key: 'update_mensagem', label: 'ÚLTIMA ATUALIZAÇÃO' },
     { key: 'lead_etapa', label: 'ETAPA DO LEAD' },
     { key: 'lead_status', label: 'STATUS' },
     { key: 'lead_nome_pessoa', label: 'NOME' },
@@ -65,7 +85,9 @@ const Pipeline = () => {
     { key: 'lead_email', label: 'EMAIL' },
     { key: 'lead_canal_origem', label: 'CANAL DE ORIGEM' },
     { key: 'lead_notas', label: 'NOTAS' },
+    { key: 'TRIAL', label: 'TRIAL' },
     { key: 'ativo_ia', label: 'IA ESTA ATIVA?' },
+    { key: 'conversa', label: 'CONVERSA (IA)' },
   ];
   const selectedColumns = allColumns.map(c => c.key);
   const columnLabels: Record<string, string> =
@@ -80,21 +102,159 @@ const Pipeline = () => {
     notes: '',
     email: '',
   });
+  const normalizeLeadPhone = (value: string) => {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) return '';
+    const localDigits = digits.startsWith('55') ? digits.slice(2) : digits;
+    const limitedLocalDigits = localDigits.slice(0, 11);
+    return limitedLocalDigits ? `55${limitedLocalDigits}` : '';
+  };
+  const formatLeadPhone = (value: string) => {
+    const normalized = normalizeLeadPhone(value);
+    if (!normalized) return '';
+    const localDigits = normalized.slice(2);
+    const ddd = localDigits.slice(0, 2);
+    const numberDigits = localDigits.slice(2);
+    if (!ddd) return '+55';
+    if (numberDigits.length === 0) return `+55 (${ddd}`;
+    if (numberDigits.length <= 4) return `+55 (${ddd}) ${numberDigits}`;
+    if (numberDigits.length <= 8) {
+      return `+55 (${ddd}) ${numberDigits.slice(0, 4)}-${numberDigits.slice(4)}`;
+    }
+    return `+55 (${ddd}) ${numberDigits.slice(0, 5)}-${numberDigits.slice(5, 9)}`;
+  };
+  const handlePhoneChange = (value: string) => {
+    setNewLead((prev) => ({ ...prev, phone: formatLeadPhone(value) }));
+  };
 
   // Filtrar origens baseado no que o usuário está digitando
   const filteredOrigins = origins.filter(origin => 
     origin.toLowerCase().includes(newLead.source.toLowerCase())
   );
+  const userIdForCompany = user ? (user.isMembro ? user.user_id_empresa : user.id) : '';
+  const currentUserMember = companyMembers.find(
+    (member) =>
+      String(member.membro_id || '') === String(user?.isMembro ? user?.membroId || '' : user?.id || '')
+  );
+  const canUseMemberFilter = Boolean(
+    currentUserMember?.membro_tipo === 'Administrador'
+  );
+  const otherActiveMembers = companyMembers.filter((member) => {
+    const sameMemberId = String(member.membro_id || '') === String(currentUserMember?.membro_id || '');
+    return !sameMemberId;
+  });
+  const showMemberFilter = canUseMemberFilter && otherActiveMembers.length > 0;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadMembers = async () => {
+      if (!userIdForCompany) {
+        if (isMounted) {
+          setCompanyMembers([]);
+          setMemberOptions([]);
+          setSelectedMemberIds([]);
+          setMembersLoading(false);
+        }
+        return;
+      }
+
+      setMembersLoading(true);
+      const { data, error } = await getMembrosByUser(userIdForCompany);
+
+      if (!isMounted) return;
+
+      if (error || !data) {
+        setCompanyMembers([]);
+        setMemberOptions([]);
+        setSelectedMemberIds([]);
+        setMembersLoading(false);
+        return;
+      }
+
+      const activeMembers = (data as Membro[])
+        .filter((membro) => membro.membro_status === 'Ativado');
+
+      const availableMembers = activeMembers
+        .filter((membro) => membro.membro_status === 'Ativado')
+        .map((membro) => ({
+          id: String(membro.membro_id),
+          name: String(membro.membro_nome || '').trim() || 'Sem nome',
+        }));
+      setCompanyMembers(activeMembers);
+      setMemberOptions(availableMembers);
+      setSelectedMemberIds((prev) => prev.filter((memberId) => availableMembers.some((member) => member.id === memberId)));
+      setMembersLoading(false);
+    };
+
+    void loadMembers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [canUseMemberFilter, userIdForCompany]);
+
+  useEffect(() => {
+    if (!showMemberFilter && selectedMemberIds.length > 0) {
+      setSelectedMemberIds([]);
+    }
+  }, [showMemberFilter, selectedMemberIds.length]);
 
   const handleOriginSelect = (origin: string) => {
     setNewLead({...newLead, source: origin});
     setShowOriginSuggestions(false);
   };
 
+  const toggleMemberSelection = (memberId: string) => {
+    setSelectedMemberIds((prev) =>
+      prev.includes(memberId)
+        ? prev.filter((id) => id !== memberId)
+        : [...prev, memberId]
+    );
+  };
+
+  const selectedMembersLabel = (() => {
+    if (membersLoading) return 'Carregando membros...';
+    if (selectedMemberIds.length === 0) return 'Todos os membros';
+    if (selectedMemberIds.length === 1) {
+      const selectedMember = memberOptions.find((member) => member.id === selectedMemberIds[0]);
+      return selectedMember?.name || '1 membro selecionado';
+    }
+    return `${selectedMemberIds.length} membros selecionados`;
+  })();
+  const selectedAdminMemberIds = new Set(
+    companyMembers
+      .filter(
+        (member) =>
+          selectedMemberIds.includes(String(member.membro_id)) &&
+          member.membro_tipo === 'Administrador'
+      )
+      .map((member) => String(member.membro_id))
+  );
+  const shouldIncludeUnassignedLeads = selectedAdminMemberIds.size > 0;
+
+  const matchesSelectedMemberFilter = (memberId: string) => {
+    if (selectedMemberIds.length === 0) return true;
+    if (selectedMemberIds.includes(memberId)) return true;
+    return !memberId && shouldIncludeUnassignedLeads;
+  };
+
+  const canViewLead = (lead: any) => {
+    if (!user) return false;
+    if (!user.isMembro) return true;
+    if (user.membro_tipo === 'Administrador') return true;
+    const myMembroId = user.membroId ? String(user.membroId).trim() : '';
+    if (!myMembroId) return false;
+    const leadMembroId = lead?.membro_id ? String(lead.membro_id).trim() : '';
+    return leadMembroId === myMembroId;
+  };
+
   const filteredLeads = leads.filter(lead => {
+    if (!canViewLead(lead)) return false;
     const matchesSearch = (lead.opportunityName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (lead.leadName || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' ||
+                         (statusFilter === 'open-won' && (lead.status === 'active' || lead.status === 'won')) ||
                          (statusFilter === 'open' && lead.status === 'active') ||
                          (statusFilter === 'lost' && lead.status === 'lost') ||
                          (statusFilter === 'won' && lead.status === 'won');
@@ -109,21 +269,31 @@ const Pipeline = () => {
       toDate.setHours(23, 59, 59, 999);
       matchesDate = createdAt >= fromDate && createdAt <= toDate;
     }
+
+    const leadMembroId = String(lead?.membro_id || '').trim();
+    const matchesMember =
+      !showMemberFilter ||
+      matchesSelectedMemberFilter(leadMembroId);
     
-    return matchesSearch && matchesStatus && matchesDate;
+    return matchesSearch && matchesStatus && matchesDate && matchesMember;
   });
 
   const handleAddLead = async () => {
     setAddLeadError(null);
     setAddLeadSuccess(null);
+    const normalizedPhone = normalizeLeadPhone(newLead.phone);
     
     if (newLead.opportunityName && newLead.leadName && newLead.phone) {
+      if (normalizedPhone.length < 12) {
+        setAddLeadError('Informe um telefone valido com DDD.');
+        return;
+      }
       setAddLeadLoading(true);
       
       const leadData = {
         opportunityName: newLead.opportunityName,
         leadName: newLead.leadName,
-        phone: newLead.phone,
+        phone: normalizedPhone,
         email: newLead.email,
         company: newLead.company,
         source: newLead.source,
@@ -167,7 +337,7 @@ const Pipeline = () => {
     try {
       const userIdForLeads = user.isMembro ? user.user_id_empresa : user.id;
       let membroIdFilter: string | undefined;
-      if (user.isMembro && user.membro_cargo === 'Usuario') {
+      if (user.isMembro && user.membroId && user.membro_tipo !== 'Administrador') {
         membroIdFilter = user.membroId;
       }
       const { data, error } = await getLeadsByUser(userIdForLeads || '', membroIdFilter);
@@ -176,25 +346,35 @@ const Pipeline = () => {
         setExportLoading(false);
         return;
       }
-      const rows = (data || []).filter((lead: any) => {
-        const statusOk = exportStatus === 'all' ? true : (lead.lead_status || '').toLowerCase() === exportStatus.toLowerCase();
+      const excludedOrigins = new Set(['worklivoo-treinamento', 'worklivoo-treinamento-manual', 'worklivoo-lixo']);
+      const rows = (data as Record<string, unknown>[] | null | undefined || []).filter((lead) => {
+        const origin = String(lead['lead_canal_origem'] || '').trim().toLowerCase();
+        if (excludedOrigins.has(origin)) return false;
+        const statusOk =
+          exportStatus === 'all'
+            ? true
+            : String(lead['lead_status'] || '').toLowerCase() === exportStatus.toLowerCase();
         const normalize = (s: string) => (s || '').toLowerCase().trim();
         const stageOk =
           exportStage === 'all'
             ? true
-            : normalize(lead.lead_etapa) === normalize(exportStage);
+            : normalize(String(lead['lead_etapa'] || '')) === normalize(exportStage);
         let dateOk = true;
         if (exportDateRange?.from && exportDateRange?.to) {
-          const createdAt = new Date(lead.created_at);
+          const createdAt = new Date(String(lead['created_at'] || ''));
           const fromDate = new Date(exportDateRange.from);
           const toDate = new Date(exportDateRange.to);
           toDate.setHours(23, 59, 59, 999);
           dateOk = createdAt >= fromDate && createdAt <= toDate;
         }
-        return statusOk && stageOk && dateOk;
+        const memberId = String(lead['membro_id'] || '').trim();
+        const memberOk =
+          !showMemberFilter ||
+          matchesSelectedMemberFilter(memberId);
+        return statusOk && stageOk && dateOk && memberOk;
       });
       const headers = selectedColumns.map((key) => columnLabels[key] || key);
-      const escapeCSV = (value: any) => {
+      const escapeCSV = (value: unknown) => {
         const v = value === null || value === undefined ? '' : String(value);
         if (/[",\n]/.test(v)) {
           return `"${v.replace(/"/g, '""')}"`;
@@ -203,9 +383,15 @@ const Pipeline = () => {
       };
       const csv = [
         headers.join(','),
-        ...rows.map((lead: any) =>
+        ...rows.map((lead) =>
           selectedColumns
-            .map((key) => escapeCSV(lead[key]))
+            .map((key) => {
+              const raw = lead[key];
+              if ((key === 'lead_nome_pessoa' || key === 'lead_nome_oportunidade') && (raw === null || raw === undefined || String(raw).trim() === '')) {
+                return escapeCSV('N/A');
+              }
+              return escapeCSV(raw);
+            })
             .join(',')
         ),
       ].join('\n');
@@ -219,7 +405,7 @@ const Pipeline = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       setShowExportDialog(false);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setExportError('Erro interno ao exportar leads.');
     } finally {
       setExportLoading(false);
@@ -289,9 +475,9 @@ const Pipeline = () => {
                       <Input
                         id="phone"
                         value={newLead.phone}
-                        onChange={(e) => setNewLead({...newLead, phone: e.target.value})}
+                        onChange={(e) => handlePhoneChange(e.target.value)}
                         className="col-span-3"
-                        placeholder="(11) 99999-9999"
+                        placeholder="+55 (11) 99999-9999"
                       />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
@@ -466,9 +652,9 @@ const Pipeline = () => {
                           <Input
                             id="phone"
                             value={newLead.phone}
-                            onChange={(e) => setNewLead({...newLead, phone: e.target.value})}
+                            onChange={(e) => handlePhoneChange(e.target.value)}
                             className="border-gray-300 focus:border-yellow-400 focus:ring-yellow-400"
-                            placeholder="(11) 99999-9999"
+                            placeholder="+55 (11) 99999-9999"
                           />
                         </div>
                         
@@ -635,6 +821,7 @@ const Pipeline = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Todos os Status</SelectItem>
+                <SelectItem value="open-won" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Abertos + Vendidos</SelectItem>
                 <SelectItem value="open" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Abertos</SelectItem>
                 <SelectItem value="won" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Ganhos</SelectItem>
                 <SelectItem value="lost" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Perdidos</SelectItem>
@@ -644,6 +831,50 @@ const Pipeline = () => {
               dateRange={dateRange}
               onDateRangeChange={setDateRange}
             />
+            {showMemberFilter && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-[240px] justify-between bg-background/50 border-border/50 hover:bg-muted/50"
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      <Users className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{selectedMembersLabel}</span>
+                    </span>
+                    <ChevronDown className="w-4 h-4 shrink-0" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel>Filtrar por membro</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {membersLoading && (
+                    <DropdownMenuItem disabled>Carregando membros...</DropdownMenuItem>
+                  )}
+                  {!membersLoading && memberOptions.length === 0 && (
+                    <DropdownMenuItem disabled>Nenhum membro disponivel</DropdownMenuItem>
+                  )}
+                  {!membersLoading && memberOptions.map((member) => (
+                    <DropdownMenuCheckboxItem
+                      key={member.id}
+                      checked={selectedMemberIds.includes(member.id)}
+                      onCheckedChange={() => toggleMemberSelection(member.id)}
+                      onSelect={(event) => event.preventDefault()}
+                    >
+                      {member.name}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                  {!membersLoading && selectedMemberIds.length > 0 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setSelectedMemberIds([])}>
+                        Limpar selecao
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -658,11 +889,12 @@ const Pipeline = () => {
                 Exportar Leads
               </TooltipContent>
             </Tooltip>
-            {(searchTerm || statusFilter !== 'open' || (dateRange.from && dateRange.to && (dateRange.from.getTime() !== startOfMonth(new Date()).getTime() || dateRange.to.getTime() !== endOfMonth(new Date()).getTime()))) && (
+            {(searchTerm || statusFilter !== 'open-won' || selectedMemberIds.length > 0 || (dateRange.from && dateRange.to && (dateRange.from.getTime() !== startOfMonth(new Date()).getTime() || dateRange.to.getTime() !== endOfMonth(new Date()).getTime()))) && (
               <Button variant="outline" size="sm" 
                 onClick={() => {
                   setSearchTerm('');
-                  setStatusFilter('open');
+                  setStatusFilter('open-won');
+                  setSelectedMemberIds([]);
                   setDateRange({
                     from: startOfMonth(new Date()),
                     to: endOfMonth(new Date())
@@ -719,6 +951,8 @@ const Pipeline = () => {
                           <SelectItem value="tentando contato">Tentando Contato</SelectItem>
                           <SelectItem value="contato realizado">Contato Realizado</SelectItem>
                           <SelectItem value="oportunidade qualificada">Oportunidade Qualificada</SelectItem>
+                          <SelectItem value="orçamento/negociação">Orçamento/Negociação</SelectItem>
+                          <SelectItem value="venda">Venda</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

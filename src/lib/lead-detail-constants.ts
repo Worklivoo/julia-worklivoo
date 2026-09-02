@@ -1,9 +1,9 @@
-import { UserPlus, PhoneCall, MessageCircle, Handshake } from 'lucide-react';
+import { UserPlus, PhoneCall, MessageCircle, Handshake, CircleDollarSign, type LucideIcon } from 'lucide-react';
 
 export interface Stage {
   id: string;
   name: string;
-  icon: React.ComponentType<{ size?: number }>;
+  icon: LucideIcon;
 }
 
 export const PIPELINE_STAGES: Stage[] = [
@@ -11,6 +11,8 @@ export const PIPELINE_STAGES: Stage[] = [
   { id: 'tentando-contato', name: 'Tentando Contato', icon: PhoneCall },
   { id: 'contato-realizado', name: 'Contato Realizado', icon: MessageCircle },
   { id: 'qualificada', name: 'Oportunidade Qualificada', icon: Handshake },
+  { id: 'orcamento-negociacao', name: 'Orçamento/Negociação', icon: Handshake },
+  { id: 'venda', name: 'Venda', icon: CircleDollarSign },
 ];
 
 export const NOTE_TRUNCATE_LENGTH = 200;

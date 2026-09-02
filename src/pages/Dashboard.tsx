@@ -1,51 +1,202 @@
-import React, { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { DateRange } from "@/components/DateRangePicker";
-import { startOfMonth, endOfMonth } from "date-fns";
+import { startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { DateRangePicker } from "@/components/DateRangePicker";
 
 import { useCRM } from '@/contexts/CRMContext';
-import { useLeadOrigins } from '@/hooks/use-lead-origins';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Users, Target, Activity, ArrowUpRight, ArrowDownRight, BarChart3, Globe, Clock } from 'lucide-react';
+import { TrendingUp, Users, Target, Activity, ArrowUpRight, ArrowDownRight, BarChart3, Clock } from 'lucide-react';
+import { getLeadsByUser } from '@/lib/leads';
+import { Lead } from '@/types';
 
-const Dashboard = () => {
-  const { leads, getDashboardMetrics, user } = useCRM();
-  const { getTopOrigins } = useLeadOrigins();
-  const isMobile = useIsMobile();
-  const metrics = getDashboardMetrics();
+type LeadsV2DashboardRow = {
+  lead_id?: number;
+  created_at?: string | null;
+  lead_etapa?: string | null;
+  lead_status?: string | null;
+  lead_canal_origem?: string | null;
+  lead_nome_pessoa?: string | null;
+  lead_nome_oportunidade?: string | null;
+  lead_telefone?: string | null;
+  TRIAL?: string | null;
+};
 
-  // Define o mês atual como padrão para o filtro de data
-  const getCurrentMonthRange = (): DateRange => {
-    const today = new Date()
-    return {
-      from: startOfMonth(today),
-      to: endOfMonth(today)
-    }
+type DashboardLead = Lead & {
+  trial?: string | null;
+};
+
+const getCurrentMonthRange = (): DateRange => {
+  const today = new Date()
+  return {
+    from: startOfMonth(today),
+    to: endOfMonth(today)
+  }
+}
+
+const clampToMonth = (year: number, monthIndex: number, day: number) => {
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  const safeDay = Math.min(Math.max(1, day), lastDay);
+  return new Date(year, monthIndex, safeDay);
+};
+
+const getDefaultBillingCycleRange = (dueDayRaw: unknown): DateRange => {
+  const dueDay = Number(dueDayRaw);
+  if (!Number.isFinite(dueDay) || dueDay <= 0) {
+    return getCurrentMonthRange();
   }
 
-  const [dateRange, setDateRange] = useState<DateRange>(getCurrentMonthRange())
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const todayNoTime = new Date(year, month, now.getDate());
 
-  // Memoizar data atual para evitar recálculos constantes
-  const now = useMemo(() => new Date(), []);
+  const dueThisMonth = clampToMonth(year, month, dueDay);
+  if (todayNoTime < dueThisMonth) {
+    return {
+      from: clampToMonth(year, month - 1, dueDay),
+      to: dueThisMonth,
+    };
+  }
+
+  return {
+    from: dueThisMonth,
+    to: clampToMonth(year, month + 1, dueDay),
+  };
+};
+
+const Dashboard = () => {
+  const { user } = useCRM();
+  const isMobile = useIsMobile();
+  const [dashboardLeads, setDashboardLeads] = useState<DashboardLead[]>([]);
+
+  const mapLeadEtapaToStage = (leadEtapa: string | null | undefined): Lead['stage'] => {
+    switch (String(leadEtapa || '').trim()) {
+      case 'Entrada do lead':
+      case 'Entrada do Lead':
+        return 'entrada';
+      case 'Tentando contato':
+      case 'Tentando Contato':
+        return 'tentando-contato';
+      case 'Contato realizado':
+      case 'Contato Realizado':
+        return 'contato-realizado';
+      case 'Oportunidade qualificada':
+      case 'Oportunidade Qualificada':
+        return 'qualificada';
+      case 'Orçamento/Negociação':
+      case 'Orcamento/Negociacao':
+        return 'orcamento-negociacao';
+      case 'Venda':
+        return 'venda';
+      default:
+        return 'entrada';
+    }
+  };
+
+  const mapLeadStatus = (leadStatus: string | null | undefined): Lead['status'] => {
+    const normalized = String(leadStatus || '').trim().toLowerCase();
+    if (normalized === 'vendido' || normalized === 'ganho' || normalized === 'won') return 'won';
+    if (normalized === 'perdido' || normalized === 'lost') return 'lost';
+    return 'active';
+  };
+
+  const normalizeString = (value: unknown) => {
+    return typeof value === 'string' ? value.trim() : '';
+  };
+
+  useEffect(() => {
+    const loadDashboardLeads = async () => {
+      const ownerUserId = user?.isMembro ? user?.user_id_empresa : user?.id;
+      if (!ownerUserId) {
+        setDashboardLeads([]);
+        return;
+      }
+
+      const { data, error } = await getLeadsByUser(ownerUserId);
+      if (error || !data) {
+        setDashboardLeads([]);
+        return;
+      }
+
+      const mapped: DashboardLead[] = (data as LeadsV2DashboardRow[]).map((lead) => {
+        const leadName = normalizeString(lead.lead_nome_pessoa) || normalizeString(lead.lead_telefone) || 'N/A';
+        const opportunityName = normalizeString(lead.lead_nome_oportunidade) || normalizeString(lead.lead_telefone) || 'N/A';
+
+        return {
+        id: String(lead.lead_id ?? ''),
+        opportunityName,
+        leadName,
+        email: '',
+        phone: '',
+        stage: mapLeadEtapaToStage(lead.lead_etapa),
+        status: mapLeadStatus(lead.lead_status),
+        createdAt: lead.created_at ? new Date(String(lead.created_at).replace(' ', 'T')) : new Date(),
+        updatedAt: new Date(),
+        source: String(lead.lead_canal_origem || ''),
+        value: 0,
+        notes: [],
+        priority: 'medium' as const,
+        trial: typeof lead.TRIAL === 'string' ? lead.TRIAL : null,
+      }});
+
+      setDashboardLeads(mapped);
+    };
+
+    loadDashboardLeads();
+  }, [user?.id, user?.user_id_empresa, user?.isMembro]);
+
+  const planoLeads = useMemo(() => {
+    const fromQuantidade = user?.planoQuantidadeLeads;
+    if (typeof fromQuantidade === 'number' && Number.isFinite(fromQuantidade) && fromQuantidade > 0) {
+      return fromQuantidade;
+    }
+
+    const fromPlanoString = typeof user?.plano === 'string' ? Number(user.plano) : NaN;
+    if (Number.isFinite(fromPlanoString) && fromPlanoString > 0) {
+      return fromPlanoString;
+    }
+
+    return 500;
+  }, [user?.plano, user?.planoQuantidadeLeads]);
+
+  const [dateRange, setDateRange] = useState<DateRange>(() => getDefaultBillingCycleRange(user?.dia_vencimento))
+  const hasUserAdjustedDateRangeRef = useRef(false);
+
+  useEffect(() => {
+    if (hasUserAdjustedDateRangeRef.current) return;
+    setDateRange(getDefaultBillingCycleRange(user?.dia_vencimento));
+  }, [user?.dia_vencimento]);
+
+  const handleDateRangeChange = (next: DateRange) => {
+    hasUserAdjustedDateRangeRef.current = true;
+    setDateRange(next);
+  };
 
   // Filtrar leads baseado no período selecionado
   const filteredLeads = useMemo(() => {
     if (!dateRange?.from || !dateRange?.to) {
-      return leads;
+      return dashboardLeads;
     }
     
-    return leads.filter(lead => {
+    const from = startOfDay(dateRange.from);
+    const to = endOfDay(dateRange.to);
+
+    return dashboardLeads.filter(lead => {
       const leadDate = new Date(lead.createdAt);
-      return leadDate >= dateRange.from! && leadDate <= dateRange.to!;
+      return leadDate >= from && leadDate <= to;
     });
-  }, [leads, dateRange]);
+  }, [dashboardLeads, dateRange]);
+
+  const filteredLeadsPlano = useMemo(() => {
+    return filteredLeads.filter((lead) => String(lead.trial || '').trim().toUpperCase() !== 'SIM');
+  }, [filteredLeads]);
 
   // Memoizar dados dos gráficos para evitar recálculos desnecessários
   const stageData = useMemo(() => [
@@ -53,6 +204,8 @@ const Dashboard = () => {
     { name: 'Tentando Contato', value: filteredLeads.filter(l => l.stage === 'tentando-contato').length },
     { name: 'Contato Realizado', value: filteredLeads.filter(l => l.stage === 'contato-realizado').length },
     { name: 'Oport. Qualificada', value: filteredLeads.filter(l => l.stage === 'qualificada').length },
+    { name: 'Orçam./Neg.', value: filteredLeads.filter(l => l.stage === 'orcamento-negociacao').length },
+    { name: 'Venda', value: filteredLeads.filter(l => l.stage === 'venda').length },
   ], [filteredLeads]);
 
   // Memoizar origens dos leads filtrados
@@ -85,7 +238,9 @@ const Dashboard = () => {
   const leadsDoPeriodo = useMemo(() => {
     const leadsNoPeriodo = filteredLeads;
     const leadsAbertosNoPeriodo = leadsNoPeriodo.filter(l => l.status === 'active');
-    const leadsQualificadosNoPeriodo = leadsNoPeriodo.filter(l => l.stage === 'qualificada');
+    const leadsQualificadosNoPeriodo = leadsNoPeriodo.filter(l =>
+      ['qualificada', 'orcamento-negociacao', 'venda'].includes(l.stage)
+    );
     const taxaConversaoQualificados = leadsNoPeriodo.length > 0 ? (leadsQualificadosNoPeriodo.length / leadsNoPeriodo.length) * 100 : 0;
 
     return {
@@ -96,33 +251,11 @@ const Dashboard = () => {
     };
   }, [filteredLeads]);
 
-  // Memoizar conversão por etapa
-  const conversaoPorEtapa = useMemo(() => {
-    const etapas = [
-      { id: 'entrada', nome: 'Entrada Lead' },
-      { id: 'contato-realizado', nome: 'Contato Realizado' },
-      { id: 'qualificada', nome: 'Oport. Qualificada' },
-    ];
-    const totalPorEtapa = etapas.map(etapa => leadsDoPeriodo.leadsNoPeriodo.filter(l => l.stage === etapa.id).length);
-    return etapas.map((etapa, idx) => {
-      if (idx === 0) return { etapa: etapa.nome, conversao: 100 };
-      const anterior = totalPorEtapa[idx - 1];
-      const atual = totalPorEtapa[idx];
-      return {
-        etapa: etapa.nome,
-        conversao: anterior > 0 ? (atual / anterior) * 100 : 0
-      };
-    });
-  }, [leadsDoPeriodo]);
-
-  const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00'];
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
-  };
+  const leadsPlanoDoPeriodo = useMemo(() => {
+    return {
+      leadsNoPeriodo: filteredLeadsPlano,
+    };
+  }, [filteredLeadsPlano]);
 
   return (
     <TooltipProvider>
@@ -142,7 +275,7 @@ const Dashboard = () => {
           <div className="flex justify-end">
             <DateRangePicker
               dateRange={dateRange}
-              onDateRangeChange={setDateRange}
+              onDateRangeChange={handleDateRangeChange}
               placeholder="Selecione o período"
             />
           </div>
@@ -162,8 +295,8 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
-                    {leadsDoPeriodo.leadsNoPeriodo.length}/{user?.plano || 500}
-                    {leadsDoPeriodo.leadsNoPeriodo.length <= (user?.plano || 500) ? 
+                    {leadsPlanoDoPeriodo.leadsNoPeriodo.length}/{planoLeads}
+                    {leadsPlanoDoPeriodo.leadsNoPeriodo.length <= planoLeads ? 
                       <ArrowUpRight className="w-4 h-4 text-green-500" /> : 
                       <ArrowDownRight className="w-4 h-4 text-red-500" />
                     }
@@ -172,16 +305,21 @@ const Dashboard = () => {
                 <CardContent>
                   <div className="space-y-2">
                     <Progress 
-                      value={Math.min((leadsDoPeriodo.leadsNoPeriodo.length / (user?.plano || 500)) * 100, 100)} 
+                      value={Math.min((leadsPlanoDoPeriodo.leadsNoPeriodo.length / planoLeads) * 100, 100)} 
                       className="h-2"
                     />
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{Math.round((leadsDoPeriodo.leadsNoPeriodo.length / (user?.plano || 500)) * 100)}% usado</span>
-                      <span>{Math.max(0, (user?.plano || 500) - leadsDoPeriodo.leadsNoPeriodo.length)} restantes</span>
+                      <span>{Math.round((leadsPlanoDoPeriodo.leadsNoPeriodo.length / planoLeads) * 100)}% usado</span>
+                      <span>{Math.max(0, planoLeads - leadsPlanoDoPeriodo.leadsNoPeriodo.length)} restantes</span>
                     </div>
-                    {leadsDoPeriodo.leadsNoPeriodo.length > (user?.plano || 500) && (
+                    {typeof user?.dia_vencimento === 'number' && user.dia_vencimento > 0 && (
+                      <div className="text-[11px] text-muted-foreground">
+                        Ciclo fecha dia {user.dia_vencimento}
+                      </div>
+                    )}
+                    {leadsPlanoDoPeriodo.leadsNoPeriodo.length > planoLeads && (
                       <Badge variant="destructive" className="rounded-full text-xs">
-                        +{leadsDoPeriodo.leadsNoPeriodo.length - (user?.plano || 500)} excedentes
+                        +{leadsPlanoDoPeriodo.leadsNoPeriodo.length - planoLeads} excedentes
                       </Badge>
                     )}
                   </div>
@@ -279,9 +417,11 @@ const Dashboard = () => {
                       'Entrada Lead': 'Entrada',
                       'Tentando Contato': 'Contato',
                       'Contato Realizado': 'Realizado',
-                      'Oport. Qualificada': 'Qualificada'
+                      'Oport. Qualificada': 'Qualificada',
+                      'Orçam./Neg.': 'Orç./Neg.',
+                      'Venda': 'Venda'
                     };
-                    const colors = ['bg-[#EBF57D]', 'bg-muted', 'bg-accent', 'bg-secondary'];
+                    const colors = ['bg-[#EBF57D]', 'bg-muted', 'bg-accent', 'bg-secondary', 'bg-orange-200', 'bg-green-200'];
                     return (
                       <div key={stage.name} className="bg-muted/30 rounded-xl p-4 text-center">
                         <div className={`w-12 h-12 ${colors[index]} rounded-full flex items-center justify-center mx-auto mb-2`}>
@@ -481,7 +621,7 @@ const Dashboard = () => {
               {leadsDoPeriodo.leadsAbertosNoPeriodo
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                 .slice(0, 5)
-                .map((lead, index) => {
+                .map((lead) => {
                   
                   return (
                     <div key={lead.id} className={`group ${isMobile ? 'p-3' : 'p-4'} bg-muted/30 border border-border/50 rounded-xl hover:bg-muted/50 hover:border-[#EBF57D]/20 transition-all duration-300 hover:shadow-md`}>

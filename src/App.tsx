@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { CRMProvider, useCRM } from "@/contexts/CRMContext";
 import { useState, useEffect } from "react";
 import Auth from "./pages/Auth";
-import Register from "./pages/Register";
+import Registrar from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Pipeline from "./pages/Pipeline";
 import LeadDetail from "./pages/LeadDetail";
@@ -17,9 +17,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Membros from "./pages/Membros";
 import BaseDeConhecimento from "./pages/BaseDeConhecimento";
 
-import TryOut from "./pages/TryOut";
 import Conversas from "./pages/Conversas";
-import Assinatura from "./pages/Assinatura";
 import IndiqueGanhe from "./pages/IndiqueGanhe";
 
 
@@ -60,7 +58,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 
 const AppRoutes = () => {
-  const { isAuthenticated, loadingUser } = useCRM();
+  const { isAuthenticated, loadingUser, user } = useCRM();
+  const canAccessDashboard = !user?.isMembro || user?.membro_tipo === 'Administrador';
+  const authenticatedHomeRoute = canAccessDashboard ? "/inicio" : "/leads";
 
   // Mostrar loading enquanto verifica autenticação
   if (loadingUser) {
@@ -76,11 +76,22 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route path="/auth" element={isAuthenticated ? <Navigate to="/inicio" replace /> : <Auth />} />
-      <Route path="/register" element={isAuthenticated ? <Navigate to="/inicio" replace /> : <Register />} />
+      <Route path="/auth" element={isAuthenticated ? <Navigate to={authenticatedHomeRoute} replace /> : <Auth />} />
+      <Route path="/registrar" element={isAuthenticated ? <Navigate to={authenticatedHomeRoute} replace /> : <Registrar />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/" element={<Navigate to={isAuthenticated ? "/inicio" : "/auth"} replace />} />
-      <Route path="/inicio" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+      <Route path="/" element={<Navigate to={isAuthenticated ? authenticatedHomeRoute : "/auth"} replace />} />
+      <Route
+        path="/inicio"
+        element={
+          <ProtectedRoute>
+            {canAccessDashboard ? (
+              <Layout><Dashboard /></Layout>
+            ) : (
+              <Navigate to="/leads" replace />
+            )}
+          </ProtectedRoute>
+        }
+      />
       <Route path="/leads" element={<ProtectedRoute><Layout><Pipeline /></Layout></ProtectedRoute>} />
       <Route path="/lead/:id" element={<ProtectedRoute><Layout><LeadDetail /></Layout></ProtectedRoute>} />
       <Route path="/whatsapp" element={<ProtectedRoute><Layout><WhatsApp /></Layout></ProtectedRoute>} />
@@ -89,8 +100,6 @@ const AppRoutes = () => {
       <Route path="/configuracoes" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
       <Route path="/conversas" element={<ProtectedRoute><Layout><Conversas /></Layout></ProtectedRoute>} />
       <Route path="/indique-ganhe" element={<ProtectedRoute><Layout><IndiqueGanhe /></Layout></ProtectedRoute>} />
-      <Route path="/assinatura" element={<ProtectedRoute><Layout><Assinatura /></Layout></ProtectedRoute>} />
-      <Route path="/try-out" element={<ProtectedRoute><Layout><TryOut /></Layout></ProtectedRoute>} />
 
       <Route path="/404" element={<NotFound />} />
       <Route path="/:clientUrl" element={<ClientPage />} />

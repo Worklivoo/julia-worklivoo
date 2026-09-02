@@ -32,8 +32,37 @@ const ResetPassword = () => {
         const hashParams = new URLSearchParams(hash);
         const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+        const tokenHash = hashParams.get('token_hash') || searchParams.get('token_hash');
+        const otpType = hashParams.get('type') || searchParams.get('type');
         
-        if (accessToken && refreshToken) {
+        if (tokenHash && otpType) {
+          if (otpType !== 'recovery') {
+            setError('Link de recuperação inválido ou expirado.');
+            return;
+          }
+
+          const { error } = await supabase.auth.verifyOtp({
+            type: 'recovery',
+            token_hash: tokenHash,
+          });
+
+          if (!error) {
+            setIsValidSession(true);
+            try {
+              const url = new URL(window.location.href);
+              url.hash = '';
+              url.searchParams.delete('token_hash');
+              url.searchParams.delete('type');
+              url.searchParams.delete('access_token');
+              url.searchParams.delete('refresh_token');
+              const cleanSearch = url.searchParams.toString();
+              const cleanUrl = url.pathname + (cleanSearch ? `?${cleanSearch}` : '');
+              window.history.replaceState({}, document.title, cleanUrl);
+            } catch {}
+          } else {
+            setError('Link de recuperação inválido ou expirado.');
+          }
+        } else if (accessToken && refreshToken) {
           const { error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken
@@ -42,7 +71,14 @@ const ResetPassword = () => {
           if (!error) {
             setIsValidSession(true);
             try {
-              const cleanUrl = window.location.pathname + window.location.search;
+              const url = new URL(window.location.href);
+              url.hash = '';
+              url.searchParams.delete('token_hash');
+              url.searchParams.delete('type');
+              url.searchParams.delete('access_token');
+              url.searchParams.delete('refresh_token');
+              const cleanSearch = url.searchParams.toString();
+              const cleanUrl = url.pathname + (cleanSearch ? `?${cleanSearch}` : '');
               window.history.replaceState({}, document.title, cleanUrl);
             } catch {}
           } else {

@@ -15,10 +15,15 @@ import {
   Moon,
   LogOut,
   Contact,
-  Sparkles,
-  CreditCard,
-  Gift
+  Gift,
+  Bell
 } from 'lucide-react';
+
+interface SidebarProps {
+  onToggleNotifications: () => void;
+  unreadCount: number;
+  isNotificationsOpen: boolean;
+}
 
 interface NavigationItem {
   name: string;
@@ -28,10 +33,11 @@ interface NavigationItem {
   highlight?: boolean;
 }
 
-const Sidebar = () => {
+const Sidebar = ({ onToggleNotifications, unreadCount, isNotificationsOpen }: SidebarProps) => {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const { logout } = useCRM();
+  const { logout, user } = useCRM();
+  const canAccessDashboard = !user?.isMembro || user?.membro_tipo === 'Administrador';
   
   // Recuperar estado do sidebar do localStorage na inicialização
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -42,12 +48,12 @@ const Sidebar = () => {
 
   // Navegação principal do CRM
   const primaryNavigation = [
-    {
+    ...(canAccessDashboard ? [{
       name: 'Inicio',
       path: '/inicio',
       icon: Home,
       tooltip: 'Inicio'
-    },
+    }] : []),
     {
       name: 'Leads',
       path: '/leads',
@@ -59,18 +65,6 @@ const Sidebar = () => {
       path: '/conversas',
       icon: MessageSquare,
       tooltip: 'Conversas'
-    },
-    {
-      name: 'Try-Out',
-      path: '/try-out',
-      icon: Sparkles,
-      tooltip: 'Try-Out'
-    },
-    {
-      name: 'Assinatura',
-      path: '/assinatura',
-      icon: CreditCard,
-      tooltip: 'Assinatura'
     },
     {
       name: 'Indique e Ganhe',
@@ -183,25 +177,23 @@ const Sidebar = () => {
 
         {/* Navegação Secundária */}
         <ul className="nav-list secondary-nav">
-          {/* Toggle de Tema */}
+          {/* Notificações */}
           <li className="nav-item">
-            <button 
-              className="nav-link theme-toggle" 
-              onClick={toggleTheme}
-              title={theme === 'dark' ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
+            <button
+              className={`nav-link notifications-button ${isNotificationsOpen ? 'active' : ''}`}
+              onClick={onToggleNotifications}
             >
-              {theme === 'dark' ? (
-                <Sun className="nav-icon material-symbols-rounded" />
-              ) : (
-                <Moon className="nav-icon material-symbols-rounded" />
-              )}
-              <span className="nav-label">
-                {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
-              </span>
+              <div className="relative flex items-center justify-center">
+                <Bell className="nav-icon material-symbols-rounded" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </div>
+              <span className="nav-label">Notificações</span>
             </button>
-            <span className="nav-tooltip">
-              {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
-            </span>
+            <span className="nav-tooltip">Notificações</span>
           </li>
 
           {/* Logout */}

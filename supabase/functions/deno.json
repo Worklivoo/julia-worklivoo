@@ -1,0 +1,21 @@
+{
+  "tasks": {
+    "start": "deno run --allow-net --allow-env --allow-read index.ts",
+    "test":  "deno test --allow-net --allow-env"
+  },
+  "compilerOptions": {
+    "allowJs": true,
+    "strict": false,
+    "lib": ["deno.ns", "deno.window", "dom"],
+    "types": ["https://raw.githubusercontent.com/denoland/deno/main/cli/dts/lib.deno.ns.d.ts"]
+  },
+  "imports": {
+    "https://deno.land/std@0.177.0/http/server.ts": "https://deno.land/std@0.177.0/http/server.ts"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-explicit-any", "no-unused-vars"]
+    }
+  },
+  "exclude": ["../../node_modules", "../../dist", "../../src"]
+}

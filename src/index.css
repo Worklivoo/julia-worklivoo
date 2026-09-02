@@ -158,3 +158,26 @@ body::-webkit-scrollbar-thumb:hover {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+.estoque-scroll {
+  scrollbar-gutter: stable both-edges;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) hsl(var(--muted));
+}
+
+.estoque-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.estoque-scroll::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+.estoque-scroll::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 9999px;
+}
+
+.estoque-scroll::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--accent));
+}
