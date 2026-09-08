@@ -1347,7 +1347,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       const { data: userRow, error: errSel } = await supabase
         .from('usuarios_v2')
         .select(
-          'user_id,followup_dinamico,followup_dinamico_volume,user_valor_mensal,id_assinatura_asaas,id_cliente_asaas',
+          'user_id,followup_dinamico,followup_dinamico_volume,user_valor_mensal,id_assinatura_asaas,id_cliente_asaas,dia_vencimento',
         )
         .eq('user_id', settingsOwnerUserId)
         .maybeSingle();
