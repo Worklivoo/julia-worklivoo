@@ -1511,6 +1511,7 @@ const Conversas = () => {
                   </DialogContent>
                 </Dialog>
                 <ConversationThread
+                  key={selectedConvId || 'none'}
                   messages={selectedConvId ? (selectedMessages as any) : []}
                   containerRef={messagesRef}
                   className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6"
