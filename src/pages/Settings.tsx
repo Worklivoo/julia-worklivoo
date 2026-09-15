@@ -153,6 +153,15 @@ Aqui é a Julia da {{ $('CAMPOS DE ENTRADA').first().json.user_empresa }}. Você
 
 Como posso te ajudar?`,
     },
+    {
+      id: 'mensagem_saudacao_padrao_4',
+      titulo: 'Modelo 4',
+      texto: `Olá {{ $('CAMPOS DE ENTRADA').first().json.lead_nome_pessoa }}, tudo bem?
+
+Aqui é a Julia da {{ $('CAMPOS DE ENTRADA').first().json.user_empresa }}. Você preencheu nosso formulário demonstrando interesse em um carro.
+
+Você tem alguma dúvida especifica sobre o carro?`,
+    },
   ];
   const saudacaoModelosImobiliaria = [
     {
@@ -1683,7 +1692,7 @@ Como posso te ajudar?`,
                 <DialogTitle>Selecionar modelo de saudação</DialogTitle>
                 <DialogDescription>Escolha um dos modelos para salvar.</DialogDescription>
               </DialogHeader>
-              <div className="grid gap-3 py-2 sm:grid-cols-3">
+              <div className={`grid gap-3 py-2 ${saudacaoModelos.length === 4 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
                 {saudacaoModelos.map((m) => {
                   const selected = idMensagemSaudacaoApiOficialSalvo === m.id;
                   return (
