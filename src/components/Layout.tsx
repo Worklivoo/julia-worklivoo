@@ -45,6 +45,7 @@ const Layout = ({ children }: LayoutProps) => {
   const [npsStep, setNpsStep] = useState(0);
   const [showComunicado, setShowComunicado] = useState(false);
   const [currentComunicado, setCurrentComunicado] = useState<ComunicadoV2 | null>(null);
+  const [planStatus, setPlanStatus] = useState<string | null>(null);
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [tarefasAtrasadas, setTarefasAtrasadas] = useState<TarefaAtrasada[]>([]);
@@ -169,6 +170,40 @@ const Layout = ({ children }: LayoutProps) => {
   useEffect(() => {
     buscarTarefasAtrasadas();
   }, [buscarTarefasAtrasadas]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!billingOwnerUserId) {
+        if (!cancelled) setPlanStatus(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('usuarios_v2')
+        .select('plano_status')
+        .eq('user_id', billingOwnerUserId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error || !data) {
+        setPlanStatus(null);
+        return;
+      }
+
+      setPlanStatus(String((data as any).plano_status || '').trim() || null);
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [billingOwnerUserId]);
+
+  const isPaymentOverdue = planStatus === 'Em atraso';
 
   useEffect(() => {
     if (!isNotificationsOpen) return;
@@ -561,6 +596,28 @@ const Layout = ({ children }: LayoutProps) => {
         onRefresh={buscarTarefasAtrasadas}
       />
       <main className="main-content">
+        {isPaymentOverdue && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="h-10 w-10 shrink-0 rounded-xl bg-red-100 flex items-center justify-center text-red-600">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <div className="text-sm font-black text-red-700">Pagamento em atraso</div>
+                <div className="text-sm text-red-600">
+                  Sua fatura esta pendente e o atendimento da Julia para novos leads esta pausado. Faça o pagamento para reativar!
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-700 transition-colors"
+              onClick={() => navigate('/configuracoes?aba=assinatura')}
+            >
+              Fazer pagamento
+            </button>
+          </div>
+        )}
         {children}
       </main>
 

@@ -3,5 +3,7 @@ node_modules
 .env*.local
 .env
 .env*
+.mcp.json
 dist
+dist.zip
 salvy-secrets.php

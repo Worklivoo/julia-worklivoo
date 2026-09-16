@@ -72,6 +72,7 @@ const Conversas = () => {
   };
 
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [conversations, setConversations] = useState<TrainingConversation[]>([]);
   const [messagesByConv, setMessagesByConv] = useState<Record<string, MessageItem[]>>({});
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
@@ -294,17 +295,37 @@ const Conversas = () => {
     return !memberId && selectedAdminMemberIds.size > 0;
   };
 
-  const fetchLeadsV2TrainingRows = async (uid: string, membroId?: string | null) => {
+  // Libera o main thread entre lotes/pedaços de processamento pesado, para a lista
+  // renderizar progressivamente em vez de travar a tela até tudo terminar.
+  const yieldToMain = () =>
+    new Promise<void>((resolve) => {
+      const w = window as any;
+      if (typeof w.requestIdleCallback === 'function') {
+        w.requestIdleCallback(() => resolve(), { timeout: 50 });
+      } else {
+        setTimeout(resolve, 0);
+      }
+    });
+
+  // Busca as conversas em páginas menores, ordenadas pela mais recente primeiro,
+  // e entrega cada página via onPage assim que chega — em vez de esperar buscar
+  // as milhares de linhas do usuário de uma vez só antes de mostrar qualquer coisa.
+  const CONVERSATIONS_PAGE_SIZE = 300;
+  const fetchLeadsV2TrainingRowsPaged = async (
+    uid: string,
+    membroId: string | null | undefined,
+    onPage: (rows: any[]) => Promise<void> | void
+  ) => {
     const supabaseAny = supabase as any;
-    const pageSize = 1000;
     let from = 0;
-    let to = pageSize - 1;
-    const allRows: any[] = [];
+    let to = CONVERSATIONS_PAGE_SIZE - 1;
     while (true) {
       let query = supabaseAny
         .from('leads_v2')
         .select('lead_id,lead_telefone,user_id,membro_id,lead_etapa,conversa,update_mensagem,created_at,lead_canal_origem,ativo_ia,ativo_followup,followup_dinamico')
         .eq('user_id', uid)
+        .order('update_mensagem', { ascending: false, nullsFirst: false })
+        .order('lead_id', { ascending: false })
         .range(from, to);
       if (membroId) {
         query = query.eq('membro_id', membroId);
@@ -312,12 +333,62 @@ const Conversas = () => {
       const { data: rows, error } = await query;
       if (error) break;
       const batch = rows || [];
-      allRows.push(...batch);
-      if (batch.length < pageSize) break;
-      from += pageSize;
-      to += pageSize;
+      if (batch.length > 0) await onPage(batch);
+      if (batch.length < CONVERSATIONS_PAGE_SIZE) break;
+      from += CONVERSATIONS_PAGE_SIZE;
+      to += CONVERSATIONS_PAGE_SIZE;
+      await yieldToMain();
     }
-    return allRows;
+  };
+
+  const buildConversationRow = (r: any): TrainingConversation => ({
+    dify_conversation: String(r?.lead_id ?? ''),
+    dify_user: String(r?.lead_telefone ?? ''),
+    user_id: String(r?.user_id ?? ''),
+    membro_id: (typeof r?.membro_id === 'undefined' ? null : r.membro_id),
+    lead_etapa: (typeof r?.lead_etapa === 'undefined' ? null : r.lead_etapa),
+    lead_canal_origem: (typeof r?.lead_canal_origem === 'undefined' ? null : r.lead_canal_origem),
+    ativo_ia: (typeof r?.ativo_ia === 'undefined' ? null : r.ativo_ia),
+    ativo_followup: (typeof r?.ativo_followup === 'undefined' ? null : r.ativo_followup),
+    update_mensagem: (typeof r?.update_mensagem === 'undefined' ? null : r.update_mensagem),
+    created_at: (typeof r?.created_at === 'undefined' ? null : r.created_at),
+    followup_dinamico: Boolean(r?.followup_dinamico) || (typeof r?.followup_dinamico === 'undefined' ? null : r.followup_dinamico),
+  });
+
+  // Processa uma página de linhas em pequenos pedaços, cedendo o main thread entre
+  // eles. O parse de `conversa` (parseLeadsV2Conversa) é a parte mais cara — com
+  // milhares de conversas, fazer tudo de uma vez trava a aba até terminar.
+  const PARSE_CHUNK_SIZE = 40;
+  const applyRowsIncrementally = async (
+    rows: any[],
+    setConvs: React.Dispatch<React.SetStateAction<TrainingConversation[]>>,
+    setMsgs: React.Dispatch<React.SetStateAction<Record<string, MessageItem[]>>>
+  ) => {
+    for (let i = 0; i < rows.length; i += PARSE_CHUNK_SIZE) {
+      const slice = rows.slice(i, i + PARSE_CHUNK_SIZE);
+      const newConvs: TrainingConversation[] = [];
+      const newMsgs: Record<string, MessageItem[]> = {};
+      slice.forEach((r: any) => {
+        newConvs.push(buildConversationRow(r));
+        const leadId = String(r?.lead_id ?? '');
+        if (!leadId) return;
+        const baseTs = toTimestamp(r?.update_mensagem) || toTimestamp(r?.created_at) || Date.now();
+        newMsgs[leadId] = parseLeadsV2Conversa(leadId, String(r?.conversa ?? ''), baseTs);
+      });
+
+      if (newConvs.length > 0) {
+        setConvs((prev) => {
+          const seen = new Set(prev.map((c) => c.dify_conversation));
+          const additions = newConvs.filter((c) => c.dify_conversation && !seen.has(c.dify_conversation));
+          return additions.length > 0 ? [...prev, ...additions] : prev;
+        });
+      }
+      if (Object.keys(newMsgs).length > 0) {
+        setMsgs((prev) => ({ ...prev, ...newMsgs }));
+      }
+
+      if (i + PARSE_CHUNK_SIZE < rows.length) await yieldToMain();
+    }
   };
 
   const fetchLeadV2ById = async (leadId: number) => {
@@ -340,65 +411,45 @@ const Conversas = () => {
     const loadConversations = async () => {
       if (!userIdForData || !membersResolved) return;
       setLoading(true);
+      setLoadingMore(true);
+
+      let savedSelection: string | null = null;
+      try { savedSelection = localStorage.getItem(`tryout:selectedConv:${userIdForData}`); } catch {}
+
+      let firstPageApplied = false;
+      let selectionResolved = false;
+      const accumulatedIds: string[] = [];
+
       try {
-        const rows = await fetchLeadsV2TrainingRows(String(userIdForData), membroIdQueryFilter);
-        const remoteConversations = (rows || [])
-          .filter((r: any) => String(r?.lead_canal_origem || '') !== 'worklivoo-lixo')
-          .map((r: any) => ({
-            dify_conversation: String(r?.lead_id ?? ''),
-            dify_user: String(r?.lead_telefone ?? ''),
-            user_id: String(r?.user_id ?? ''),
-            membro_id: (typeof r?.membro_id === 'undefined' ? null : r.membro_id),
-            lead_etapa: (typeof r?.lead_etapa === 'undefined' ? null : r.lead_etapa),
-            lead_canal_origem: (typeof r?.lead_canal_origem === 'undefined' ? null : r.lead_canal_origem),
-            ativo_ia: (typeof r?.ativo_ia === 'undefined' ? null : r.ativo_ia),
-            ativo_followup: (typeof r?.ativo_followup === 'undefined' ? null : r.ativo_followup),
-            update_mensagem: (typeof r?.update_mensagem === 'undefined' ? null : r.update_mensagem),
-            created_at: (typeof r?.created_at === 'undefined' ? null : r.created_at),
-            followup_dinamico: Boolean(r?.followup_dinamico) || (typeof r?.followup_dinamico === 'undefined' ? null : r.followup_dinamico),
-          })) as TrainingConversation[];
-
-        const remoteMessages: Record<string, MessageItem[]> = {};
-        (rows || []).forEach((r: any) => {
-          const leadId = String(r?.lead_id ?? '');
-          if (!leadId) return;
-          const baseTs = toTimestamp(r?.update_mensagem) || toTimestamp(r?.created_at) || Date.now();
-          remoteMessages[leadId] = parseLeadsV2Conversa(leadId, String(r?.conversa ?? ''), baseTs);
-        });
-
-        setConversations((prev) => {
-          const local = prev.filter((c) => !isNumericConversationId(c.dify_conversation));
-          const seen = new Set<string>();
-          const merged: TrainingConversation[] = [];
-          [...local, ...remoteConversations].forEach((c) => {
-            if (!c?.dify_conversation) return;
-            if (seen.has(c.dify_conversation)) return;
-            seen.add(c.dify_conversation);
-            merged.push(c);
+        await fetchLeadsV2TrainingRowsPaged(String(userIdForData), membroIdQueryFilter, async (rows) => {
+          const filtered = rows.filter((r: any) => String(r?.lead_canal_origem || '') !== 'worklivoo-lixo');
+          await applyRowsIncrementally(filtered, setConversations, setMessagesByConv);
+          filtered.forEach((r: any) => {
+            const id = String(r?.lead_id ?? '');
+            if (id) accumulatedIds.push(id);
           });
-          return merged;
+
+          if (!firstPageApplied) {
+            firstPageApplied = true;
+            // Assim que a primeira página (as conversas mais recentes) já está na
+            // tela, liberamos a UI — o resto continua chegando em segundo plano.
+            setLoading(false);
+          }
+
+          if (!selectionResolved) {
+            const candidate = savedSelection && accumulatedIds.includes(savedSelection) ? savedSelection : accumulatedIds[0];
+            if (candidate) {
+              selectionResolved = true;
+              setSelectedConvId(candidate);
+            }
+          }
         });
 
-        setMessagesByConv((prev) => {
-          const next: Record<string, MessageItem[]> = { ...prev, ...remoteMessages };
-          const cacheKey = `tryout:messages:${userIdForData}`;
-          try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
-          return next;
-        });
-
-        const combined = [...conversations.filter((c) => !isNumericConversationId(c.dify_conversation)), ...remoteConversations];
-        if (combined.length === 0) {
+        if (!selectionResolved && accumulatedIds.length === 0) {
           setSelectedConvId(null);
-          return;
         }
-
-        const kSel = `tryout:selectedConv:${userIdForData}`;
-        let saved: string | null = null;
-        try { saved = localStorage.getItem(kSel); } catch {}
-        const candidate = saved || selectedConvId;
-        const exists = !!candidate && combined.some((c) => c.dify_conversation === candidate);
-        setSelectedConvId(exists ? String(candidate) : combined[0].dify_conversation);
       } finally {
+        setLoadingMore(false);
         setLoading(false);
       }
     };
@@ -480,50 +531,32 @@ const Conversas = () => {
     if (!userIdForData || !membersResolved) return;
     if (loading) return;
     setLoading(true);
+    setLoadingMore(true);
     try {
       const showToast = options?.showToast === true;
-      const rows = await fetchLeadsV2TrainingRows(String(userIdForData), membroIdQueryFilter);
-      const remoteConversations = (rows || []).map((r: any) => ({
-        dify_conversation: String(r?.lead_id ?? ''),
-        dify_user: String(r?.lead_telefone ?? ''),
-        user_id: String(r?.user_id ?? ''),
-        membro_id: (typeof r?.membro_id === 'undefined' ? null : r.membro_id),
-        lead_etapa: (typeof r?.lead_etapa === 'undefined' ? null : r.lead_etapa),
-        lead_canal_origem: (typeof r?.lead_canal_origem === 'undefined' ? null : r.lead_canal_origem),
-        ativo_ia: (typeof r?.ativo_ia === 'undefined' ? null : r.ativo_ia),
-        ativo_followup: (typeof r?.ativo_followup === 'undefined' ? null : r.ativo_followup),
-        update_mensagem: (typeof r?.update_mensagem === 'undefined' ? null : r.update_mensagem),
-        created_at: (typeof r?.created_at === 'undefined' ? null : r.created_at),
-        followup_dinamico: Boolean(r?.followup_dinamico) || (typeof r?.followup_dinamico === 'undefined' ? null : r.followup_dinamico),
-      })) as TrainingConversation[];
-      const remoteConversationsFiltered = remoteConversations.filter((c) => String(c.lead_canal_origem || '') !== 'worklivoo-lixo');
 
-      const remoteMessages: Record<string, MessageItem[]> = {};
-      (rows || []).forEach((r: any) => {
-        const leadId = String(r?.lead_id ?? '');
-        if (!leadId) return;
-        const baseTs = toTimestamp(r?.update_mensagem) || toTimestamp(r?.created_at) || Date.now();
-        remoteMessages[leadId] = parseLeadsV2Conversa(leadId, String(r?.conversa ?? ''), baseTs);
-      });
+      // Mantém conversas locais (ainda não numéricas/sincronizadas) e recomeça a
+      // lista remota do zero, preenchendo página a página igual ao carregamento inicial.
+      setConversations((prev) => prev.filter((c) => !isNumericConversationId(c.dify_conversation)));
 
-      setConversations((prev) => {
-        const local = prev.filter((c) => !isNumericConversationId(c.dify_conversation));
-        const seen = new Set<string>();
-        const merged: TrainingConversation[] = [];
-        [...local, ...remoteConversationsFiltered].forEach((c) => {
-          if (!c?.dify_conversation) return;
-          if (seen.has(c.dify_conversation)) return;
-          seen.add(c.dify_conversation);
-          merged.push(c);
+      let firstPageApplied = false;
+      const accumulatedIds: string[] = [];
+
+      await fetchLeadsV2TrainingRowsPaged(String(userIdForData), membroIdQueryFilter, async (rows) => {
+        const filtered = rows.filter((r: any) => String(r?.lead_canal_origem || '') !== 'worklivoo-lixo');
+        await applyRowsIncrementally(filtered, setConversations, setMessagesByConv);
+        filtered.forEach((r: any) => {
+          const id = String(r?.lead_id ?? '');
+          if (id) accumulatedIds.push(id);
         });
-        return merged;
-      });
 
-      setMessagesByConv((prev) => {
-        const next: Record<string, MessageItem[]> = { ...prev, ...remoteMessages };
-        const cacheKey = `tryout:messages:${userIdForData}`;
-        try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
-        return next;
+        if (!firstPageApplied) {
+          firstPageApplied = true;
+          setLoading(false);
+          if (!selectedConvId && accumulatedIds.length > 0) {
+            setSelectedConvId(accumulatedIds[0]);
+          }
+        }
       });
 
       try {
@@ -548,8 +581,8 @@ const Conversas = () => {
         }
       } catch {}
       if (showToast) toast({ title: 'Conversas atualizadas', description: 'Conversas recarregadas com sucesso.' });
-      if (!selectedConvId && remoteConversationsFiltered.length > 0) setSelectedConvId(remoteConversationsFiltered[0].dify_conversation);
     } finally {
+      setLoadingMore(false);
       setLoading(false);
     }
   };
@@ -781,12 +814,7 @@ const Conversas = () => {
       });
       setSelectedConvId(conversationId);
       if (isMobile) setMobileView('thread');
-      setMessagesByConv((prev) => {
-        const next = { ...prev, [conversationId]: [] };
-        const cacheKey = `tryout:messages:${userIdForData}`;
-        try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
-        return next;
-      });
+      setMessagesByConv((prev) => ({ ...prev, [conversationId]: [] }));
       toast({ title: 'Conversa manual criada', description: 'Lead criado com sucesso.' });
     } catch (e: any) {
       toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível criar a conversa.' });
@@ -827,10 +855,7 @@ const Conversas = () => {
         setMessagesByConv((prev) => {
           const current = prev[conv.dify_conversation] ? [...prev[conv.dify_conversation]] : [];
           current.push(optimisticUser);
-          const next = { ...prev, [conv.dify_conversation]: current };
-          const cacheKey = `tryout:messages:${userIdForData}`;
-          try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
-          return next;
+          return { ...prev, [conv.dify_conversation]: current };
         });
         setTimeout(scrollMessagesToBottom, 0);
 
@@ -900,8 +925,6 @@ const Conversas = () => {
         const arr = next[conv.dify_conversation] ? [...next[conv.dify_conversation]] : [];
         arr.push(optimisticUser);
         next[conv.dify_conversation] = arr;
-        const cacheKey = `tryout:messages:${userIdForData}`;
-        try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
         return next;
       });
       setTimeout(scrollMessagesToBottom, 0);
@@ -940,8 +963,6 @@ const Conversas = () => {
           const arr = next[conv.dify_conversation] ? [...next[conv.dify_conversation]] : [];
           arr.push(assistantMsg);
           next[conv.dify_conversation] = arr;
-          const cacheKey = `tryout:messages:${userIdForData}`;
-          try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
           return next;
         });
         setTimeout(scrollMessagesToBottom, 0);
@@ -1329,8 +1350,13 @@ const Conversas = () => {
                       </button>
                     );
                   })}
-                  {loading && <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>}
-                  {!loading && conversations.length === 0 && (
+                  {loading && conversations.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
+                  )}
+                  {!loading && loadingMore && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">Carregando mais conversas…</div>
+                  )}
+                  {!loading && !loadingMore && conversations.length === 0 && (
                     <div className="px-3 py-6 text-center text-sm text-muted-foreground">Nenhuma conversa disponível</div>
                   )}
                 </div>
