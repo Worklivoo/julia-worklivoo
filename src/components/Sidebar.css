@@ -486,6 +486,12 @@
   }
 }
 
+/* Páginas que zeram o padding do main (ex.: Conversas): dá respiro ao aviso de pagamento */
+.main-content.main-content--flush > .payment-overdue-banner {
+  margin-top: 1.5rem;
+  margin-bottom: 0;
+}
+
 /* Ajuste quando sidebar está colapsado */
 .sidebar.collapsed ~ .main-content {
   margin-left: 101px;

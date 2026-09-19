@@ -597,7 +597,7 @@ const Layout = ({ children }: LayoutProps) => {
       />
       <main className="main-content">
         {isPaymentOverdue && (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="payment-overdue-banner mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex items-center gap-3 flex-1">
               <div className="h-10 w-10 shrink-0 rounded-xl bg-red-100 flex items-center justify-center text-red-600">
                 <AlertTriangle size={20} />

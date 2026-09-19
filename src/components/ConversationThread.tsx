@@ -119,13 +119,21 @@ export const formatMessage = (s: string) => {
 
 type MessageRenderBlock =
   | { type: 'text'; content: string }
-  | { type: 'image'; url: string; alt: string; caption?: string }
+  | { type: 'image'; url: string; alt: string; caption?: string; thumbnail?: boolean }
   | { type: 'pdf'; url: string; fileName: string; caption?: string };
 
-const ImageAttachmentCard = ({ url, alt, caption }: { url: string; alt: string; caption?: string }) => {
+// Linha que a automação grava na coluna `conversa` quando a IA envia uma foto:
+// "[Foto do carro enviada ao lead: legenda] (Link: https://...)" (a legenda é opcional).
+const aiPhotoLine = /^\[\s*Foto\s+d[oa]\s+(carro|im[oó]vel)\s+enviad[ao]\s+ao\s+lead\s*(?::\s*(.*?))?\s*\]\s*\(\s*Link:\s*`?([^\s)`]*)[^)]*\)\s*$/i;
+
+const ImageAttachmentCard = ({ url, alt, caption, thumbnail }: { url: string; alt: string; caption?: string; thumbnail?: boolean }) => {
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const frameStyle = useMemo<React.CSSProperties>(() => {
+    if (thumbnail) {
+      return { width: '11rem', aspectRatio: '4 / 3', maxWidth: '100%' };
+    }
     if (!dimensions?.width || !dimensions?.height) {
       return { width: '18rem', aspectRatio: '1 / 1', maxWidth: '100%' };
     }
@@ -138,7 +146,15 @@ const ImageAttachmentCard = ({ url, alt, caption }: { url: string; alt: string; 
       return { width: '14rem', aspectRatio: `${dimensions.width} / ${dimensions.height}`, maxWidth: '100%' };
     }
     return { width: '18rem', aspectRatio: '1 / 1', maxWidth: '100%' };
-  }, [dimensions]);
+  }, [dimensions, thumbnail]);
+
+  if (failed) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-semibold underline opacity-90 hover:opacity-100">
+        {`📷 ${alt} (abrir foto)`}
+      </a>
+    );
+  }
 
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="block">
@@ -151,6 +167,7 @@ const ImageAttachmentCard = ({ url, alt, caption }: { url: string; alt: string; 
           alt={alt}
           className="h-full w-full object-cover"
           loading="lazy"
+          onError={() => setFailed(true)}
           onLoad={(event) => {
             const img = event.currentTarget;
             const width = Number(img.naturalWidth || 0);
@@ -162,12 +179,24 @@ const ImageAttachmentCard = ({ url, alt, caption }: { url: string; alt: string; 
         />
       </div>
       {!!caption && (
-        <div className="mt-2 whitespace-pre-line text-sm text-black">
+        <div className={`mt-2 whitespace-pre-line text-black ${thumbnail ? 'text-xs opacity-80' : 'text-sm'}`}>
           {formatMessage(caption)}
         </div>
       )}
     </a>
   );
+};
+
+// Resumo de uma mensagem para listas/prévias: troca a linha da foto da IA por um rótulo curto.
+export const getMessagePreviewText = (input: string) => {
+  return String(input || '')
+    .split('\n')
+    .map((line) => {
+      const m = line.trim().match(aiPhotoLine);
+      if (!m) return line;
+      return /^im/i.test(m[1]) ? '📷 Foto do imóvel' : '📷 Foto do carro';
+    })
+    .join('\n');
 };
 
 const PdfAttachmentCard = ({ url, caption }: { url: string; caption?: string }) => {
@@ -251,6 +280,21 @@ export const getMessageRenderBlocks = (input: string): MessageRenderBlock[] => {
       } else {
         continue;
       }
+    }
+
+    const aiPhotoMatch = trimmed.match(aiPhotoLine);
+    if (aiPhotoMatch) {
+      const isProperty = /^im/i.test(aiPhotoMatch[1]);
+      const label = isProperty ? 'Foto do imóvel' : 'Foto do carro';
+      const caption = String(aiPhotoMatch[2] || '').trim();
+      const url = String(aiPhotoMatch[3] || '').trim();
+      flushTextBuffer();
+      if (/^https?:\/\//i.test(url)) {
+        blocks.push({ type: 'image', url, alt: label, caption: caption || undefined, thumbnail: true });
+      } else {
+        blocks.push({ type: 'text', content: `📷 ${label} enviada ao lead${caption ? `: ${caption}` : ''}` });
+      }
+      continue;
     }
 
     const imgMatch = trimmed.match(imageHeader);
@@ -751,6 +795,7 @@ export const ConversationThread = ({
                                 url={block.url}
                                 alt={block.alt}
                                 caption={block.caption}
+                                thumbnail={block.thumbnail}
                               />
                             );
                           }

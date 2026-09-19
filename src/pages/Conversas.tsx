@@ -10,7 +10,7 @@ import { ThumbsUp, ThumbsDown, RotateCcw, MessageCircle, Smartphone, Sparkles, P
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ConversationThread, normalizeMessageId, parseLeadsV2Conversa, parseTimestampzToDate, stripAiThinking, toTimestamp } from '@/components/ConversationThread';
+import { ConversationThread, getMessagePreviewText, normalizeMessageId, parseLeadsV2Conversa, parseTimestampzToDate, stripAiThinking, toTimestamp } from '@/components/ConversationThread';
 import { useCRM } from '@/contexts/CRMContext';
 import { supabase } from '@/lib/supabase';
 import { getUserProfile } from '@/lib/supabase-utils';
@@ -466,7 +466,12 @@ const Conversas = () => {
       paddingBottom: main.style.paddingBottom,
       height: main.style.height,
       overflow: main.style.overflow,
+      overflowX: main.style.overflowX,
+      overflowY: main.style.overflowY,
+      display: main.style.display,
+      flexDirection: main.style.flexDirection,
     };
+    main.classList.add('main-content--flush');
     main.style.paddingLeft = isMobile ? '0' : prev.paddingLeft;
     main.style.paddingRight = isMobile ? '0' : prev.paddingRight;
     main.style.paddingTop = isMobile ? '80px' : '0';
@@ -480,10 +485,20 @@ const Conversas = () => {
         main.style.overflow = 'auto';
       }
     } else {
+      // A página ocupa a altura da tela (o card de conversas preenche o espaço restante),
+      // mas o próprio main rola quando o conteúdo (ex.: aviso de pagamento) passa da tela.
       main.style.height = '100dvh';
-      main.style.overflow = 'hidden';
+      main.style.display = 'flex';
+      main.style.flexDirection = 'column';
+      main.style.overflowX = 'hidden';
+      main.style.overflowY = 'auto';
     }
     return () => {
+      main.classList.remove('main-content--flush');
+      main.style.overflowX = prev.overflowX;
+      main.style.overflowY = prev.overflowY;
+      main.style.display = prev.display;
+      main.style.flexDirection = prev.flexDirection;
       main.style.paddingLeft = prev.paddingLeft;
       main.style.paddingRight = prev.paddingRight;
       main.style.paddingTop = prev.paddingTop;
@@ -1166,10 +1181,10 @@ const Conversas = () => {
   }, [originLabelByValue, selectedOrigins]);
 
   return (
-    <div className={`${isMobileThreadView ? 'h-[calc(100dvh-80px)] min-h-0 overflow-hidden' : 'min-h-[calc(100dvh-80px)] bg-background'} md:h-[100vh] md:min-h-0 md:overflow-hidden`}>
-      <div className={`${isMobileThreadView ? 'h-[calc(100dvh-80px)] min-h-0' : 'min-h-[calc(100dvh-80px)]'} p-2 md:h-full md:min-h-0 md:p-6`}>
-        <Card className={`${isMobileThreadView ? 'h-[calc(100dvh-96px)] min-h-0' : 'min-h-[calc(100dvh-96px)]'} overflow-hidden rounded-[22px] border-border/60 bg-card/70 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60 md:h-full md:min-h-0 md:rounded-3xl`}>
-          <CardContent className={`${isMobileThreadView ? 'h-[calc(100dvh-96px)] min-h-0' : 'min-h-[calc(100dvh-96px)]'} flex flex-col overflow-hidden p-0 md:h-full md:min-h-0`}>
+    <div className={`${isMobileThreadView ? 'h-[calc(100dvh-80px)] min-h-0 overflow-hidden' : 'min-h-[calc(100dvh-80px)] bg-background'} md:flex md:h-auto md:min-h-[560px] md:flex-1 md:basis-0 md:flex-col md:overflow-visible`}>
+      <div className={`${isMobileThreadView ? 'h-[calc(100dvh-80px)] min-h-0' : 'min-h-[calc(100dvh-80px)]'} p-2 md:flex md:h-auto md:min-h-0 md:flex-1 md:flex-col md:p-6`}>
+        <Card className={`${isMobileThreadView ? 'h-[calc(100dvh-96px)] min-h-0' : 'min-h-[calc(100dvh-96px)]'} overflow-hidden rounded-[22px] border-border/60 bg-card/70 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60 md:flex md:h-auto md:min-h-0 md:flex-1 md:flex-col md:rounded-3xl`}>
+          <CardContent className={`${isMobileThreadView ? 'h-[calc(100dvh-96px)] min-h-0' : 'min-h-[calc(100dvh-96px)]'} flex flex-col overflow-hidden p-0 md:h-auto md:min-h-0 md:flex-1`}>
             <div className={`${isMobileThreadView ? 'hidden' : 'flex'} flex-col gap-3 border-b border-border/70 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6 md:py-4`}>
               <div className="min-w-0">
                 <div className="truncate text-base font-semibold tracking-tight md:text-lg">Todas as conversas da IA</div>
@@ -1309,7 +1324,7 @@ const Conversas = () => {
                   {filteredConversations.map((c) => {
                     const msgs = messagesByConv[c.dify_conversation] || [];
                     const last = msgs[msgs.length - 1];
-                    const preview = stripAiThinking((last?.content || last?.answer || '').toString());
+                    const preview = getMessagePreviewText(stripAiThinking((last?.content || last?.answer || '').toString()));
                     const origem = String(c.lead_canal_origem || '');
                     const title = (origem === 'worklivoo-treinamento' || origem === 'worklivoo-treinamento-manual')
                       ? 'TESTE'
