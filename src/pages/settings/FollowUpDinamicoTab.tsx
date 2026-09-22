@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useMemo } from 'react';
+﻿import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -180,6 +180,18 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Só vira false quando o componente desmonta de verdade — usado pelo timer de
+  // fechamento automático do dialog, que não pode depender do `cancelled` local
+  // do efeito de polling (esse é derrubado pelo próprio polling ao confirmar o
+  // pagamento, antes do timer disparar, fazendo o dialog nunca fechar sozinho).
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const [followupDinamicoAtivo, setFollowupDinamicoAtivo] = useState<boolean>(false);
   const [followupDinamicoVolume, setFollowupDinamicoVolume] = useState<string>('');
@@ -1821,9 +1833,12 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
               'Recebemos a confirmação do PIX. Aguarde alguns segundos enquanto ativamos a sua funcionalidade.',
           });
 
-          // Fechamos o dialog de forma suave após 3 segundos para o usuário curtir a animação de sucesso
+          // Fechamos o dialog de forma suave após 3 segundos para o usuário curtir a animação de sucesso.
+          // Usa isMountedRef (não `cancelled`) porque este mesmo setPagamentoAtivo/setPagamentoConfirmadoUI
+          // acima já derruba o efeito de polling (dependências mudaram) e marcaria `cancelled=true`
+          // antes deste timer disparar, impedindo o fechamento automático.
           timeoutAuto = setTimeout(() => {
-            if (cancelled) return;
+            if (!isMountedRef.current) return;
             console.info('[FU Dinamico Polling] Fechando dialog após confirmação (3s delay).');
             setIsAcquireDialogOpen(false);
             setSelectedPlanId(null);
@@ -2665,24 +2680,6 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                         <Button type="button" variant="ghost" onClick={handleCloseAcquireDialog}>
                           {pagamentoAtivo ? 'Fechar e pagar depois' : 'Cancelar'}
                         </Button>
-                        {pagamentoAtivo && (
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              console.info(
-                                `[FU Dinamico Confirmacao] Botao "Ja paguei" clicado. externalRef=${pagamentoAtivo.externalReference}. A confirmacao real vira por webhook nas proximas etapas.`,
-                              );
-                              toast({
-                                title: 'Aguardando confirmação',
-                                description:
-                                  'A ativação ocorre automaticamente após a confirmação do pagamento pela operadora do PIX. Caso tenha pago, aguarde alguns instantes e atualize a página.',
-                              });
-                            }}
-                            className="h-11 px-6 rounded-xl text-sm font-semibold text-zinc-900 shadow-md bg-[#EBF57D] hover:brightness-[0.96]"
-                          >
-                            Já paguei, quero ativar
-                          </Button>
-                        )}
                       </div>
                     </div>
                   </div>
