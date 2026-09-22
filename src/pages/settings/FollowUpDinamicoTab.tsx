@@ -2986,7 +2986,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                 <div>
                   <div className="text-base font-semibold">Histórico de FollowUps enviados</div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Somente registros confirmados com followup_dinamico = true.
+                    Mostra apenas os envios já confirmados.
                   </div>
                 </div>
               </div>

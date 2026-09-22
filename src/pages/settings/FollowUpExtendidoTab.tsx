@@ -37,7 +37,17 @@ import {
 } from '@/components/ui/dialog';
 import { Crown, Database, History, User, Zap, Clock, Sparkles, ArrowRightLeft, BarChart3, XCircle, CheckCircle2, ArrowRight, ArrowDown, ExternalLink } from 'lucide-react';
 import { formatPhone } from '@/lib/lead-detail-utils';
-import { PIPELINE_STAGES } from '@/lib/lead-detail-constants';
+// Valores idênticos ao enum "lead_etapa" no banco (case-sensitive no PostgREST) — não usar
+// PIPELINE_STAGES aqui, pois seus rótulos têm capitalização diferente do enum real e
+// quebrariam o filtro `lead_etapa in (...)` da automação de envio no n8n.
+const FUNNEL_STAGES: { value: string; label: string }[] = [
+  { value: 'Entrada do lead', label: 'Entrada do Lead' },
+  { value: 'Tentando contato', label: 'Tentando Contato' },
+  { value: 'Contato realizado', label: 'Contato Realizado' },
+  { value: 'Oportunidade qualificada', label: 'Oportunidade Qualificada' },
+  { value: 'Orçamento/Negociação', label: 'Orçamento/Negociação' },
+  { value: 'Venda', label: 'Venda' },
+];
 
 interface FollowUpExtendidoTabProps {
   user: any;
@@ -197,6 +207,7 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
   const [followupExtendidoAtivo, setFollowupExtendidoAtivo] = useState<boolean>(false);
   const [followupExtendidoVolume, setFollowupExtendidoVolume] = useState<string>('');
   const [followupExtendidoDiasPerdidos, setFollowupExtendidoDiasPerdidos] = useState<string>('');
+  const [followupExtendidoFrequencia, setFollowupExtendidoFrequencia] = useState<string>('');
   const [followupExtendidoEtapas, setFollowupExtendidoEtapas] = useState<string[]>([]);
   const [loadingFollowupExtendidoConfig, setLoadingFollowupExtendidoConfig] = useState<boolean>(false);
   const [isSavingFollowupExtendidoConfig, setIsSavingFollowupExtendidoConfig] = useState<boolean>(false);
@@ -332,6 +343,7 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
             followup_extendido_volume,
             followup_extendido_dias_perdidos,
             followup_extendido_etapas,
+            followup_extendido_frequencia,
             id_cliente_asaas,
             id_assinatura_asaas,
             dia_vencimento,
@@ -360,11 +372,16 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
           .split(',')
           .map((etapa: string) => etapa.trim())
           .filter(Boolean);
+        const frequencia =
+          d.followup_extendido_frequencia === null || d.followup_extendido_frequencia === undefined
+            ? ''
+            : String(d.followup_extendido_frequencia);
 
         setFollowupExtendidoAtivo(ativo);
         setFollowupExtendidoVolume(volume);
         setFollowupExtendidoDiasPerdidos(dias);
         setFollowupExtendidoEtapas(etapas);
+        setFollowupExtendidoFrequencia(frequencia);
 
         setUserPagamentoConfig({
           id_cliente_asaas: String(d.id_cliente_asaas ?? '').trim(),
@@ -629,19 +646,21 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
 
     const volumeRaw = String(followupExtendidoVolume || '').trim();
     const diasRaw = String(followupExtendidoDiasPerdidos || '').trim();
+    const frequenciaRaw = String(followupExtendidoFrequencia || '').trim();
     const etapasSelecionadas = Array.isArray(followupExtendidoEtapas) ? followupExtendidoEtapas : [];
 
     const volume = volumeRaw ? Number(volumeRaw) : null;
     const dias = diasRaw ? Number(diasRaw) : null;
+    const frequencia = frequenciaRaw ? Number(frequenciaRaw) : null;
 
     if (volumeRaw && (!Number.isFinite(volume) || volume < 0)) {
       toast({ title: 'Atenção', description: 'Quantidade de followups por ciclo deve ser um número válido.' });
       return;
     }
-    // Dias e etapas nunca podem ficar em branco: o cliente configura isso após a contratação
-    // e é comum esquecer, então bloqueamos o salvamento em vez de permitir valor vazio.
+    // Dias, frequência e etapas nunca podem ficar em branco: o cliente configura isso após a
+    // contratação e é comum esquecer, então bloqueamos o salvamento em vez de permitir valor vazio.
     if (!diasRaw) {
-      toast({ title: 'Atenção', description: 'Informe a frequência de dias (entre 7 e 360).' });
+      toast({ title: 'Atenção', description: 'Informe os dias sem resposta (entre 7 e 360).' });
       return;
     }
     if (!Number.isFinite(dias)) {
@@ -650,6 +669,18 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
     }
     if (dias! < 7 || dias! > 360) {
       toast({ title: 'Atenção', description: 'A quantidade de dias deve ser entre 7 e 360.' });
+      return;
+    }
+    if (!frequenciaRaw) {
+      toast({ title: 'Atenção', description: 'Informe a frequência de mensagens por lead (entre 1 e 50).' });
+      return;
+    }
+    if (!Number.isFinite(frequencia) || !Number.isInteger(frequencia)) {
+      toast({ title: 'Atenção', description: 'A frequência de mensagens deve ser um número inteiro válido.' });
+      return;
+    }
+    if (frequencia! < 1 || frequencia! > 50) {
+      toast({ title: 'Atenção', description: 'A frequência de mensagens deve ser entre 1 e 50.' });
       return;
     }
     if (etapasSelecionadas.length === 0) {
@@ -666,6 +697,7 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
           followup_extendido_volume: volume,
           followup_extendido_dias_perdidos: dias,
           followup_extendido_etapas: etapasSelecionadas.join(','),
+          followup_extendido_frequencia: frequencia,
         } as any)
         .eq('user_id', settingsOwnerUserId);
 
@@ -2910,25 +2942,39 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-foreground">
-                          Configuração de Dias
+                          Configuração de Envio
                         </div>
                         <div className="mt-0.5 text-xs text-muted-foreground">
-                          Ajuste a janela de busca por leads sem resposta para recontato.
+                          Ajuste a janela de busca por leads sem resposta e quantas vezes tentar o mesmo lead.
                         </div>
                       </div>
                     </div>
-                    <Badge
-                      variant="secondary"
-                      className={`px-3 py-1 text-[11px] font-semibold shrink-0 ${
-                        followupExtendidoDiasPerdidos
-                          ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100'
-                          : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-100'
-                      }`}
-                    >
-                      {followupExtendidoDiasPerdidos
-                        ? `${Number(followupExtendidoDiasPerdidos).toLocaleString('pt-BR')} dia${Number(followupExtendidoDiasPerdidos) === 1 ? '' : 's'}`
-                        : 'Não definido'}
-                    </Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge
+                        variant="secondary"
+                        className={`px-3 py-1 text-[11px] font-semibold shrink-0 ${
+                          followupExtendidoDiasPerdidos
+                            ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100'
+                            : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-100'
+                        }`}
+                      >
+                        {followupExtendidoDiasPerdidos
+                          ? `${Number(followupExtendidoDiasPerdidos).toLocaleString('pt-BR')} dia${Number(followupExtendidoDiasPerdidos) === 1 ? '' : 's'}`
+                          : 'Dias: não definido'}
+                      </Badge>
+                      <Badge
+                        variant="secondary"
+                        className={`px-3 py-1 text-[11px] font-semibold shrink-0 ${
+                          followupExtendidoFrequencia
+                            ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100'
+                            : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-100'
+                        }`}
+                      >
+                        {followupExtendidoFrequencia
+                          ? `${Number(followupExtendidoFrequencia).toLocaleString('pt-BR')}x por lead`
+                          : 'Frequência: não definida'}
+                      </Badge>
+                    </div>
                   </div>
 
                   <div className="rounded-xl border border-border/50 bg-background/70 p-4 sm:p-5 space-y-4">
@@ -2957,6 +3003,35 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
                           className="bg-background border-border rounded-xl disabled:opacity-70"
                         />
                       </div>
+                    </div>
+
+                    <div className="h-px w-full bg-border/50" />
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Label className="text-sm font-semibold text-foreground cursor-help">
+                          Frequência de mensagens por lead
+                        </Label>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" align="start" className="max-w-xs text-xs">
+                        Exemplo: 3 = tenta reengajar o mesmo lead até 3 vezes (respeitando sempre os dias sem resposta entre uma tentativa e outra) antes de parar (mínimo 1, máximo 50).
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
+                      <div className="flex-1 min-w-0">
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          max={50}
+                          placeholder="Ex: 3"
+                          value={followupExtendidoFrequencia}
+                          onChange={(e) => setFollowupExtendidoFrequencia(e.target.value)}
+                          disabled={!isEditingFollowupExtendidoDias}
+                          className="bg-background border-border rounded-xl disabled:opacity-70"
+                        />
+                      </div>
                       {!isEditingFollowupExtendidoDias ? (
                         <Button
                           variant="outline"
@@ -2980,13 +3055,13 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
                       <span className="inline-block h-1.5 w-1.5 mt-1.5 rounded-full bg-muted-foreground/60 shrink-0" />
                       <div className="space-y-2 min-w-0 break-words overflow-wrap-anywhere leading-relaxed">
                         <p>
-                          Defina por quantos dias o lead pode ficar sem responder, dentro das etapas selecionadas, antes de receber um novo follow-up automático.
+                          Defina por quantos dias o lead pode ficar sem responder, dentro das etapas selecionadas, antes de receber um novo follow-up automático, e quantas vezes no máximo tentar reengajar o mesmo lead.
                         </p>
                         <p>
-                          <strong className="font-semibold text-foreground/80">Exemplo:</strong> se você configurar 30 dias, o sistema envia um follow-up automático para leads que estão há 30 dias sem resposta nas etapas selecionadas.
+                          <strong className="font-semibold text-foreground/80">Exemplo:</strong> com 30 dias e frequência 3, o sistema envia um follow-up a cada 30 dias sem resposta, até no máximo 3 tentativas para o mesmo lead.
                         </p>
                         <p>
-                          <strong className="font-semibold text-foreground/80">Período:</strong> mínimo de 7 dias e máximo de 360 dias.
+                          <strong className="font-semibold text-foreground/80">Período:</strong> dias entre 7 e 360. Frequência entre 1 e 50 tentativas por lead.
                         </p>
                       </div>
                     </div>
@@ -3035,11 +3110,11 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
                     </Tooltip>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                      {PIPELINE_STAGES.map((stage) => {
-                        const checked = followupExtendidoEtapas.includes(stage.name);
+                      {FUNNEL_STAGES.map((stage) => {
+                        const checked = followupExtendidoEtapas.includes(stage.value);
                         return (
                           <label
-                            key={stage.id}
+                            key={stage.value}
                             className={`flex items-center gap-2 rounded-xl border border-border/60 bg-background px-3 py-2 text-sm ${
                               isEditingFollowupExtendidoEtapas ? 'cursor-pointer' : 'cursor-default opacity-80'
                             }`}
@@ -3052,13 +3127,13 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
                                 const isChecked = e.target.checked;
                                 setFollowupExtendidoEtapas((prev) =>
                                   isChecked
-                                    ? [...prev, stage.name]
-                                    : prev.filter((nome) => nome !== stage.name),
+                                    ? [...prev, stage.value]
+                                    : prev.filter((valor) => valor !== stage.value),
                                 );
                               }}
                               className="h-4 w-4 rounded border border-input bg-background accent-black shrink-0"
                             />
-                            <span className="truncate">{stage.name}</span>
+                            <span className="truncate">{stage.label}</span>
                           </label>
                         );
                       })}
@@ -3113,7 +3188,7 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
                 <div>
                   <div className="text-base font-semibold">Histórico de FollowUps enviados</div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Somente registros confirmados com followup_extendido = true.
+                    Mostra apenas os envios já confirmados.
                   </div>
                 </div>
               </div>
