@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -37,38 +37,39 @@ import {
 } from '@/components/ui/dialog';
 import { Crown, Database, History, User, Zap, Clock, Sparkles, ArrowRightLeft, BarChart3, XCircle, CheckCircle2, ArrowRight, ArrowDown, ExternalLink } from 'lucide-react';
 import { formatPhone } from '@/lib/lead-detail-utils';
+import { PIPELINE_STAGES } from '@/lib/lead-detail-constants';
 
-interface FollowUpDinamicoTabProps {
+interface FollowUpExtendidoTabProps {
   user: any;
   settingsOwnerUserId: string | null;
 }
 
-type FollowUpDinamicoPagamentoStatus = 'PENDING' | 'RECEIVED' | 'CANCELLED' | 'EXPIRED';
+type FollowUpExtendidoPagamentoStatus = 'PENDING' | 'RECEIVED' | 'CANCELLED' | 'EXPIRED';
 
-interface FollowUpDinamicoCicloInfo {
+interface FollowUpExtendidoCicloInfo {
   inicio: string;
   fim: string;
   diaVencimento: number;
   diasRestantes: number;
 }
 
-interface FollowUpDinamicoPixInfo {
+interface FollowUpExtendidoPixInfo {
   payload: string;
   base64?: string | null;
   qrCodeImageUrl?: string | null;
   expirationDate?: string | null;
 }
 
-interface FollowUpDinamicoPagamento {
+interface FollowUpExtendidoPagamento {
   paymentId: string;
   externalReference: string;
-  status: FollowUpDinamicoPagamentoStatus;
+  status: FollowUpExtendidoPagamentoStatus;
   planoId: string;
   valorRateio: number;
   valorPlanoCheio: number;
   valorProxFatura: number;
-  ciclo: FollowUpDinamicoCicloInfo;
-  pix: FollowUpDinamicoPixInfo;
+  ciclo: FollowUpExtendidoCicloInfo;
+  pix: FollowUpExtendidoPixInfo;
   createdAt: number;
   lastPolledAt?: number | null;
   completedAt?: number | null;
@@ -80,9 +81,9 @@ interface FollowUpDinamicoPagamento {
   };
 }
 
-const STORAGE_PREFIX = 'fu_dinamico_pagamento_';
+const STORAGE_PREFIX = 'fu_extendido_pagamento_';
 const STORAGE_EXPIRE_MS = 24 * 60 * 60 * 1000; // 24h
-const DEBUG_TAG = 'FU Dinamico Storage';
+const DEBUG_TAG = 'FU Extendido Storage';
 
 const getStorageKey = (userId: string | null | undefined): string | null => {
   if (!userId) return null;
@@ -91,7 +92,7 @@ const getStorageKey = (userId: string | null | undefined): string | null => {
 
 const savePagamentoToStorage = (
   userId: string | null | undefined,
-  data: FollowUpDinamicoPagamento,
+  data: FollowUpExtendidoPagamento,
 ): void => {
   const key = getStorageKey(userId);
   if (!key) return;
@@ -106,7 +107,7 @@ const savePagamentoToStorage = (
 
 const loadPagamentoFromStorage = (
   userId: string | null | undefined,
-): FollowUpDinamicoPagamento | null => {
+): FollowUpExtendidoPagamento | null => {
   const key = getStorageKey(userId);
   if (!key) return null;
   try {
@@ -115,7 +116,7 @@ const loadPagamentoFromStorage = (
       console.debug(`[${DEBUG_TAG}] load -> key=${key}; payload=VAZIO`);
       return null;
     }
-    const parsed = JSON.parse(raw) as FollowUpDinamicoPagamento;
+    const parsed = JSON.parse(raw) as FollowUpExtendidoPagamento;
     const ageMs = Date.now() - (parsed.createdAt ?? 0);
     if (ageMs > STORAGE_EXPIRE_MS) {
       console.warn(
@@ -174,21 +175,23 @@ const clearPagamentoFromStorage = (userId: string | null | undefined): void => {
   }
 };
 
-export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
+export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
   user,
   settingsOwnerUserId,
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [followupDinamicoAtivo, setFollowupDinamicoAtivo] = useState<boolean>(false);
-  const [followupDinamicoVolume, setFollowupDinamicoVolume] = useState<string>('');
-  const [followupDinamicoDiasPerdidos, setFollowupDinamicoDiasPerdidos] = useState<string>('');
-  const [loadingFollowupDinamicoConfig, setLoadingFollowupDinamicoConfig] = useState<boolean>(false);
-  const [isSavingFollowupDinamicoConfig, setIsSavingFollowupDinamicoConfig] = useState<boolean>(false);
-  const [isEditingFollowupDinamicoDias, setIsEditingFollowupDinamicoDias] = useState<boolean>(false);
-  const [followupDinamicoHistorico, setFollowupDinamicoHistorico] = useState<any[]>([]);
-  const [loadingFollowupDinamicoHistorico, setLoadingFollowupDinamicoHistorico] = useState<boolean>(false);
+  const [followupExtendidoAtivo, setFollowupExtendidoAtivo] = useState<boolean>(false);
+  const [followupExtendidoVolume, setFollowupExtendidoVolume] = useState<string>('');
+  const [followupExtendidoDiasPerdidos, setFollowupExtendidoDiasPerdidos] = useState<string>('');
+  const [followupExtendidoEtapas, setFollowupExtendidoEtapas] = useState<string[]>([]);
+  const [loadingFollowupExtendidoConfig, setLoadingFollowupExtendidoConfig] = useState<boolean>(false);
+  const [isSavingFollowupExtendidoConfig, setIsSavingFollowupExtendidoConfig] = useState<boolean>(false);
+  const [isEditingFollowupExtendidoDias, setIsEditingFollowupExtendidoDias] = useState<boolean>(false);
+  const [isEditingFollowupExtendidoEtapas, setIsEditingFollowupExtendidoEtapas] = useState<boolean>(false);
+  const [followupExtendidoHistorico, setFollowupExtendidoHistorico] = useState<any[]>([]);
+  const [loadingFollowupExtendidoHistorico, setLoadingFollowupExtendidoHistorico] = useState<boolean>(false);
 
   const [userPagamentoConfig, setUserPagamentoConfig] = useState<{
     id_cliente_asaas: string;
@@ -204,7 +207,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [isAdvancingToStep3, setIsAdvancingToStep3] = useState<boolean>(false);
 
-  const [pagamentoAtivo, setPagamentoAtivo] = useState<FollowUpDinamicoPagamento | null>(null);
+  const [pagamentoAtivo, setPagamentoAtivo] = useState<FollowUpExtendidoPagamento | null>(null);
   const [isCreatingQrCode, setIsCreatingQrCode] = useState<boolean>(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
   const [isPollingPagamento, setIsPollingPagamento] = useState<boolean>(false);
@@ -217,7 +220,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         nome: 'Essencial',
         volume: 40,
         preco: 99,
-        descricao: 'Ideal para quem está começando a reativar leads perdidos.',
+        descricao: 'Ideal para quem está começando a reengajar leads sem resposta.',
       },
       {
         id: 'pro',
@@ -235,7 +238,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         descricao: 'Alto volume para empresas com base grande de leads.',
       },
     ];
-    console.debug('[FU Dinamico Init] Planos carregados (precos R$ 99, R$ 190, R$ 490):', list.map(p => `${p.id} R$${p.preco} / ${p.volume} reativacoes`));
+    console.debug('[FU Extendido Init] Planos carregados (precos R$ 99, R$ 190, R$ 490):', list.map(p => `${p.id} R$${p.preco} / ${p.volume} reativacoes`));
     return list;
   }, []);
 
@@ -308,14 +311,15 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
   useEffect(() => {
     const load = async () => {
       if (!settingsOwnerUserId) return;
-      setLoadingFollowupDinamicoConfig(true);
+      setLoadingFollowupExtendidoConfig(true);
       try {
         const { data, error } = await supabase
           .from('usuarios_v2')
           .select(`
-            followup_dinamico,
-            followup_dinamico_volume,
-            followup_dinamico_dias_perdidos,
+            followup_extendido,
+            followup_extendido_volume,
+            followup_extendido_dias_perdidos,
+            followup_extendido_etapas,
             id_cliente_asaas,
             id_assinatura_asaas,
             dia_vencimento,
@@ -331,19 +335,24 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
 
         const d = data as any;
 
-        const ativo = Boolean(d.followup_dinamico ?? false);
+        const ativo = Boolean(d.followup_extendido ?? false);
         const volume =
-          d.followup_dinamico_volume === null || d.followup_dinamico_volume === undefined
+          d.followup_extendido_volume === null || d.followup_extendido_volume === undefined
             ? ''
-            : String(d.followup_dinamico_volume);
+            : String(d.followup_extendido_volume);
         const dias =
-          d.followup_dinamico_dias_perdidos === null || d.followup_dinamico_dias_perdidos === undefined
+          d.followup_extendido_dias_perdidos === null || d.followup_extendido_dias_perdidos === undefined
             ? ''
-            : String(d.followup_dinamico_dias_perdidos);
+            : String(d.followup_extendido_dias_perdidos);
+        const etapas = String(d.followup_extendido_etapas ?? '')
+          .split(',')
+          .map((etapa: string) => etapa.trim())
+          .filter(Boolean);
 
-        setFollowupDinamicoAtivo(ativo);
-        setFollowupDinamicoVolume(volume);
-        setFollowupDinamicoDiasPerdidos(dias);
+        setFollowupExtendidoAtivo(ativo);
+        setFollowupExtendidoVolume(volume);
+        setFollowupExtendidoDiasPerdidos(dias);
+        setFollowupExtendidoEtapas(etapas);
 
         setUserPagamentoConfig({
           id_cliente_asaas: String(d.id_cliente_asaas ?? '').trim(),
@@ -354,7 +363,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
           user_empresa: d.user_empresa ?? undefined,
         });
 
-        console.info('[FU Dinamico Init] userPagamentoConfig carregado do banco:', {
+        console.info('[FU Extendido Init] userPagamentoConfig carregado do banco:', {
           id_cliente_asaas: String(d.id_cliente_asaas ?? '').trim()
             ? `${String(d.id_cliente_asaas ?? '').slice(0, 4)}...${String(d.id_cliente_asaas ?? '').slice(-3)}`
             : '<VAZIO>',
@@ -365,9 +374,9 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
           user_valor_mensal: d.user_valor_mensal,
         });
       } catch (err: any) {
-        console.error('[FollowUp Dinamico] Erro ao carregar configuração:', err);
+        console.error('[FollowUp Extendido] Erro ao carregar configuração:', err);
       } finally {
-        setLoadingFollowupDinamicoConfig(false);
+        setLoadingFollowupExtendidoConfig(false);
       }
     };
     load();
@@ -379,7 +388,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
 
     const storagePagamento = loadPagamentoFromStorage(settingsOwnerUserId);
     if (!storagePagamento) {
-      console.debug('[FU Dinamico Restore] Nenhum storage encontrado, seguindo fluxo normal.');
+      console.debug('[FU Extendido Restore] Nenhum storage encontrado, seguindo fluxo normal.');
       return;
     }
 
@@ -391,7 +400,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
     // ============================================================
     if (storagePagamento.status === 'RECEIVED' && storagePagamento.pipelineExecutado !== true) {
       console.groupCollapsed(
-        `[FU Dinamico Restore] ⚠️ Pagamento RECEIVED sem pipeline! Executando ativação agora. externalRef=${storagePagamento.externalReference}`,
+        `[FU Extendido Restore] ⚠️ Pagamento RECEIVED sem pipeline! Executando ativação agora. externalRef=${storagePagamento.externalReference}`,
       );
       console.info('pagamento_id:', storagePagamento.paymentId);
       console.info('planoId:', storagePagamento.planoId);
@@ -408,7 +417,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         try {
           const pipelineRes = await executarPipelinePosPagamento(storagePagamento);
           // Salva flag pipelineExecutado no storage (evita rodar 2x em caso de refresh rápido)
-          const atualizado: FollowUpDinamicoPagamento = {
+          const atualizado: FollowUpExtendidoPagamento = {
             ...storagePagamento,
             completedAt: storagePagamento.completedAt ?? Date.now(),
             pipelineExecutado: pipelineRes.ok,
@@ -428,12 +437,12 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
             toast({
               title: 'Funcionalidade ativada! 🎉',
               description: pipelineRes.guard_clause
-                ? 'FollowUp Dinâmico já estava ativado.'
+                ? 'FollowUp Extendido já estava ativado.'
                 : 'Tudo certo, sua funcionalidade premium foi liberada!',
             });
           }
         } catch (err: any) {
-          console.error(`[FU Dinamico Restore] Erro ao executar pipeline:`, err);
+          console.error(`[FU Extendido Restore] Erro ao executar pipeline:`, err);
         } finally {
           // Atraso 3s para o usuário curtir animação de sucesso (igual ao fluxo normal)
           setTimeout(() => {
@@ -442,7 +451,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
             setAcquireStep(1);
             setPagamentoConfirmadoUI(false);
             clearPagamentoFromStorage(settingsOwnerUserId);
-            reloadFollowupDinamicoConfig().catch(() => void 0);
+            reloadFollowupExtendidoConfig().catch(() => void 0);
           }, 3000);
         }
       })();
@@ -454,7 +463,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
     // ============================================================
     if (storagePagamento.status === 'PENDING') {
       console.info(
-        `[FU Dinamico Restore] Storage encontrado: status=PENDING. pagamento_id=${storagePagamento.paymentId}. externalRef=${storagePagamento.externalReference}. Retomando automaticamente no passo 3 (QR Code).`,
+        `[FU Extendido Restore] Storage encontrado: status=PENDING. pagamento_id=${storagePagamento.paymentId}. externalRef=${storagePagamento.externalReference}. Retomando automaticamente no passo 3 (QR Code).`,
       );
       setSelectedPlanId(storagePagamento.planoId);
       setPagamentoAtivo(storagePagamento);
@@ -467,7 +476,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
     // Qualquer outro status (CANCELLED, EXPIRED, RECEIVED+pipeline_executado) → limpa
     // ============================================================
     console.warn(
-      `[FU Dinamico Restore] Storage encontrado mas status=${storagePagamento.status}; pipelineExecutado=${storagePagamento.pipelineExecutado === true}. Limpando storage.`,
+      `[FU Extendido Restore] Storage encontrado mas status=${storagePagamento.status}; pipelineExecutado=${storagePagamento.pipelineExecutado === true}. Limpando storage.`,
     );
     clearPagamentoFromStorage(settingsOwnerUserId);
   }, [settingsOwnerUserId]);
@@ -475,30 +484,30 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
   useEffect(() => {
     const load = async () => {
       if (!settingsOwnerUserId) return;
-      setLoadingFollowupDinamicoHistorico(true);
+      setLoadingFollowupExtendidoHistorico(true);
       try {
         const { data, error } = await supabase
-          .from('followup_dinamico_v2')
+          .from('followup_extendido_v2')
           .select('*')
           .eq('user_id', settingsOwnerUserId)
-          .eq('followup_dinamico', true)
+          .eq('followup_extendido', true)
           .order('criado_em', { ascending: false })
           .limit(100);
 
-        console.debug('[FollowUp Dinamico] Histórico bruto (followup_dinamico_v2):', { data, error });
+        console.debug('[FollowUp Extendido] Histórico bruto (followup_extendido_v2):', { data, error });
         if (error) throw error;
-        setFollowupDinamicoHistorico(Array.isArray(data) ? data : []);
+        setFollowupExtendidoHistorico(Array.isArray(data) ? data : []);
       } catch (err: any) {
-        console.error('[FollowUp Dinamico] Erro ao carregar histórico:', err);
-        setFollowupDinamicoHistorico([]);
+        console.error('[FollowUp Extendido] Erro ao carregar histórico:', err);
+        setFollowupExtendidoHistorico([]);
       } finally {
-        setLoadingFollowupDinamicoHistorico(false);
+        setLoadingFollowupExtendidoHistorico(false);
       }
     };
     load();
   }, [settingsOwnerUserId]);
 
-  const followupDinamicoCiclo = useMemo(() => {
+  const followupExtendidoCiclo = useMemo(() => {
     const diaVencimentoRaw =
       userPagamentoConfig?.dia_vencimento?.trim()
         ? userPagamentoConfig.dia_vencimento.trim()
@@ -553,7 +562,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
 
     const enviadosCiclo = (() => {
       if (!inicio || !fim) return 0;
-      const lista = Array.isArray(followupDinamicoHistorico) ? followupDinamicoHistorico : [];
+      const lista = Array.isArray(followupExtendidoHistorico) ? followupExtendidoHistorico : [];
       return lista.reduce((acc: number, row: any) => {
         try {
           const criadoRaw = row?.criado_em;
@@ -567,14 +576,14 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       }, 0);
     })();
 
-    const volumeNumRaw = String(followupDinamicoVolume || '').trim();
+    const volumeNumRaw = String(followupExtendidoVolume || '').trim();
     const volumeNum = volumeNumRaw ? Number(volumeNumRaw) : NaN;
     const volumeValido = Number.isFinite(volumeNum) && volumeNum >= 0 ? volumeNum : 0;
     const pendentesCiclo = Math.max(volumeValido - enviadosCiclo, 0);
     const progressoCiclo =
       volumeValido > 0 ? Math.min(Math.max((enviadosCiclo / volumeValido) * 100, 0), 100) : 0;
 
-    console.debug('[FollowUp Dinamico] Ciclo calculado:', {
+    console.debug('[FollowUp Extendido] Ciclo calculado:', {
       dia_vencimento_raw: userPagamentoConfig?.dia_vencimento ?? user?.dia_vencimento,
       diaVencimentoNum,
       diaVencimentoAjustado,
@@ -598,16 +607,17 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       pendentesCiclo,
       progressoCiclo,
     };
-  }, [userPagamentoConfig?.dia_vencimento, user?.dia_vencimento, followupDinamicoHistorico, followupDinamicoVolume]);
+  }, [userPagamentoConfig?.dia_vencimento, user?.dia_vencimento, followupExtendidoHistorico, followupExtendidoVolume]);
 
-  const handleSaveFollowupDinamicoConfig = async () => {
+  const handleSaveFollowupExtendidoConfig = async () => {
     if (!settingsOwnerUserId) {
       toast({ title: 'Atenção', description: 'Usuário não identificado.' });
       return;
     }
 
-    const volumeRaw = String(followupDinamicoVolume || '').trim();
-    const diasRaw = String(followupDinamicoDiasPerdidos || '').trim();
+    const volumeRaw = String(followupExtendidoVolume || '').trim();
+    const diasRaw = String(followupExtendidoDiasPerdidos || '').trim();
+    const etapasSelecionadas = Array.isArray(followupExtendidoEtapas) ? followupExtendidoEtapas : [];
 
     const volume = volumeRaw ? Number(volumeRaw) : null;
     const dias = diasRaw ? Number(diasRaw) : null;
@@ -616,43 +626,51 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       toast({ title: 'Atenção', description: 'Quantidade de followups por ciclo deve ser um número válido.' });
       return;
     }
-    if (diasRaw) {
-      if (!Number.isFinite(dias)) {
-        toast({ title: 'Atenção', description: 'Quantidade de dias perdidos deve ser um número válido.' });
-        return;
-      }
-      if (dias! < 30 || dias! > 360) {
-        toast({ title: 'Atenção', description: 'A quantidade de dias deve ser entre 30 e 360.' });
-        return;
-      }
+    // Dias e etapas nunca podem ficar em branco: o cliente configura isso após a contratação
+    // e é comum esquecer, então bloqueamos o salvamento em vez de permitir valor vazio.
+    if (!diasRaw) {
+      toast({ title: 'Atenção', description: 'Informe a frequência de dias (entre 7 e 360).' });
+      return;
+    }
+    if (!Number.isFinite(dias)) {
+      toast({ title: 'Atenção', description: 'Quantidade de dias sem resposta deve ser um número válido.' });
+      return;
+    }
+    if (dias! < 7 || dias! > 360) {
+      toast({ title: 'Atenção', description: 'A quantidade de dias deve ser entre 7 e 360.' });
+      return;
+    }
+    if (etapasSelecionadas.length === 0) {
+      toast({ title: 'Atenção', description: 'Selecione ao menos uma etapa do funil para o FollowUp Extendido.' });
+      return;
     }
 
-    setIsSavingFollowupDinamicoConfig(true);
+    setIsSavingFollowupExtendidoConfig(true);
     try {
       const { error } = await supabase
         .from('usuarios_v2')
         .update({
-          followup_dinamico: Boolean(followupDinamicoAtivo),
-          followup_dinamico_volume: volume,
-          followup_dinamico_dias_perdidos: dias,
+          followup_extendido: Boolean(followupExtendidoAtivo),
+          followup_extendido_volume: volume,
+          followup_extendido_dias_perdidos: dias,
+          followup_extendido_etapas: etapasSelecionadas.join(','),
         } as any)
         .eq('user_id', settingsOwnerUserId);
 
       if (error) throw error;
 
-      setIsEditingFollowupDinamicoDias(false);
+      setIsEditingFollowupExtendidoDias(false);
+      setIsEditingFollowupExtendidoEtapas(false);
 
       toast({
         title: 'Configuração salva',
-        description: diasRaw
-          ? `Quantidade de dias para leads perdidos atualizada para ${Number(dias).toLocaleString('pt-BR')} dia${Number(dias) === 1 ? '' : 's'}.`
-          : 'As preferências de FollowUp Dinâmico foram salvas.',
+        description: 'As preferências de FollowUp Extendido foram salvas.',
       });
     } catch (err: any) {
-      console.error('[FollowUp Dinamico] Erro ao salvar configuração:', err);
+      console.error('[FollowUp Extendido] Erro ao salvar configuração:', err);
       toast({ title: 'Erro', description: err?.message || 'Não foi possível salvar as alterações.' });
     } finally {
-      setIsSavingFollowupDinamicoConfig(false);
+      setIsSavingFollowupExtendidoConfig(false);
     }
   };
 
@@ -673,7 +691,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
     }
     if (acquireStep < 3) {
       if (selectedPlan) {
-        console.debug('[FollowUp Dinamico] Cálculo de rateio (etapa 2):', {
+        console.debug('[FollowUp Extendido] Cálculo de rateio (etapa 2):', {
           plano: selectedPlan.id,
           valor_plano_cheio: selectedPlan.preco,
           dia_vencimento_usuario: user?.dia_vencimento ?? null,
@@ -684,13 +702,13 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
 
       if (nextStep === 3) {
         if (isAdvancingToStep3 || isCreatingQrCode) {
-          console.info('[FU Dinamico StepAuto] Já em avanço p/ passo 3 ou criando QR. Ignorando clique duplicado.', {
+          console.info('[FU Extendido StepAuto] Já em avanço p/ passo 3 ou criando QR. Ignorando clique duplicado.', {
             isAdvancingToStep3, isCreatingQrCode,
           });
           return;
         }
         if (pagamentoAtivo) {
-          console.info('[FU Dinamico StepAuto] Pagamento já existe, só navegar (não criar nova cobrança).');
+          console.info('[FU Extendido StepAuto] Pagamento já existe, só navegar (não criar nova cobrança).');
           setAcquireStep(nextStep);
           return;
         }
@@ -702,12 +720,12 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       if (nextStep === 3) {
         queueMicrotask(() => {
           if (!pagamentoAtivo && !isCreatingQrCode) {
-            console.info('[FU Dinamico StepAuto] Passo 3 carregado. Disparando handleGerarQrCode automaticamente.');
+            console.info('[FU Extendido StepAuto] Passo 3 carregado. Disparando handleGerarQrCode automaticamente.');
             void handleGerarQrCode().finally(() => {
               setIsAdvancingToStep3(false);
             });
           } else {
-            console.info('[FU Dinamico StepAuto] Passo 3 carregado mas pagamentoAtivo/criando já existe. Nada a fazer.', {
+            console.info('[FU Extendido StepAuto] Passo 3 carregado mas pagamentoAtivo/criando já existe. Nada a fazer.', {
               temPagamentoAtivo: !!pagamentoAtivo,
               isCreatingQrCode,
             });
@@ -744,14 +762,14 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
     try {
       await navigator.clipboard.writeText(pagamentoAtivo.pix.payload);
       console.debug(
-        `[FU Dinamico PIX] Copiar payload OK. externalRef=${pagamentoAtivo.externalReference}; tamanho=${pagamentoAtivo.pix.payload.length}`,
+        `[FU Extendido PIX] Copiar payload OK. externalRef=${pagamentoAtivo.externalReference}; tamanho=${pagamentoAtivo.pix.payload.length}`,
       );
       toast({
         title: 'Código copiado!',
         description: 'Cole o código PIX no aplicativo do seu banco para pagar.',
       });
     } catch (err) {
-      console.error('[FU Dinamico PIX] Erro ao copiar payload PIX:', err);
+      console.error('[FU Extendido PIX] Erro ao copiar payload PIX:', err);
       toast({
         title: 'Não foi possível copiar',
         description: 'Selecione e copie manualmente o código abaixo.',
@@ -773,11 +791,11 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
     try {
       const correlationId = `PDF_${pagamentoAtivo.externalReference}_${Date.now()}`;
       console.info(
-        `[FU Dinamico PDF] Iniciando geracao. correlationId=${correlationId}; externalRef=${pagamentoAtivo.externalReference}`,
+        `[FU Extendido PDF] Iniciando geracao. correlationId=${correlationId}; externalRef=${pagamentoAtivo.externalReference}`,
       );
 
       const hojeStr = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
-      const suggestedFileName = `PIX_FollowUp_Dinamico_${hojeStr}.pdf`;
+      const suggestedFileName = `PIX_FollowUp_Extendido_${hojeStr}.pdf`;
 
       const payload = pagamentoAtivo.pix.payload || '';
       const qrBase64 = pagamentoAtivo.pix.base64 || pagamentoAtivo.pix.qrCodeImageUrl || '';
@@ -889,7 +907,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       win.document.close();
 
       console.info(
-        `[FU Dinamico PDF] Janela aberta. correlationId=${correlationId}; suggestedFileName="${suggestedFileName}"`,
+        `[FU Extendido PDF] Janela aberta. correlationId=${correlationId}; suggestedFileName="${suggestedFileName}"`,
       );
 
       toast({
@@ -897,7 +915,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         description: 'Na janela aberta, clique em "Salvar PDF".',
       });
     } catch (err) {
-      console.error('[FU Dinamico PDF] Erro ao preparar PDF:', err);
+      console.error('[FU Extendido PDF] Erro ao preparar PDF:', err);
       toast({
         title: 'Erro ao gerar PDF',
         description: 'Tente novamente ou copie o código PIX diretamente.',
@@ -932,7 +950,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
 
     if (!idClienteAsaas || !idAssinaturaAsaas) {
       console.warn(
-        `[FU Dinamico ASAAS] userPagamentoConfig nao carregado ou vazios. Executando SELECT de refresh antes da guard clause.`,
+        `[FU Extendido ASAAS] userPagamentoConfig nao carregado ou vazios. Executando SELECT de refresh antes da guard clause.`,
         {
           settingsOwnerUserId,
           userPagamentoConfig_id_cliente: idClienteAsaas ? 'OK' : 'VAZIO',
@@ -967,16 +985,16 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
             user_nome: d.user_nome ?? prev?.user_nome,
             user_empresa: d.user_empresa ?? prev?.user_empresa,
           }));
-          console.info('[FU Dinamico ASAAS] userPagamentoConfig atualizado por refresh no handleGerarQrCode.');
+          console.info('[FU Extendido ASAAS] userPagamentoConfig atualizado por refresh no handleGerarQrCode.');
         }
       } catch (e: any) {
-        console.error('[FU Dinamico ASAAS] Erro no SELECT refresh antes de guard clause:', e?.message || e);
+        console.error('[FU Extendido ASAAS] Erro no SELECT refresh antes de guard clause:', e?.message || e);
       }
     }
 
     if (!idClienteAsaas) {
       console.error(
-        `[FU Dinamico ASAAS] Guard clause: id_cliente_asaas ausente. user_id=${settingsOwnerUserId}`,
+        `[FU Extendido ASAAS] Guard clause: id_cliente_asaas ausente. user_id=${settingsOwnerUserId}`,
       );
       toast({
         title: 'Não foi possível gerar o pagamento',
@@ -989,7 +1007,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
 
     if (!idAssinaturaAsaas) {
       console.error(
-        `[FU Dinamico ASAAS] Guard clause: id_assinatura_asaas ausente. user_id=${settingsOwnerUserId}`,
+        `[FU Extendido ASAAS] Guard clause: id_assinatura_asaas ausente. user_id=${settingsOwnerUserId}`,
       );
       toast({
         title: 'Não foi possível gerar o pagamento',
@@ -1001,15 +1019,15 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
     }
 
     setIsCreatingQrCode(true);
-    const correlationId = `FU_DINAMICO_${settingsOwnerUserId}_${Date.now()}`;
+    const correlationId = `FU_EXTENDIDO_${settingsOwnerUserId}_${Date.now()}`;
     const timestampUnix = Math.floor(Date.now() / 1000);
-    const externalReference = `FU_DINAMICO_${settingsOwnerUserId}_${timestampUnix}`;
+    const externalReference = `FU_EXTENDIDO_${settingsOwnerUserId}_${timestampUnix}`;
 
     const valorRateioCentavos = Math.round(Number(planoProrrateado.valorRateio) * 100);
     const valorPlanoCheioCentavos = Math.round(Number(planoProrrateado.valorPlanoCheio) * 100);
     const valorProxFaturaCentavos = Math.round(Number(planoProrrateado.valorProxFatura) * 100);
 
-    console.groupCollapsed(`[FU Dinamico ASAAS] ${correlationId} — Criar cobrança PIX`);
+    console.groupCollapsed(`[FU Extendido ASAAS] ${correlationId} — Criar cobrança PIX`);
     console.info('correlationId:', correlationId);
     console.info('externalReference:', externalReference);
     console.info('user_id (settingsOwnerUserId):', settingsOwnerUserId);
@@ -1037,7 +1055,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       value: planoProrrateado.valorRateio,
       dueDate: new Date().toISOString().split('T')[0],
       externalReference,
-      description: `FollowUp Dinâmico - Plano ${selectedPlan.nome} - Ciclo ${planoProrrateado.inicioCiclo} a ${planoProrrateado.fimCiclo} (ativação imediata)`,
+      description: `FollowUp Extendido - Plano ${selectedPlan.nome} - Ciclo ${planoProrrateado.inicioCiclo} a ${planoProrrateado.fimCiclo} (ativação imediata)`,
     });
     console.info('idempotency-key:', correlationId);
     console.groupEnd();
@@ -1051,7 +1069,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       // Asaas Idempotency-Key LIMITA em no MAX 48 caracteres.
       // Colocamos TIMESTAMP SEGUIDO de externalReference (não o contrário).
       // Assim mesmo truncando, os 48 chars mais à esquerda contêm TS único → evita
-      // conflito de idempotência ao reativar funcionalidade (ex: followup_dinamico=false e tenta de novo).
+      // conflito de idempotência ao reativar funcionalidade (ex: followup_extendido=false e tenta de novo).
       const idempotencyKeySafe =
         String(`${Date.now()}_${externalReference}`).slice(0, 48);
 
@@ -1065,7 +1083,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       headersAsaas['idempotency'] = idempotencyKeySafe;
       headersAsaas['idempotency-key'] = idempotencyKeySafe;
       console.info(
-        `[FU Dinamico ASAAS] ${correlationId} — Idempotency-Key (48 chars max) = "${idempotencyKeySafe}" (tamanho=${idempotencyKeySafe.length}).`,
+        `[FU Extendido ASAAS] ${correlationId} — Idempotency-Key (48 chars max) = "${idempotencyKeySafe}" (tamanho=${idempotencyKeySafe.length}).`,
       );
 
       const bodyPagamento = {
@@ -1074,12 +1092,12 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         value: Number(planoProrrateado.valorRateio.toFixed(2)),
         dueDate: new Date().toISOString().split('T')[0],
         externalReference,
-        description: 'FollowUp Dinâmico (Ativação)',
+        description: 'FollowUp Extendido (Ativação)',
         postalService: false,
       };
 
       console.info(
-        `[FU Dinamico ASAAS] ${correlationId} — Criando pagamento via asaasFetch. endpoint=POST /payments; value=${bodyPagamento.value}; customer=${bodyPagamento.customer.slice(0,6)}...${bodyPagamento.customer.slice(-4)}`,
+        `[FU Extendido ASAAS] ${correlationId} — Criando pagamento via asaasFetch. endpoint=POST /payments; value=${bodyPagamento.value}; customer=${bodyPagamento.customer.slice(0,6)}...${bodyPagamento.customer.slice(-4)}`,
       );
 
       const respCriar = await asaasFetch('/payments', {
@@ -1097,7 +1115,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         // NÃO criamos cobrança duplicada — BUSCAMOS a cobrança já existente por externalReference
         // e continuamos o fluxo normal (QR code, polling etc.).
         console.warn(
-          `[FU Dinamico ASAAS] ${correlationId} — POST /payments retornou 409 CONFLICT (idempotency/externalRef ja utilizado). Buscando cobrança existente por externalReference=${externalReference} ...`,
+          `[FU Extendido ASAAS] ${correlationId} — POST /payments retornou 409 CONFLICT (idempotency/externalRef ja utilizado). Buscando cobrança existente por externalReference=${externalReference} ...`,
         );
 
         try {
@@ -1118,13 +1136,13 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
               pagamentoAsaas = primeira;
               statusCriar = 200;
               console.info(
-                `[FU Dinamico ASAAS] ${correlationId} — 409 resolvido: encontrada cobrança existente ${primeira.id}. status=${primeira.status}.`,
+                `[FU Extendido ASAAS] ${correlationId} — 409 resolvido: encontrada cobrança existente ${primeira.id}. status=${primeira.status}.`,
               );
             }
           }
         } catch (buscaErr) {
           console.warn(
-            `[FU Dinamico ASAAS] ${correlationId} — 409 mas falhou ao buscar externalReference.`,
+            `[FU Extendido ASAAS] ${correlationId} — 409 mas falhou ao buscar externalReference.`,
             buscaErr,
           );
         }
@@ -1139,7 +1157,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
           else if (j?.error) msg = j.error;
         } catch {}
         console.error(
-          `[FU Dinamico ASAAS] ${correlationId} — POST /payments falhou:`,
+          `[FU Extendido ASAAS] ${correlationId} — POST /payments falhou:`,
           { status: statusCriar, preview: t.slice(0, 400) },
         );
         throw new Error(msg || `Asaas retornou status ${statusCriar}`);
@@ -1161,14 +1179,14 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
 
       if (!asaasPaymentId) {
         console.error(
-          `[FU Dinamico ASAAS] ${correlationId} — Pagamento criado sem ID?`,
+          `[FU Extendido ASAAS] ${correlationId} — Pagamento criado sem ID?`,
           pagamentoAsaas,
         );
         throw new Error('A plataforma de pagamento não retornou o ID da cobrança.');
       }
 
       console.info(
-        `[FU Dinamico ASAAS] ${correlationId} — Pagamento criado. payment_id=${asaasPaymentId}; status_asaas=${asaasStatus}. Buscando pixQrCode...`,
+        `[FU Extendido ASAAS] ${correlationId} — Pagamento criado. payment_id=${asaasPaymentId}; status_asaas=${asaasStatus}. Buscando pixQrCode...`,
       );
 
       let pixPayload = '';
@@ -1196,7 +1214,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
           pixExpiration = pixExpiration ? new Date(String(pixExpiration)).toISOString() : null;
         } else {
           console.warn(
-            `[FU Dinamico ASAAS] ${correlationId} — GET pixQrCode status=${qrResp.status}; tentando extrair direto do body do pagamento...`,
+            `[FU Extendido ASAAS] ${correlationId} — GET pixQrCode status=${qrResp.status}; tentando extrair direto do body do pagamento...`,
           );
           pixPayload = String(pagamentoAsaas?.pix?.payload || pagamentoAsaas?.pix?.qrCode?.payload || '').trim();
           pixBase64 = String(pagamentoAsaas?.pix?.qrCode?.encodedImage || pagamentoAsaas?.pix?.qrCode?.base64 || '').trim() || null;
@@ -1206,7 +1224,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         }
       } catch (e: any) {
         console.warn(
-          `[FU Dinamico ASAAS] ${correlationId} — Erro ao buscar pixQrCode (NÃO FATAL se payload estiver em pagamentoAsaas):`,
+          `[FU Extendido ASAAS] ${correlationId} — Erro ao buscar pixQrCode (NÃO FATAL se payload estiver em pagamentoAsaas):`,
           e?.message || e,
         );
         pixPayload = String(pagamentoAsaas?.pix?.payload || pagamentoAsaas?.pix?.qrCode?.payload || '').trim();
@@ -1220,14 +1238,14 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         );
       }
 
-      const statusNormalizado: FollowUpDinamicoPagamentoStatus = (() => {
+      const statusNormalizado: FollowUpExtendidoPagamentoStatus = (() => {
         if (asaasStatus === 'RECEIVED' || asaasStatus === 'CONFIRMED') return 'RECEIVED';
         if (asaasStatus === 'OVERDUE' || asaasStatus === 'EXPIRED') return 'EXPIRED';
         if (asaasStatus === 'DELETED' || asaasStatus === 'CANCELLED') return 'CANCELLED';
         return 'PENDING';
       })();
 
-      const pagamento: FollowUpDinamicoPagamento = {
+      const pagamento: FollowUpExtendidoPagamento = {
         paymentId: asaasPaymentId,
         externalReference,
         status: statusNormalizado,
@@ -1260,7 +1278,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       setPagamentoAtivo(pagamento);
 
       console.info(
-        `[FU Dinamico ASAAS] ${correlationId} — Cobrança REAL criada com sucesso. payment_id=${pagamento.paymentId}; externalRef=${pagamento.externalReference}; status=${pagamento.status}. Salvo no localStorage.`,
+        `[FU Extendido ASAAS] ${correlationId} — Cobrança REAL criada com sucesso. payment_id=${pagamento.paymentId}; externalRef=${pagamento.externalReference}; status=${pagamento.status}. Salvo no localStorage.`,
       );
 
       toast({
@@ -1269,7 +1287,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
           'Realize o pagamento via PIX. Quando confirmado, a funcionalidade será ativada automaticamente.',
       });
     } catch (err: any) {
-      console.error(`[FU Dinamico ASAAS] ${correlationId} — Erro ao criar cobrança:`, err);
+      console.error(`[FU Extendido ASAAS] ${correlationId} — Erro ao criar cobrança:`, err);
       toast({
         title: 'Não foi possível gerar o pagamento',
         description:
@@ -1282,40 +1300,40 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
     }
   };
 
-  const reloadFollowupDinamicoConfig = async () => {
+  const reloadFollowupExtendidoConfig = async () => {
     if (!settingsOwnerUserId) return;
-    console.debug('[FU Dinamico Refresh] Revalidando configuração do usuário (polling / pós-confirmação)...');
-    setLoadingFollowupDinamicoConfig(true);
+    console.debug('[FU Extendido Refresh] Revalidando configuração do usuário (polling / pós-confirmação)...');
+    setLoadingFollowupExtendidoConfig(true);
     try {
       const { data, error } = await supabase
         .from('usuarios_v2')
-        .select('followup_dinamico, followup_dinamico_volume, followup_dinamico_dias_perdidos')
+        .select('followup_extendido, followup_extendido_volume, followup_extendido_dias_perdidos')
         .eq('user_id', settingsOwnerUserId)
         .maybeSingle();
       if (error) throw error;
       if (data) {
-        const ativo = Boolean((data as any)?.followup_dinamico ?? false);
+        const ativo = Boolean((data as any)?.followup_extendido ?? false);
         const volume =
-          (data as any)?.followup_dinamico_volume === null || (data as any)?.followup_dinamico_volume === undefined
+          (data as any)?.followup_extendido_volume === null || (data as any)?.followup_extendido_volume === undefined
             ? ''
-            : String((data as any).followup_dinamico_volume);
+            : String((data as any).followup_extendido_volume);
         const dias =
-          (data as any)?.followup_dinamico_dias_perdidos === null || (data as any)?.followup_dinamico_dias_perdidos === undefined
+          (data as any)?.followup_extendido_dias_perdidos === null || (data as any)?.followup_extendido_dias_perdidos === undefined
             ? ''
-            : String((data as any).followup_dinamico_dias_perdidos);
-        setFollowupDinamicoAtivo(ativo);
-        setFollowupDinamicoVolume(volume);
-        setFollowupDinamicoDiasPerdidos(dias);
-        console.info('[FU Dinamico Refresh] Configuração recarregada:', {
-          followup_dinamico: ativo,
+            : String((data as any).followup_extendido_dias_perdidos);
+        setFollowupExtendidoAtivo(ativo);
+        setFollowupExtendidoVolume(volume);
+        setFollowupExtendidoDiasPerdidos(dias);
+        console.info('[FU Extendido Refresh] Configuração recarregada:', {
+          followup_extendido: ativo,
           volume,
           dias_perdidos: dias,
         });
       }
     } catch (err: any) {
-      console.error('[FU Dinamico Refresh] Erro ao revalidar configuração:', err);
+      console.error('[FU Extendido Refresh] Erro ao revalidar configuração:', err);
     } finally {
-      setLoadingFollowupDinamicoConfig(false);
+      setLoadingFollowupExtendidoConfig(false);
     }
   };
 
@@ -1331,7 +1349,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
   };
 
   const executarPipelinePosPagamento = async (
-    pagamentoConfirmado: FollowUpDinamicoPagamento,
+    pagamentoConfirmado: FollowUpExtendidoPagamento,
   ): Promise<{ ok: boolean; guard_clause?: boolean; detalhes?: any; erro?: string }> => {
     const correlationId = `PIPELINE_${pagamentoConfirmado.externalReference}_${Date.now()}`;
 
@@ -1354,7 +1372,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       const { data: userRow, error: errSel } = await supabase
         .from('usuarios_v2')
         .select(
-          'user_id,followup_dinamico,followup_dinamico_volume,user_valor_mensal,id_assinatura_asaas,id_cliente_asaas,dia_vencimento',
+          'user_id,followup_extendido,followup_extendido_volume,user_valor_mensal,id_assinatura_asaas,id_cliente_asaas,dia_vencimento',
         )
         .eq('user_id', settingsOwnerUserId)
         .maybeSingle();
@@ -1363,14 +1381,14 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       if (!userRow) throw new Error('usuario_nao_encontrado');
       const ur = userRow as any;
 
-      const followup_dinamico_atual = Boolean(ur.followup_dinamico ?? false);
+      const followup_extendido_atual = Boolean(ur.followup_extendido ?? false);
       const idAssinaturaAsaas = String(ur.id_assinatura_asaas || '').trim();
       const userValorMensalAtualReais = Number(ur.user_valor_mensal) || 0;
 
       // ---- Step 2: GUARD CLAUSE ANTI DUPLA ATIVAÇÃO ----
-      if (followup_dinamico_atual === true) {
+      if (followup_extendido_atual === true) {
         console.warn(
-          `[FU Pipeline ${correlationId}] Step 2/5: GUARD CLAUSE — followup_dinamico já é true. Abortando pipeline SEM ALTERAR NADA para não somar 2x no user_valor_mensal.`,
+          `[FU Pipeline ${correlationId}] Step 2/5: GUARD CLAUSE — followup_extendido já é true. Abortando pipeline SEM ALTERAR NADA para não somar 2x no user_valor_mensal.`,
         );
         console.groupCollapsed(`[FU Pipeline ${correlationId}] ✅ Concluído (guard clause).`);
         console.info('guard_clause=already_active');
@@ -1381,14 +1399,14 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       // ---- Step 3: UPDATE usuarios_v2 ----
       console.info(`[FU Pipeline ${correlationId}] Step 3/5: PATCH usuarios_v2.`);
       console.info('  - user_valor_mensal (de):', userValorMensalAtualReais);
-      console.info('  - followup_dinamico_volume (padrão plano):', volumePadrao);
+      console.info('  - followup_extendido_volume (padrão plano):', volumePadrao);
       const novoValorMensalReais = userValorMensalAtualReais + precoPlanoReais;
       console.info('  - user_valor_mensal (para):', novoValorMensalReais);
 
       const volumeAtualBanco =
-        ur.followup_dinamico_volume === null || ur.followup_dinamico_volume === undefined
+        ur.followup_extendido_volume === null || ur.followup_extendido_volume === undefined
           ? null
-          : Number(ur.followup_dinamico_volume);
+          : Number(ur.followup_extendido_volume);
       const novoVolume =
         volumeAtualBanco && volumeAtualBanco > 0 ? volumeAtualBanco : volumePadrao;
 
@@ -1396,8 +1414,8 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         .from('usuarios_v2')
         .update({
           user_valor_mensal: novoValorMensalReais,
-          followup_dinamico: true,
-          followup_dinamico_volume: novoVolume,
+          followup_extendido: true,
+          followup_extendido_volume: novoVolume,
         } as any)
         .eq('user_id', settingsOwnerUserId);
 
@@ -1597,8 +1615,8 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       console.info('guard_clause=executado (primeira ativação)');
       console.info('user_valor_mensal_de:', userValorMensalAtualReais);
       console.info('user_valor_mensal_para:', novoValorMensalReais);
-      console.info('followup_dinamico=true');
-      console.info('followup_dinamico_volume:', novoVolume);
+      console.info('followup_extendido=true');
+      console.info('followup_extendido_volume:', novoVolume);
       console.info('cancelamentos_futuros:', cancelamentosFuturos);
       console.info('patch_assinatura_ok:', patchAssinaturaOk);
       if (patchAssinaturaErro) console.info('patch_assinatura_erro:', patchAssinaturaErro);
@@ -1609,8 +1627,8 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         detalhes: {
           user_valor_mensal_de: userValorMensalAtualReais,
           user_valor_mensal_para: novoValorMensalReais,
-          followup_dinamico: true,
-          followup_dinamico_volume: novoVolume,
+          followup_extendido: true,
+          followup_extendido_volume: novoVolume,
           cancelamentos_futuros: cancelamentosFuturos,
           patch_assinatura_ok: patchAssinaturaOk,
           patch_assinatura_erro: patchAssinaturaErro || null,
@@ -1626,18 +1644,18 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
   };
 
   const pollStatusPagamentoOnce = async (
-    pagamento: FollowUpDinamicoPagamento,
-  ): Promise<{ novoStatus: FollowUpDinamicoPagamentoStatus; rawResponse?: any }> => {
+    pagamento: FollowUpExtendidoPagamento,
+  ): Promise<{ novoStatus: FollowUpExtendidoPagamentoStatus; rawResponse?: any }> => {
     const correlationId = `POLL_${pagamento.externalReference}_${Date.now()}`;
     console.debug(
-      `[FU Dinamico Polling] ${correlationId} — Consultando status pagamento_id=${pagamento.paymentId} via asaasFetch /payments`,
+      `[FU Extendido Polling] ${correlationId} — Consultando status pagamento_id=${pagamento.paymentId} via asaasFetch /payments`,
     );
 
     try {
       const apiKey = getAsaasApiKey();
       if (shouldRequireAsaasApiKey() && !apiKey) {
         console.warn(
-          `[FU Dinamico Polling] ${correlationId} — shouldRequireAsaasApiKey=true mas sem chave frontend. Tentando mesmo assim (proxy injeta no servidor)...`,
+          `[FU Extendido Polling] ${correlationId} — shouldRequireAsaasApiKey=true mas sem chave frontend. Tentando mesmo assim (proxy injeta no servidor)...`,
         );
       }
       const headers = {
@@ -1662,7 +1680,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         }
       } catch (e) {
         console.warn(
-          `[FU Dinamico Polling] ${correlationId} — Erro ao consultar por ID, tentando externalReference...`,
+          `[FU Extendido Polling] ${correlationId} — Erro ao consultar por ID, tentando externalReference...`,
           e,
         );
       }
@@ -1683,13 +1701,13 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
           }
         } catch (e) {
           console.warn(
-            `[FU Dinamico Polling] ${correlationId} — Erro ao consultar por externalReference:`,
+            `[FU Extendido Polling] ${correlationId} — Erro ao consultar por externalReference:`,
             e,
           );
         }
       }
 
-      const statusNormalizado: FollowUpDinamicoPagamentoStatus = (() => {
+      const statusNormalizado: FollowUpExtendidoPagamentoStatus = (() => {
         if (statusAsaasRaw === 'RECEIVED' || statusAsaasRaw === 'CONFIRMED') return 'RECEIVED';
         if (statusAsaasRaw === 'OVERDUE' || statusAsaasRaw === 'EXPIRED') return 'EXPIRED';
         if (statusAsaasRaw === 'DELETED' || statusAsaasRaw === 'CANCELLED' || statusAsaasRaw === 'REFUNDED') return 'CANCELLED';
@@ -1709,7 +1727,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       return { novoStatus: statusNormalizado, rawResponse: rawData };
     } catch (err: any) {
       console.warn(
-        `[FU Dinamico Polling] ${correlationId} — Exceçao no polling, mantendo status atual:`,
+        `[FU Extendido Polling] ${correlationId} — Exceçao no polling, mantendo status atual:`,
         err,
       );
       return {
@@ -1728,7 +1746,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
     if (pagamentoConfirmadoUI) return;
 
     console.info(
-      `[FU Dinamico Polling] Iniciando ciclo de polling para pagamento_id=${pagamentoAtivo.paymentId} externalRef=${pagamentoAtivo.externalReference}. Intervalo=3s.`,
+      `[FU Extendido Polling] Iniciando ciclo de polling para pagamento_id=${pagamentoAtivo.paymentId} externalRef=${pagamentoAtivo.externalReference}. Intervalo=3s.`,
     );
 
     setIsPollingPagamento(true);
@@ -1747,7 +1765,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         const { novoStatus, rawResponse } = await pollStatusPagamentoOnce(snapAtivo);
         if (cancelled) return;
 
-        const atualizado: FollowUpDinamicoPagamento = {
+        const atualizado: FollowUpExtendidoPagamento = {
           ...snapAtivo,
           status: novoStatus,
           lastPolledAt: Date.now(),
@@ -1755,11 +1773,11 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
 
         if (novoStatus !== snapAtivo.status) {
           console.info(
-            `[FU Dinamico Polling] Status alterado: ${snapAtivo.status} → ${novoStatus}. pagamento_id=${snapAtivo.paymentId}`,
+            `[FU Extendido Polling] Status alterado: ${snapAtivo.status} → ${novoStatus}. pagamento_id=${snapAtivo.paymentId}`,
           );
         } else {
           console.debug(
-            `[FU Dinamico Polling] Tentativa ${tentativas} — status continua ${novoStatus}.`,
+            `[FU Extendido Polling] Tentativa ${tentativas} — status continua ${novoStatus}.`,
           );
         }
 
@@ -1770,7 +1788,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
 
         if (novoStatus === 'RECEIVED') {
           console.groupCollapsed(
-            `🎉 [FU Dinamico Polling] Pagamento CONFIRMADO (via polling UI). externalRef=${atualizado.externalReference}`,
+            `🎉 [FU Extendido Polling] Pagamento CONFIRMADO (via polling UI). externalRef=${atualizado.externalReference}`,
           );
           console.info('pagamento_id:', atualizado.paymentId);
           console.info('valorRateio (R$):', atualizado.valorRateio);
@@ -1794,12 +1812,12 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
             });
           } else if (pipelineRes.guard_clause) {
             console.info(
-              `[FU Dinamico Polling] Pipeline retornou guard_clause (funcionalidade já ativada anteriormente). Continuando normalmente.`,
+              `[FU Extendido Polling] Pipeline retornou guard_clause (funcionalidade já ativada anteriormente). Continuando normalmente.`,
             );
           }
 
           if (settingsOwnerUserId) {
-            const finalizado: FollowUpDinamicoPagamento = {
+            const finalizado: FollowUpExtendidoPagamento = {
               ...atualizado,
               completedAt: Date.now(),
               pipelineExecutado: pipelineRes.ok === true,
@@ -1824,7 +1842,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
           // Fechamos o dialog de forma suave após 3 segundos para o usuário curtir a animação de sucesso
           timeoutAuto = setTimeout(() => {
             if (cancelled) return;
-            console.info('[FU Dinamico Polling] Fechando dialog após confirmação (3s delay).');
+            console.info('[FU Extendido Polling] Fechando dialog após confirmação (3s delay).');
             setIsAcquireDialogOpen(false);
             setSelectedPlanId(null);
             setAcquireStep(1);
@@ -1837,11 +1855,11 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
 
             // Revalida os dados do usuário para trocar a tela de aquisição pelo layout ativo
             // (caso a confirmação já tenha sido processada pelo webhook)
-            reloadFollowupDinamicoConfig().catch(() => void 0);
+            reloadFollowupExtendidoConfig().catch(() => void 0);
           }, 3000);
         } else if (novoStatus === 'CANCELLED' || novoStatus === 'EXPIRED') {
           console.warn(
-            `[FU Dinamico Polling] Pagamento em status final não pago: ${novoStatus}. Parando polling.`,
+            `[FU Extendido Polling] Pagamento em status final não pago: ${novoStatus}. Parando polling.`,
           );
           setIsPollingPagamento(false);
           if (settingsOwnerUserId) {
@@ -1849,7 +1867,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
           }
         }
       } catch (err) {
-        console.error(`[FU Dinamico Polling] Erro na tentativa ${tentativas}:`, err);
+        console.error(`[FU Extendido Polling] Erro na tentativa ${tentativas}:`, err);
       }
     };
 
@@ -1861,7 +1879,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
       window.clearInterval(id);
       if (timeoutAuto) clearTimeout(timeoutAuto);
       setIsPollingPagamento(false);
-      console.debug('[FU Dinamico Polling] Cleanup: parado (dialog fechado / step mudou / status mudou).');
+      console.debug('[FU Extendido Polling] Cleanup: parado (dialog fechado / step mudou / status mudou).');
     };
   }, [
     isAcquireDialogOpen,
@@ -1872,7 +1890,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
     pagamentoConfirmadoUI,
   ]);
 
-  if (loadingFollowupDinamicoConfig) {
+  if (loadingFollowupExtendidoConfig) {
     return (
       <div className="w-full animate-in fade-in duration-500 pb-12 py-4 px-1 sm:px-2 md:px-3">
         <Card className="border-border bg-card shadow-sm rounded-2xl w-full">
@@ -1884,35 +1902,35 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
     );
   }
 
-  if (!followupDinamicoAtivo) {
+  if (!followupExtendidoAtivo) {
     const flowSteps = [
       {
         group: 'Uso atual',
         state: 'amber-1',
         chip: 'Etapa 1',
-        title: 'O lead demonstra interesse',
-        desc: 'O lead entra em contato buscando algo específico e a operação identifica a oportunidade inicial.',
+        title: 'O lead avança no funil',
+        desc: 'O lead é atendido normalmente e chega a etapas como Contato Realizado ou Oportunidade Qualificada.',
       },
       {
         group: 'Uso atual',
         state: 'amber-2',
         chip: 'Etapa 2',
-        title: 'Não existe oportunidade agora',
-        desc: 'O lead é marcado como perdido e a operação para de investir nele naquele momento.',
+        title: 'O lead para de responder',
+        desc: 'Sem retorno do lead, a operação para de insistir e ele fica parado naquela etapa do funil.',
       },
       {
         group: 'Nova funcionalidade',
         state: 'green-1',
         chip: 'Etapa 3',
         title: 'Sistema continua acompanhando',
-        desc: 'O FollowUp Dinâmico mantém esse lead no radar por uma janela de 30 a 360 dias.',
+        desc: 'O FollowUp Extendido monitora esse lead por uma janela de 7 a 360 dias sem resposta, configurável por você.',
       },
       {
         group: 'Nova funcionalidade',
         state: 'green-2',
         chip: 'Etapa 4',
-        title: 'Lead reativado automaticamente',
-        desc: 'A IA identifica uma nova janela de oportunidade e inicia um follow-up automático.',
+        title: 'Lead reengajado automaticamente',
+        desc: 'Passado o prazo configurado, um follow-up automático é enviado para tentar reengajar o lead.',
       },
     ] as const;
 
@@ -1979,10 +1997,10 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                 {/* 2. Título + 3. Texto pequeno */}
                 <div className="space-y-2">
                   <h1 className="text-base sm:text-lg font-semibold text-foreground">
-                    FollowUp Dinâmico
+                    FollowUp Extendido
                   </h1>
                   <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-                    Um &ldquo;não agora&rdquo; não precisa ser um &ldquo;não para sempre&rdquo;. Continue trabalhando leads perdidos de forma automática.
+                    Um &ldquo;não agora&rdquo; não precisa ser um &ldquo;não para sempre&rdquo;. Continue trabalhando leads sem resposta de forma automática.
                   </p>
                 </div>
               </div>
@@ -1994,7 +2012,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                   className="h-10 w-full md:w-auto px-5 rounded-lg text-xs md:text-sm font-semibold text-zinc-900 shadow-sm bg-[#EBF57D] hover:brightness-[0.97] hover:shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 ease-out"
                 >
                   <Crown className="h-3.5 w-3.5 mr-1.5 text-zinc-900" />
-                  Adquirir FollowUp Dinâmico
+                  Adquirir FollowUp Extendido
                 </Button>
               </div>
             </div>
@@ -2046,7 +2064,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                       Nova funcionalidade
                     </div>
                     <div className="text-[11px] text-emerald-900/75 leading-snug">
-                      Etapas 3 e 4 · O que muda com o FollowUp Dinâmico
+                      Etapas 3 e 4 · O que muda com o FollowUp Extendido
                     </div>
                   </div>
                 </div>
@@ -2130,13 +2148,13 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
               <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 rounded-2xl border border-dashed border-border/80 bg-gradient-to-r from-amber-50/60 via-[#EBF57D]/10 to-emerald-50/50 px-4 sm:px-6 py-3.5 mt-2">
                 <span className="inline-flex items-center gap-2 rounded-full bg-amber-100 text-amber-800 px-3 py-1.5 text-[11.5px] font-medium shadow-sm border border-amber-200/70">
                   <XCircle className="h-3.5 w-3.5 shrink-0" />
-                  Lead perdido sem retorno
+                  Lead sem resposta
                 </span>
                 <ArrowRight className="h-4 w-4 text-emerald-600 shrink-0 hidden sm:block" />
                 <ArrowDown className="h-4 w-4 text-emerald-600 shrink-0 sm:hidden" />
                 <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 text-emerald-800 px-3 py-1.5 text-[11.5px] font-semibold shadow-sm border border-emerald-200/80">
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                  Lead reativado automaticamente
+                  Lead reengajado automaticamente
                 </span>
               </div>
             </section>
@@ -2154,7 +2172,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
             <DialogHeader className="px-5 sm:px-6 pt-5 sm:pt-6 pb-4 border-b border-border/70 shrink-0">
               <div>
                 <DialogTitle className="text-base font-semibold">
-                  Contratar FollowUp Dinâmico
+                  Contratar FollowUp Extendido
                 </DialogTitle>
                 <DialogDescription className="text-sm text-muted-foreground">
                   Complete os passos abaixo para ativar a funcionalidade.
@@ -2230,7 +2248,8 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                               O que está incluso
                             </div>
                             <ul className="mt-2 space-y-1.5 text-[11px] text-muted-foreground list-disc list-inside">
-                              <li>Janela de 30 a 360 dias para leads perdidos</li>
+                              <li>Janela de 7 a 360 dias para leads sem resposta</li>
+                              <li>Filtro por etapa do funil</li>
                               <li>Histórico completo de envios</li>
                               <li>Envios automáticos via IA</li>
                             </ul>
@@ -2562,7 +2581,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                                     ? `data:image/png;base64,${pagamentoAtivo.pix.base64}`
                                     : (pagamentoAtivo.pix.qrCodeImageUrl || '')
                               }
-                              alt="QR Code PIX FollowUp Dinâmico"
+                              alt="QR Code PIX FollowUp Extendido"
                               className="h-56 w-56 object-contain"
                             />
                           ) : (
@@ -2670,7 +2689,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                             type="button"
                             onClick={() => {
                               console.info(
-                                `[FU Dinamico Confirmacao] Botao "Ja paguei" clicado. externalRef=${pagamentoAtivo.externalReference}. A confirmacao real vira por webhook nas proximas etapas.`,
+                                `[FU Extendido Confirmacao] Botao "Ja paguei" clicado. externalRef=${pagamentoAtivo.externalReference}. A confirmacao real vira por webhook nas proximas etapas.`,
                               );
                               toast({
                                 title: 'Aguardando confirmação',
@@ -2701,28 +2720,28 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
         <CardHeader className="pb-4">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
             <div>
-              <CardTitle className="text-base font-semibold">FollowUp Dinâmico</CardTitle>
+              <CardTitle className="text-base font-semibold">FollowUp Extendido</CardTitle>
               <CardDescription>
-                Configure os parâmetros e acompanhe os FollowUps enviados automaticamente para leads perdidos.
+                Configure os parâmetros e acompanhe os FollowUps enviados automaticamente para leads sem resposta.
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Badge
                 variant="secondary"
                 className={`px-3 py-1 text-xs font-semibold ${
-                  followupDinamicoAtivo
+                  followupExtendidoAtivo
                     ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
                     : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-100'
                 }`}
               >
-                {followupDinamicoAtivo ? 'Funcionalidade Ativa' : 'Funcionalidade Inativa'}
+                {followupExtendidoAtivo ? 'Funcionalidade Ativa' : 'Funcionalidade Inativa'}
               </Badge>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-10">
           <TooltipProvider delayDuration={150}>
-            {loadingFollowupDinamicoConfig ? (
+            {loadingFollowupExtendidoConfig ? (
               <div className="text-sm text-muted-foreground">Carregando...</div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
@@ -2740,7 +2759,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                           <Badge
                             variant="secondary"
                             className={`px-2.5 py-0.5 text-[11px] font-semibold cursor-default ${
-                              followupDinamicoAtivo
+                              followupExtendidoAtivo
                                 ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
                                 : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-100'
                             }`}
@@ -2748,10 +2767,10 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                             <span className="inline-flex items-center gap-1.5">
                               <span
                                 className={`h-1.5 w-1.5 rounded-full ${
-                                  followupDinamicoAtivo ? 'bg-emerald-500' : 'bg-zinc-400'
+                                  followupExtendidoAtivo ? 'bg-emerald-500' : 'bg-zinc-400'
                                 }`}
                               />
-                              {followupDinamicoAtivo ? 'Ativo' : 'Inativo'}
+                              {followupExtendidoAtivo ? 'Ativo' : 'Inativo'}
                             </span>
                           </Badge>
                         </TooltipTrigger>
@@ -2770,8 +2789,8 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                             Volume por ciclo
                           </div>
                           <div className="mt-1.5 text-lg font-semibold text-foreground">
-                            {followupDinamicoVolume
-                              ? Number(followupDinamicoVolume).toLocaleString('pt-BR')
+                            {followupExtendidoVolume
+                              ? Number(followupExtendidoVolume).toLocaleString('pt-BR')
                               : '-'}
                           </div>
                           <div className="mt-0.5 text-[11px] text-muted-foreground">
@@ -2790,20 +2809,20 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                       </div>
                       <div className="mt-1.5 text-sm font-semibold text-foreground">
                         <span className="whitespace-nowrap">
-                          {followupDinamicoCiclo.inicioFormatado}
+                          {followupExtendidoCiclo.inicioFormatado}
                         </span>
                         <span className="mx-1.5 text-muted-foreground font-normal">
                           até
                         </span>
                         <span className="whitespace-nowrap">
-                          {followupDinamicoCiclo.fimFormatado}
+                          {followupExtendidoCiclo.fimFormatado}
                         </span>
                       </div>
                       <div className="mt-0.5 text-[11px] text-muted-foreground">
                         Vencimento dia{' '}
                         <span className="font-semibold text-foreground">
-                          {followupDinamicoCiclo.diaVencimentoNum !== null
-                            ? String(followupDinamicoCiclo.diaVencimentoNum)
+                          {followupExtendidoCiclo.diaVencimentoNum !== null
+                            ? String(followupExtendidoCiclo.diaVencimentoNum)
                             : '-'}
                         </span>
                       </div>
@@ -2818,11 +2837,11 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                         </div>
                         <div className="mt-0.5 text-xs text-muted-foreground">
                           <span className="whitespace-nowrap">
-                            {followupDinamicoCiclo.inicioFormatado}
+                            {followupExtendidoCiclo.inicioFormatado}
                           </span>
                           <span className="mx-1">até</span>
                           <span className="whitespace-nowrap">
-                            {followupDinamicoCiclo.fimFormatado}
+                            {followupExtendidoCiclo.fimFormatado}
                           </span>
                         </div>
                       </div>
@@ -2832,17 +2851,17 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                         </div>
                         <div className="text-sm font-semibold text-foreground">
                           <span className="text-emerald-600">
-                            {followupDinamicoCiclo.enviadosCiclo.toLocaleString('pt-BR')}
+                            {followupExtendidoCiclo.enviadosCiclo.toLocaleString('pt-BR')}
                           </span>
                           <span className="text-muted-foreground font-normal">
                             {' '}
                             /{' '}
                           </span>
                           <span>
-                            {followupDinamicoCiclo.volumeValido > 0
-                              ? followupDinamicoCiclo.volumeValido.toLocaleString('pt-BR')
-                              : followupDinamicoVolume
-                              ? Number(followupDinamicoVolume).toLocaleString('pt-BR')
+                            {followupExtendidoCiclo.volumeValido > 0
+                              ? followupExtendidoCiclo.volumeValido.toLocaleString('pt-BR')
+                              : followupExtendidoVolume
+                              ? Number(followupExtendidoVolume).toLocaleString('pt-BR')
                               : '-'}
                           </span>
                         </div>
@@ -2854,10 +2873,10 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                         <div
                           className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 transition-all"
                           style={{
-                            width: `${followupDinamicoCiclo.progressoCiclo}%`,
+                            width: `${followupExtendidoCiclo.progressoCiclo}%`,
                           }}
                           role="progressbar"
-                          aria-valuenow={Math.round(followupDinamicoCiclo.progressoCiclo)}
+                          aria-valuenow={Math.round(followupExtendidoCiclo.progressoCiclo)}
                           aria-valuemin={0}
                           aria-valuemax={100}
                         />
@@ -2867,17 +2886,17 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                           <span className="h-2 w-2 rounded-full bg-emerald-500" />
                           Enviados
                           <span className="ml-auto font-semibold text-foreground">
-                            {followupDinamicoCiclo.enviadosCiclo.toLocaleString('pt-BR')}
+                            {followupExtendidoCiclo.enviadosCiclo.toLocaleString('pt-BR')}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <span className="h-2 w-2 rounded-full bg-orange-500" />
                           Pendentes
                           <span className="ml-auto font-semibold text-foreground">
-                            {followupDinamicoCiclo.volumeValido > 0
-                              ? followupDinamicoCiclo.pendentesCiclo.toLocaleString('pt-BR')
-                              : followupDinamicoVolume
-                              ? Number(followupDinamicoVolume).toLocaleString('pt-BR')
+                            {followupExtendidoCiclo.volumeValido > 0
+                              ? followupExtendidoCiclo.pendentesCiclo.toLocaleString('pt-BR')
+                              : followupExtendidoVolume
+                              ? Number(followupExtendidoVolume).toLocaleString('pt-BR')
                               : '-'}
                           </span>
                         </div>
@@ -2897,20 +2916,20 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                           Configuração de Dias
                         </div>
                         <div className="mt-0.5 text-xs text-muted-foreground">
-                          Ajuste a janela de busca por leads perdidos para recontato.
+                          Ajuste a janela de busca por leads sem resposta para recontato.
                         </div>
                       </div>
                     </div>
                     <Badge
                       variant="secondary"
                       className={`px-3 py-1 text-[11px] font-semibold shrink-0 ${
-                        followupDinamicoDiasPerdidos
+                        followupExtendidoDiasPerdidos
                           ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100'
                           : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-100'
                       }`}
                     >
-                      {followupDinamicoDiasPerdidos
-                        ? `${Number(followupDinamicoDiasPerdidos).toLocaleString('pt-BR')} dia${Number(followupDinamicoDiasPerdidos) === 1 ? '' : 's'}`
+                      {followupExtendidoDiasPerdidos
+                        ? `${Number(followupExtendidoDiasPerdidos).toLocaleString('pt-BR')} dia${Number(followupExtendidoDiasPerdidos) === 1 ? '' : 's'}`
                         : 'Não definido'}
                     </Badge>
                   </div>
@@ -2919,11 +2938,11 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Label className="text-sm font-semibold text-foreground cursor-help">
-                          Dias para buscar leads perdidos
+                          Dias sem resposta para buscar leads
                         </Label>
                       </TooltipTrigger>
                       <TooltipContent side="top" align="start" className="max-w-xs text-xs">
-                        Exemplo: 30 = considera leads perdidos dos últimos 30 dias para recontato (mínimo 30, máximo 360).
+                        Exemplo: 30 = considera leads sem resposta há até 30 dias para recontato (mínimo 7, máximo 360).
                       </TooltipContent>
                     </Tooltip>
 
@@ -2932,30 +2951,30 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                         <Input
                           type="number"
                           inputMode="numeric"
-                          min={30}
+                          min={7}
                           max={360}
                           placeholder="Ex: 30"
-                          value={followupDinamicoDiasPerdidos}
-                          onChange={(e) => setFollowupDinamicoDiasPerdidos(e.target.value)}
-                          disabled={!isEditingFollowupDinamicoDias}
+                          value={followupExtendidoDiasPerdidos}
+                          onChange={(e) => setFollowupExtendidoDiasPerdidos(e.target.value)}
+                          disabled={!isEditingFollowupExtendidoDias}
                           className="bg-background border-border rounded-xl disabled:opacity-70"
                         />
                       </div>
-                      {!isEditingFollowupDinamicoDias ? (
+                      {!isEditingFollowupExtendidoDias ? (
                         <Button
                           variant="outline"
-                          onClick={() => setIsEditingFollowupDinamicoDias(true)}
+                          onClick={() => setIsEditingFollowupExtendidoDias(true)}
                           className="rounded-xl sm:shrink-0"
                         >
                           Editar
                         </Button>
                       ) : (
                         <Button
-                          onClick={handleSaveFollowupDinamicoConfig}
-                          disabled={isSavingFollowupDinamicoConfig || loadingFollowupDinamicoConfig}
+                          onClick={handleSaveFollowupExtendidoConfig}
+                          disabled={isSavingFollowupExtendidoConfig || loadingFollowupExtendidoConfig}
                           className="rounded-xl sm:shrink-0"
                         >
-                          {isSavingFollowupDinamicoConfig ? 'Salvando...' : 'Salvar'}
+                          {isSavingFollowupExtendidoConfig ? 'Salvando...' : 'Salvar'}
                         </Button>
                       )}
                     </div>
@@ -2964,13 +2983,121 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                       <span className="inline-block h-1.5 w-1.5 mt-1.5 rounded-full bg-muted-foreground/60 shrink-0" />
                       <div className="space-y-2 min-w-0 break-words overflow-wrap-anywhere leading-relaxed">
                         <p>
-                          Defina por quantos dias o sistema deve considerar os leads perdidos para enviar novos follow-ups quando surgir uma oportunidade relevante para eles.
+                          Defina por quantos dias o lead pode ficar sem responder, dentro das etapas selecionadas, antes de receber um novo follow-up automático.
                         </p>
                         <p>
-                          <strong className="font-semibold text-foreground/80">Exemplo:</strong> se você configurar 30 dias, o sistema poderá reativar leads que foram marcados como perdidos nos últimos 30 dias.
+                          <strong className="font-semibold text-foreground/80">Exemplo:</strong> se você configurar 30 dias, o sistema envia um follow-up automático para leads que estão há 30 dias sem resposta nas etapas selecionadas.
                         </p>
                         <p>
-                          <strong className="font-semibold text-foreground/80">Período:</strong> mínimo de 30 dias e máximo de 360 dias.
+                          <strong className="font-semibold text-foreground/80">Período:</strong> mínimo de 7 dias e máximo de 360 dias.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border/60 bg-muted/10 p-5 sm:p-6 space-y-5 lg:col-span-2 order-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="h-9 w-9 shrink-0 rounded-xl border border-border/60 bg-gradient-to-br from-emerald-400/15 via-teal-500/15 to-cyan-500/15 flex items-center justify-center">
+                        <BarChart3 className="h-4 w-4 text-teal-600 dark:text-teal-300" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-foreground">
+                          Configuração de Etapas
+                        </div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          Escolha em quais etapas do funil o lead precisa estar para receber o FollowUp Extendido.
+                        </div>
+                      </div>
+                    </div>
+                    <Badge
+                      variant="secondary"
+                      className={`px-3 py-1 text-[11px] font-semibold shrink-0 ${
+                        followupExtendidoEtapas.length > 0
+                          ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-100'
+                          : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-100'
+                      }`}
+                    >
+                      {followupExtendidoEtapas.length > 0
+                        ? `${followupExtendidoEtapas.length} etapa${followupExtendidoEtapas.length === 1 ? '' : 's'}`
+                        : 'Não definido'}
+                    </Badge>
+                  </div>
+
+                  <div className="rounded-xl border border-border/50 bg-background/70 p-4 sm:p-5 space-y-4">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Label className="text-sm font-semibold text-foreground cursor-help">
+                          Etapas do funil elegíveis
+                        </Label>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" align="start" className="max-w-xs text-xs">
+                        Somente leads que estiverem em uma das etapas marcadas vão receber o FollowUp Extendido.
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {PIPELINE_STAGES.map((stage) => {
+                        const checked = followupExtendidoEtapas.includes(stage.name);
+                        return (
+                          <label
+                            key={stage.id}
+                            className={`flex items-center gap-2 rounded-xl border border-border/60 bg-background px-3 py-2 text-sm ${
+                              isEditingFollowupExtendidoEtapas ? 'cursor-pointer' : 'cursor-default opacity-80'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={!isEditingFollowupExtendidoEtapas}
+                              onChange={(e) => {
+                                const isChecked = e.target.checked;
+                                setFollowupExtendidoEtapas((prev) =>
+                                  isChecked
+                                    ? [...prev, stage.name]
+                                    : prev.filter((nome) => nome !== stage.name),
+                                );
+                              }}
+                              className="h-4 w-4 rounded border border-input bg-background accent-black shrink-0"
+                            />
+                            <span className="truncate">{stage.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex justify-end">
+                      {!isEditingFollowupExtendidoEtapas ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsEditingFollowupExtendidoEtapas(true)}
+                          className="rounded-xl"
+                        >
+                          Editar
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleSaveFollowupExtendidoConfig}
+                          disabled={isSavingFollowupExtendidoConfig || loadingFollowupExtendidoConfig}
+                          className="rounded-xl"
+                        >
+                          {isSavingFollowupExtendidoConfig ? 'Salvando...' : 'Salvar'}
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="flex items-start gap-2 text-[11px] text-muted-foreground pt-1">
+                      <span className="inline-block h-1.5 w-1.5 mt-1.5 rounded-full bg-muted-foreground/60 shrink-0" />
+                      <div className="space-y-2 min-w-0 break-words overflow-wrap-anywhere leading-relaxed">
+                        <p>
+                          Defina em quais etapas do funil o lead precisa estar para ser elegível ao FollowUp Extendido.
+                        </p>
+                        <p>
+                          <strong className="font-semibold text-foreground/80">Exemplo:</strong> marcando "Contato Realizado" e "Oportunidade Qualificada", só leads nessas duas etapas entram no envio.
+                        </p>
+                        <p>
+                          <strong className="font-semibold text-foreground/80">Obrigatório:</strong> selecione ao menos uma etapa.
                         </p>
                       </div>
                     </div>
@@ -2989,24 +3116,24 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                 <div>
                   <div className="text-base font-semibold">Histórico de FollowUps enviados</div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Somente registros confirmados com followup_dinamico = true.
+                    Somente registros confirmados com followup_extendido = true.
                   </div>
                 </div>
               </div>
               <div className="text-xs text-muted-foreground">
-                {loadingFollowupDinamicoHistorico
+                {loadingFollowupExtendidoHistorico
                   ? 'Carregando...'
-                  : `${followupDinamicoHistorico.length} registro${
-                      followupDinamicoHistorico.length === 1 ? '' : 's'
+                  : `${followupExtendidoHistorico.length} registro${
+                      followupExtendidoHistorico.length === 1 ? '' : 's'
                     }`}
               </div>
             </div>
 
-            {loadingFollowupDinamicoHistorico ? (
+            {loadingFollowupExtendidoHistorico ? (
               <div className="text-sm text-muted-foreground">Carregando...</div>
-            ) : followupDinamicoHistorico.length === 0 ? (
+            ) : followupExtendidoHistorico.length === 0 ? (
               <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-muted/30 to-transparent p-6 text-sm text-muted-foreground">
-                Nenhum FollowUp Dinâmico enviado ainda.
+                Nenhum FollowUp Extendido enviado ainda.
               </div>
             ) : (
               <TooltipProvider delayDuration={150}>
@@ -3022,7 +3149,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {followupDinamicoHistorico.map((row, idxHist) => {
+                      {followupExtendidoHistorico.map((row, idxHist) => {
                         const keyId = String(
                           (row as any).idx !== undefined && (row as any).idx !== null
                             ? `${(row as any).idx}-${(row as any).lead_id ?? idxHist}-${(row as any).criado_em ?? idxHist}`
@@ -3043,7 +3170,7 @@ export const FollowUpDinamicoTab: React.FC<FollowUpDinamicoTabProps> = ({
                         const handleAbrirLead = (e: React.MouseEvent) => {
                           e.preventDefault();
                           if (!leadId) return;
-                          console.debug('[FollowUp Dinamico] Abrir página do lead:', { leadId, nome });
+                          console.debug('[FollowUp Extendido] Abrir página do lead:', { leadId, nome });
                           navigate(`/lead/${leadId}`);
                         };
 

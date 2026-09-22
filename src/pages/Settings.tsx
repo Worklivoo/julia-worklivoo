@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useCRM } from '@/contexts/CRMContext';
-import { User, Mail, Phone, Building, Crown, Hash, Settings as SettingsIcon, Database, Users, BookOpen, History, MessageCircle, Shuffle, Plus, X, KeyRound, FileText, Eye, EyeOff, CreditCard, Package, Star, Sparkles, Send } from 'lucide-react';
+import { User, Mail, Phone, Building, Crown, Hash, Settings as SettingsIcon, Database, Users, BookOpen, History, MessageCircle, Shuffle, Plus, X, KeyRound, FileText, Eye, EyeOff, CreditCard, Package, Star, Sparkles, Send, Rocket } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { usePersistentTab } from '@/hooks/use-persistent-state';
 import WhatsApp from '@/pages/WhatsApp';
 import EstoqueDeProdutosTab from '@/pages/settings/EstoqueDeProdutosTab';
 import { FollowUpDinamicoTab } from '@/pages/settings/FollowUpDinamicoTab';
+import { FollowUpExtendidoTab } from '@/pages/settings/FollowUpExtendidoTab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -120,6 +121,34 @@ const Settings = () => {
       userTipo,
       userTipoUpper,
       isNotOutros,
+      pode_exibir: result,
+    });
+    return result;
+  }, [isAdmin, regraFU, regraFUDB, user?.id, settingsOwnerUserId]);
+
+  const canShowFollowupExtendido = useMemo(() => {
+    if (!isAdmin) return false;
+    const apiOficial = Boolean(regraFU.api_oficial);
+    const clienteStatus = String(regraFU.cliente_status || '').trim().toUpperCase();
+    const isNotTrial = clienteStatus !== 'TRIAL';
+    const userTipo = String(regraFU.user_tipo || '').trim();
+    const userTipoUpper = userTipo.toUpperCase();
+    const isOutros = userTipoUpper === 'OUTROS';
+    const result = apiOficial === true && isNotTrial && isOutros;
+    console.debug('[FollowUp Extendido] Verificação de exibição:', {
+      origem_campos: regraFUDB ? 'BANCO (usuarios_v2)' : 'CONTEXTO CRM (fallback)',
+      user_id: user?.id,
+      settingsOwnerUserId,
+      isAdmin,
+      api_oficial_raw: regraFU.api_oficial,
+      apiOficial,
+      cliente_status_raw: regraFU.cliente_status,
+      clienteStatus,
+      isNotTrial,
+      user_tipo_raw: regraFU.user_tipo,
+      userTipo,
+      userTipoUpper,
+      isOutros,
       pode_exibir: result,
     });
     return result;
@@ -1015,6 +1044,7 @@ Como posso te ajudar?`,
 
   const menuItems = [
     { id: 'followup-dinamico', label: 'FollowUp Dinamico', icon: Sparkles, highlight: true },
+    { id: 'followup-extendido', label: 'FollowUp Extendido', icon: Rocket, highlight: true },
     { id: 'gerais', label: 'Gerais', icon: SettingsIcon },
     { id: 'membros', label: 'Membros', icon: Users },
     { id: 'whatsapp', label: 'WhatsApp', icon: WhatsAppLogo },
@@ -1027,16 +1057,18 @@ Como posso te ajudar?`,
   const visibleMenuItems = useMemo(() => {
     const fullList = isAdmin ? menuItems : menuItems.filter((i) => new Set(nonAdminAllowedTabs).has(i.id as any));
     const filtered = fullList.filter((item) => {
-      if ((item as any).id !== 'followup-dinamico') return true;
-      return canShowFollowupDinamico;
+      if ((item as any).id === 'followup-dinamico') return canShowFollowupDinamico;
+      if ((item as any).id === 'followup-extendido') return canShowFollowupExtendido;
+      return true;
     });
-    console.debug('[FollowUp Dinamico] Menu filtrado final:', {
+    console.debug('[FollowUp Dinamico/Extendido] Menu filtrado final:', {
       isAdmin,
       canShowFollowupDinamico,
+      canShowFollowupExtendido,
       abas_visiveis: filtered.map((i) => i.id),
     });
     return filtered;
-  }, [isAdmin, nonAdminAllowedTabs, canShowFollowupDinamico]);
+  }, [isAdmin, nonAdminAllowedTabs, canShowFollowupDinamico, canShowFollowupExtendido]);
 
   useEffect(() => {
     if (!user) return;
@@ -1048,11 +1080,18 @@ Como posso te ajudar?`,
         });
         setActiveTab('gerais');
       }
+      if (activeTab === 'followup-extendido' && !canShowFollowupExtendido) {
+        console.debug('[FollowUp Extendido] Aba ativa inválida para este usuário. Redirecionando para "gerais".', {
+          activeTab,
+          canShowFollowupExtendido,
+        });
+        setActiveTab('gerais');
+      }
       return;
     }
     if (nonAdminAllowedTabs.includes(activeTab as any)) return;
     setActiveTab('base-de-conhecimento');
-  }, [activeTab, isAdmin, nonAdminAllowedTabs, setActiveTab, user, canShowFollowupDinamico]);
+  }, [activeTab, isAdmin, nonAdminAllowedTabs, setActiveTab, user, canShowFollowupDinamico, canShowFollowupExtendido]);
 
   return (
     <div className="h-full bg-background transition-colors">
@@ -2351,6 +2390,12 @@ Como posso te ajudar?`,
             {isAdmin && canShowFollowupDinamico && (
               <TabsContent value="followup-dinamico" className="mt-0">
                 <FollowUpDinamicoTab user={user} settingsOwnerUserId={settingsOwnerUserId} />
+              </TabsContent>
+            )}
+
+            {isAdmin && canShowFollowupExtendido && (
+              <TabsContent value="followup-extendido" className="mt-0">
+                <FollowUpExtendidoTab user={user} settingsOwnerUserId={settingsOwnerUserId} />
               </TabsContent>
             )}
           </div>
