@@ -442,48 +442,7 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
       setIsAcquireDialogOpen(true);
       setAcquireStep(3);
 
-      (async () => {
-        try {
-          const pipelineRes = await executarPipelinePosPagamento(storagePagamento);
-          // Salva flag pipelineExecutado no storage (evita rodar 2x em caso de refresh rápido)
-          const atualizado: FollowUpExtendidoPagamento = {
-            ...storagePagamento,
-            completedAt: storagePagamento.completedAt ?? Date.now(),
-            pipelineExecutado: pipelineRes.ok,
-            pipelineErro: pipelineRes.ok ? null : pipelineRes.erro ?? 'erro_desconhecido',
-          };
-          savePagamentoToStorage(settingsOwnerUserId, atualizado);
-
-          if (!pipelineRes.ok) {
-            toast({
-              title: 'Pagamento confirmado!',
-              description:
-                'Porém houve um erro ao ativar a funcionalidade. Contate o suporte com o código: ' +
-                storagePagamento.externalReference,
-              variant: 'destructive',
-            });
-          } else {
-            toast({
-              title: 'Funcionalidade ativada! 🎉',
-              description: pipelineRes.guard_clause
-                ? 'FollowUp Extendido já estava ativado.'
-                : 'Tudo certo, sua funcionalidade premium foi liberada!',
-            });
-          }
-        } catch (err: any) {
-          console.error(`[FU Extendido Restore] Erro ao executar pipeline:`, err);
-        } finally {
-          // Atraso 3s para o usuário curtir animação de sucesso (igual ao fluxo normal)
-          setTimeout(() => {
-            setIsAcquireDialogOpen(false);
-            setSelectedPlanId(null);
-            setAcquireStep(1);
-            setPagamentoConfirmadoUI(false);
-            clearPagamentoFromStorage(settingsOwnerUserId);
-            reloadFollowupExtendidoConfig().catch(() => void 0);
-          }, 3000);
-        }
-      })();
+      finalizarAposPagamento(storagePagamento).catch(() => void 0);
       return;
     }
 
@@ -1065,7 +1024,7 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
     setIsCreatingQrCode(true);
     const correlationId = `FU_EXTENDIDO_${settingsOwnerUserId}_${Date.now()}`;
     const timestampUnix = Math.floor(Date.now() / 1000);
-    const externalReference = `FU_EXTENDIDO_${settingsOwnerUserId}_${timestampUnix}`;
+    const externalReference = `FU_EXTENDIDO_${selectedPlan.id}_${settingsOwnerUserId}_${timestampUnix}`;
 
     const valorRateioCentavos = Math.round(Number(planoProrrateado.valorRateio) * 100);
     const valorPlanoCheioCentavos = Math.round(Number(planoProrrateado.valorPlanoCheio) * 100);
@@ -1381,310 +1340,53 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
     }
   };
 
-  const PLANOS_PRECOS_FU: Record<string, number> = {
-    essencial: 99,
-    pro: 190,
-    empresarial: 490,
-  };
-  const PLANOS_VOLUME_FU: Record<string, number> = {
-    essencial: 40,
-    pro: 100,
-    empresarial: 300,
-  };
-
-  const executarPipelinePosPagamento = async (
-    pagamentoConfirmado: FollowUpExtendidoPagamento,
-  ): Promise<{ ok: boolean; guard_clause?: boolean; detalhes?: any; erro?: string }> => {
-    const correlationId = `PIPELINE_${pagamentoConfirmado.externalReference}_${Date.now()}`;
-
-    console.groupCollapsed(`[FU Pipeline ${correlationId}] Iniciando pipeline pós-pagamento RECEIVED`);
-    console.info('externalReference:', pagamentoConfirmado.externalReference);
-    console.info('planoId:', pagamentoConfirmado.planoId);
-    console.info('paymentId:', pagamentoConfirmado.paymentId);
-    console.groupEnd();
-
-    try {
-      if (!settingsOwnerUserId) throw new Error('settingsOwnerUserId ausente');
-
-      const precoPlanoReais = PLANOS_PRECOS_FU[String(pagamentoConfirmado.planoId || '').toLowerCase()] || 0;
-      const volumePadrao = PLANOS_VOLUME_FU[String(pagamentoConfirmado.planoId || '').toLowerCase()] || 40;
-
-      if (precoPlanoReais <= 0) throw new Error(`planoId desconhecido: ${pagamentoConfirmado.planoId}`);
-
-      // ---- Step 1: SELECT usuarios_v2 ----
-      console.info(`[FU Pipeline ${correlationId}] Step 1/5: SELECT usuarios_v2 WHERE user_id=eq.${settingsOwnerUserId} ...`);
-      const { data: userRow, error: errSel } = await supabase
-        .from('usuarios_v2')
-        .select(
-          'user_id,followup_extendido,followup_extendido_volume,user_valor_mensal,id_assinatura_asaas,id_cliente_asaas,dia_vencimento',
-        )
-        .eq('user_id', settingsOwnerUserId)
-        .maybeSingle();
-
-      if (errSel) throw new Error(`select_usuarios: ${errSel.message}`);
-      if (!userRow) throw new Error('usuario_nao_encontrado');
-      const ur = userRow as any;
-
-      const followup_extendido_atual = Boolean(ur.followup_extendido ?? false);
-      const idAssinaturaAsaas = String(ur.id_assinatura_asaas || '').trim();
-      const userValorMensalAtualReais = Number(ur.user_valor_mensal) || 0;
-
-      // ---- Step 2: GUARD CLAUSE ANTI DUPLA ATIVAÇÃO ----
-      if (followup_extendido_atual === true) {
-        console.warn(
-          `[FU Pipeline ${correlationId}] Step 2/5: GUARD CLAUSE — followup_extendido já é true. Abortando pipeline SEM ALTERAR NADA para não somar 2x no user_valor_mensal.`,
-        );
-        console.groupCollapsed(`[FU Pipeline ${correlationId}] ✅ Concluído (guard clause).`);
-        console.info('guard_clause=already_active');
-        console.groupEnd();
-        return { ok: true, guard_clause: true, detalhes: { motivo: 'already_active' } };
-      }
-
-      // ---- Step 3: UPDATE usuarios_v2 ----
-      console.info(`[FU Pipeline ${correlationId}] Step 3/5: PATCH usuarios_v2.`);
-      console.info('  - user_valor_mensal (de):', userValorMensalAtualReais);
-      console.info('  - followup_extendido_volume (padrão plano):', volumePadrao);
-      const novoValorMensalReais = userValorMensalAtualReais + precoPlanoReais;
-      console.info('  - user_valor_mensal (para):', novoValorMensalReais);
-
-      const volumeAtualBanco =
-        ur.followup_extendido_volume === null || ur.followup_extendido_volume === undefined
-          ? null
-          : Number(ur.followup_extendido_volume);
-      const novoVolume =
-        volumeAtualBanco && volumeAtualBanco > 0 ? volumeAtualBanco : volumePadrao;
-
-      const { error: errUpd } = await supabase
-        .from('usuarios_v2')
-        .update({
-          user_valor_mensal: novoValorMensalReais,
-          followup_extendido: true,
-          followup_extendido_volume: novoVolume,
-        } as any)
-        .eq('user_id', settingsOwnerUserId);
-
-      if (errUpd) {
-        console.error(
-          `[FU Pipeline ${correlationId}] Step 3/5 FALHOU. Pipeline ABORTADO (não tocaremos Asaas para evitar divergência).`,
-          errUpd,
-        );
-        throw new Error(`update_usuarios: ${errUpd.message}`);
-      }
-      console.info(`[FU Pipeline ${correlationId}] Step 3/5 OK. usuarios_v2 atualizado.`);
-
-      // Verifica se tem id_assinatura_asaas — se não, pular etapas 4 e 5 com warn (não fatal)
-      let cancelamentosFuturos = { ok: 0, falha: 0, ids: [] as string[] };
-      let patchAssinaturaOk = false;
-      let patchAssinaturaErro: string | null = null;
-
-      if (!idAssinaturaAsaas) {
-        console.warn(
-          `[FU Pipeline ${correlationId}] Steps 4/5 e 5/5 SKIPPADOS: id_assinatura_asaas ausente em usuarios_v2. Nada para apagar/atualizar no Asaas.`,
-        );
-      } else {
-        const apiKey = getAsaasApiKey();
-        if (shouldRequireAsaasApiKey() && !apiKey) {
-          console.warn(
-            `[FU Pipeline ${correlationId}] Steps 4/5 e 5/5 SKIPPADOS (não fatal): shouldRequireAsaasApiKey=true mas chave frontend ausente. Tente novamente depois ou configure o token no servidor.`,
-          );
-        } else {
-          const headersAsaas = {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            ...(apiKey ? { access_token: apiKey } : {}),
-          };
-
-          // ---- Step 4: Listar + deletar cobranças futuras pendentes da assinatura ----
-          console.info(
-            `[FU Pipeline ${correlationId}] Step 4/5: Listando cobranças PENDENTES FUTURAS da assinatura ${idAssinaturaAsaas.slice(0,4)}...${idAssinaturaAsaas.slice(-3)} ...`,
-          );
-          try {
-            const hojeIso = new Date().toISOString().split('T')[0];
-            const respLista = await asaasFetch(
-              `/subscriptions/${encodeURIComponent(idAssinaturaAsaas)}/payments?limit=100&status=PENDING`,
-              { method: 'GET', headers: { Accept: 'application/json', ...(apiKey ? { access_token: apiKey } : {}) } },
-            );
-            let pagamentosPendentes: any[] = [];
-            if (respLista.ok) {
-              const lista: any = await respLista.json();
-              pagamentosPendentes = Array.isArray(lista?.data) ? lista.data : [];
-            }
-            console.info(
-              `[FU Pipeline ${correlationId}] Step 4/5: Encontradas ${pagamentosPendentes.length} cobranças PENDING da assinatura. Filtrando datas futuras >= HOJE (${hojeIso}).`,
-            );
-
-            const idsDeletar: string[] = [];
-            for (const p of pagamentosPendentes) {
-              const data = String(p?.dueDate || p?.expectedPaymentDate || '').split('T')[0].trim();
-              if (!data) continue;
-              if (data >= hojeIso) {
-                idsDeletar.push(String(p?.id || '').trim());
-              }
-            }
-            console.info(
-              `[FU Pipeline ${correlationId}] Step 4/5: ${idsDeletar.length} cobranças FUTURAS (>= hoje) serão deletadas. ids=`,
-              idsDeletar,
-            );
-
-            for (const pid of idsDeletar) {
-              if (!pid) continue;
-              try {
-                const delResp = await asaasFetch(`/payments/${encodeURIComponent(pid)}`, {
-                  method: 'DELETE',
-                  headers: { Accept: 'application/json', ...(apiKey ? { access_token: apiKey } : {}) },
-                });
-                if (delResp.ok) {
-                  cancelamentosFuturos.ok += 1;
-                  cancelamentosFuturos.ids.push(pid);
-                } else {
-                  cancelamentosFuturos.falha += 1;
-                  console.warn(
-                    `[FU Pipeline ${correlationId}] Step 4/5: DELETE payment ${pid} status=${delResp.status} (WARN, NÃO FATAL).`,
-                  );
-                }
-              } catch (e) {
-                cancelamentosFuturos.falha += 1;
-                console.warn(
-                  `[FU Pipeline ${correlationId}] Step 4/5: Exceção DELETE payment ${pid}:`,
-                  e,
-                );
-              }
-            }
-          } catch (e: any) {
-            console.warn(
-              `[FU Pipeline ${correlationId}] Step 4/5: Exceção geral ao listar/deletar (NÃO FATAL, banco já atualizado):`,
-              e?.message || e,
-            );
-          }
-
-          // ---- Step 5: PUT /subscriptions/{id} com novo valor total ----
-          // PADRÃO EXATO DA ABA ASSINATURA (ver Assinatura.tsx handleChangeDueDate 772-788):
-          // OBRIGATÓRIO enviar nextDueDate + updatePendingPayments=true
-          // Só método PUT funciona (Asaas não aceita PATCH para alterar valor/nextDueDate).
-          console.info(
-            `[FU Pipeline ${correlationId}] Step 5/5: PUT assinatura ${idAssinaturaAsaas.slice(0,4)}...${idAssinaturaAsaas.slice(-3)} COM PADRÃO ABA ASSINATURA (nextDueDate + updatePendingPayments=true). value=${novoValorMensalReais}.`,
-          );
-
-          try {
-            // Calcula nextDueDate igual ao padrão Assinatura: se HOJE >= dia_vencimento
-            // então próxima data é mês que vem no mesmo dia. Caso contrário é esse mês no dia_vencimento.
-            const agora = new Date();
-            const diaVencimentoRaw = String(ur.dia_vencimento || '').trim();
-            const diaVencimentoNum = parseInt(diaVencimentoRaw, 10);
-            const diaSeguro =
-              isNaN(diaVencimentoNum) || diaVencimentoNum < 1 || diaVencimentoNum > 31
-                ? 15
-                : diaVencimentoNum;
-            const ultimoDiaProximoMes = new Date(
-              agora.getFullYear(),
-              agora.getMonth() + 2,
-              0,
-            ).getDate();
-            const diaLimite = Math.min(diaSeguro, ultimoDiaProximoMes);
-            const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
-            const dataAtualMes = new Date(agora.getFullYear(), agora.getMonth(), diaLimite);
-            const dataProximoMes = new Date(agora.getFullYear(), agora.getMonth() + 1, diaLimite);
-            const ultimoDiaMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).getDate();
-            let dataAtualMesSegura = new Date(agora.getFullYear(), agora.getMonth(), Math.min(diaLimite, ultimoDiaMesAtual));
-            const nextDueDateDate =
-              dataAtualMesSegura <= hoje ? dataProximoMes : dataAtualMesSegura;
-            const nextDueDateYmd =
-              nextDueDateDate.getFullYear() +
-              '-' +
-              String(nextDueDateDate.getMonth() + 1).padStart(2, '0') +
-              '-' +
-              String(nextDueDateDate.getDate()).padStart(2, '0');
-
-            const putBody = {
-              value: Number(novoValorMensalReais.toFixed(2)),
-              nextDueDate: nextDueDateYmd,
-              updatePendingPayments: true,
-            };
-
-            console.info(
-              `[FU Pipeline ${correlationId}] Step 5/5: PUT body =`,
-              putBody,
-            );
-
-            const finalResp = await asaasFetch(
-              `/subscriptions/${encodeURIComponent(idAssinaturaAsaas)}`,
-              {
-                method: 'PUT',
-                headers: {
-                  accept: 'application/json',
-                  'content-type': 'application/json',
-                  ...(apiKey ? { access_token: apiKey } : {}),
-                },
-                body: JSON.stringify(putBody),
-              },
-            );
-
-            if (finalResp.ok) {
-              patchAssinaturaOk = true;
-              let respValorConfirmado: any = null;
-              try {
-                respValorConfirmado = await finalResp.json();
-              } catch {}
-              console.info(
-                `[FU Pipeline ${correlationId}] Step 5/5 OK. Assinatura atualizada no Asaas. response.value=${respValorConfirmado?.value}; response.nextDueDate=${respValorConfirmado?.nextDueDate}; response.updatePendingPayments=${respValorConfirmado?.updatePendingPayments}.`,
-              );
-            } else {
-              const t = await finalResp.text().catch(() => '');
-              let detalheErro = '';
-              try {
-                const jsonErr = JSON.parse(t);
-                if (jsonErr?.errors?.[0]?.description) detalheErro = jsonErr.errors[0].description;
-                else if (jsonErr?.error) detalheErro = jsonErr.error;
-                else if (jsonErr?.message) detalheErro = jsonErr.message;
-              } catch {}
-              patchAssinaturaErro = detalheErro
-                ? `${detalheErro} (status_${finalResp.status})`
-                : `status_${finalResp.status}: ${t.slice(0, 180)}`;
-              console.warn(
-                `[FU Pipeline ${correlationId}] Step 5/5 WARN (NÃO FATAL, banco já está certo): status=${finalResp.status}. body preview=`,
-                t.slice(0, 400),
-              );
-            }
-          } catch (e: any) {
-            patchAssinaturaErro = e?.message || String(e);
-            console.warn(
-              `[FU Pipeline ${correlationId}] Step 5/5 Exceção (NÃO FATAL):`,
-              e?.message || e,
-            );
-          }
+  // Ativação feita no servidor (n8n). Aqui só aguardamos a flag ligar e atualizamos a tela.
+  const finalizarAposPagamento = async (pagamento: any) => {
+    const owner = settingsOwnerUserId;
+    if (!owner) return;
+    let ativado = false;
+    const limite = Date.now() + 90000;
+    while (Date.now() < limite && isMountedRef.current) {
+      try {
+        const { data } = await supabase
+          .from('usuarios_v2')
+          .select('followup_extendido')
+          .eq('user_id', owner)
+          .maybeSingle();
+        if ((data as any)?.followup_extendido === true) {
+          ativado = true;
+          break;
         }
+      } catch (err) {
+        console.warn('[FU Extendido] Erro ao consultar ativação (tentando novamente):', err);
       }
-
-      console.groupCollapsed(`[FU Pipeline ${correlationId}] ✅ Pipeline concluído SEM ERROS FATAIS.`);
-      console.info('guard_clause=executado (primeira ativação)');
-      console.info('user_valor_mensal_de:', userValorMensalAtualReais);
-      console.info('user_valor_mensal_para:', novoValorMensalReais);
-      console.info('followup_extendido=true');
-      console.info('followup_extendido_volume:', novoVolume);
-      console.info('cancelamentos_futuros:', cancelamentosFuturos);
-      console.info('patch_assinatura_ok:', patchAssinaturaOk);
-      if (patchAssinaturaErro) console.info('patch_assinatura_erro:', patchAssinaturaErro);
-      console.groupEnd();
-
-      return {
-        ok: true,
-        detalhes: {
-          user_valor_mensal_de: userValorMensalAtualReais,
-          user_valor_mensal_para: novoValorMensalReais,
-          followup_extendido: true,
-          followup_extendido_volume: novoVolume,
-          cancelamentos_futuros: cancelamentosFuturos,
-          patch_assinatura_ok: patchAssinaturaOk,
-          patch_assinatura_erro: patchAssinaturaErro || null,
-          plano: pagamentoConfirmado.planoId,
-          preco_plano_reais: precoPlanoReais,
-        },
-      };
-    } catch (e: any) {
-      const msg = e?.message || String(e);
-      console.error(`[FU Pipeline ${correlationId}] ❌ ERRO FATAL no pipeline:`, msg, e);
-      return { ok: false, erro: msg };
+      await new Promise((r) => setTimeout(r, 2000));
     }
+    // Desmontou: mantém o storage; ao voltar à tela o restore retoma a espera.
+    if (!isMountedRef.current) return;
+
+    clearPagamentoFromStorage(owner);
+    if (ativado) {
+      toast({
+        title: 'Funcionalidade ativada! 🎉',
+        description: 'Tudo certo, sua funcionalidade premium foi liberada!',
+      });
+    } else {
+      toast({
+        title: 'Pagamento confirmado!',
+        description:
+          'Seu pagamento foi recebido e a ativação está sendo finalizada. Se em alguns minutos ela não aparecer, contate o suporte com o código: ' +
+          pagamento.externalReference,
+      });
+    }
+    setTimeout(() => {
+      if (!isMountedRef.current) return;
+      setIsAcquireDialogOpen(false);
+      setSelectedPlanId(null);
+      setAcquireStep(1);
+      setPagamentoConfirmadoUI(false);
+      reloadFollowupExtendidoConfig().catch(() => void 0);
+    }, ativado ? 2000 : 500);
   };
 
   const pollStatusPagamentoOnce = async (
@@ -1839,71 +1541,17 @@ export const FollowUpExtendidoTab: React.FC<FollowUpExtendidoTabProps> = ({
           console.info('valorProxFatura (R$):', atualizado.valorProxFatura);
           console.info('planoId:', atualizado.planoId);
           console.info('ciclo:', atualizado.ciclo);
-          console.info(
-            '>>> Executando pipeline de ativação no FRONTEND (padrão ABA ASSINATURA): SELECT → GUARD → UPDATE usuarios_v2 → DELETE cobranças futuras → PATCH assinatura Asaas.',
-          );
           console.groupEnd();
 
-          // ===== EXECUTA PIPELINE PÓS-PAGAMENTO (igual padrão ABA ASSINATURA) =====
-          const pipelineRes = await executarPipelinePosPagamento(atualizado);
-          if (pipelineRes.ok === false) {
-            toast({
-              title: 'Pagamento recebido!',
-              description:
-                'A confirmação do PIX chegou, mas houve um erro ao finalizar a ativação. Por favor contate o suporte informando o código: ' +
-                atualizado.externalReference,
-              variant: 'destructive',
-            });
-          } else if (pipelineRes.guard_clause) {
-            console.info(
-              `[FU Extendido Polling] Pipeline retornou guard_clause (funcionalidade já ativada anteriormente). Continuando normalmente.`,
-            );
-          }
-
-          if (settingsOwnerUserId) {
-            const finalizado: FollowUpExtendidoPagamento = {
-              ...atualizado,
-              completedAt: Date.now(),
-              pipelineExecutado: pipelineRes.ok === true,
-              pipelineErro:
-                pipelineRes.ok === true
-                  ? null
-                  : pipelineRes.erro ?? (pipelineRes.ok === false ? 'erro_pipeline_generico' : null),
-            };
-            savePagamentoToStorage(settingsOwnerUserId, finalizado);
-            setPagamentoAtivo(finalizado);
-          }
-
+          // A ativação é feita no servidor (automação n8n "Pagamentos Recebidos (FollowUps)").
+          // O front apenas mostra a confirmação e aguarda a flag ser ligada.
           setPagamentoConfirmadoUI(true);
           setIsPollingPagamento(false);
-
           toast({
             title: 'Pagamento confirmado! 🎉',
-            description:
-              'Recebemos a confirmação do PIX. Aguarde alguns segundos enquanto ativamos a sua funcionalidade.',
+            description: 'Recebemos o PIX. Estamos preparando a ativação da sua funcionalidade...',
           });
-
-          // Fechamos o dialog de forma suave após 3 segundos para o usuário curtir a animação de sucesso.
-          // Usa isMountedRef (não `cancelled`) porque este mesmo setPagamentoAtivo/setPagamentoConfirmadoUI
-          // acima já derruba o efeito de polling (dependências mudaram) e marcaria `cancelled=true`
-          // antes deste timer disparar, impedindo o fechamento automático.
-          timeoutAuto = setTimeout(() => {
-            if (!isMountedRef.current) return;
-            console.info('[FU Extendido Polling] Fechando dialog após confirmação (3s delay).');
-            setIsAcquireDialogOpen(false);
-            setSelectedPlanId(null);
-            setAcquireStep(1);
-            setPagamentoConfirmadoUI(false);
-
-            // Limpa o storage pois o pagamento foi concluído
-            if (settingsOwnerUserId) {
-              clearPagamentoFromStorage(settingsOwnerUserId);
-            }
-
-            // Revalida os dados do usuário para trocar a tela de aquisição pelo layout ativo
-            // (caso a confirmação já tenha sido processada pelo webhook)
-            reloadFollowupExtendidoConfig().catch(() => void 0);
-          }, 3000);
+          finalizarAposPagamento(atualizado).catch(() => void 0);
         } else if (novoStatus === 'CANCELLED' || novoStatus === 'EXPIRED') {
           console.warn(
             `[FU Extendido Polling] Pagamento em status final não pago: ${novoStatus}. Parando polling.`,
