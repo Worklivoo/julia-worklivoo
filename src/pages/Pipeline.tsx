@@ -70,6 +70,7 @@ const Pipeline = () => {
   const [exportLoading, setExportLoading] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [companyMembers, setCompanyMembers] = useState<Membro[]>([]);
+  const [memberNamesById, setMemberNamesById] = useState<Record<string, string>>({});
   const [memberOptions, setMemberOptions] = useState<MemberFilterOption[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -83,10 +84,21 @@ const Pipeline = () => {
     { key: 'lead_empresa', label: 'EMPRESA' },
     { key: 'lead_telefone', label: 'TELEFONE' },
     { key: 'lead_email', label: 'EMAIL' },
+    { key: 'membro_id', label: 'RESPONSÁVEL' },
+    { key: 'lead_nome_oportunidade', label: 'NOME DA OPORTUNIDADE' },
+    { key: 'lead_valor', label: 'VALOR' },
     { key: 'lead_canal_origem', label: 'CANAL DE ORIGEM' },
-    { key: 'lead_notas', label: 'NOTAS' },
+    { key: 'item_interesse', label: 'ITEM DE INTERESSE' },
+    { key: 'link_produto_interessado', label: 'LINK DO PRODUTO' },
     { key: 'TRIAL', label: 'TRIAL' },
     { key: 'ativo_ia', label: 'IA ESTA ATIVA?' },
+    { key: 'ativo_followup', label: 'FOLLOWUP ATIVO?' },
+    { key: 'ativo_fluxo_cadencia', label: 'CADÊNCIA ATIVA?' },
+    { key: 'etapa_fluxo_followup', label: 'ETAPA DO FOLLOWUP' },
+    { key: 'followup_dinamico', label: 'FOLLOWUP DINÂMICO?' },
+    { key: 'followup_extendido', label: 'FOLLOWUP ESTENDIDO?' },
+    { key: 'tentativas_followup', label: 'TENTATIVAS DE FOLLOWUP' },
+    { key: 'lead_notas', label: 'NOTAS' },
     { key: 'conversa', label: 'CONVERSA (IA)' },
   ];
   const selectedColumns = allColumns.map(c => c.key);
@@ -152,6 +164,7 @@ const Pipeline = () => {
       if (!userIdForCompany) {
         if (isMounted) {
           setCompanyMembers([]);
+          setMemberNamesById({});
           setMemberOptions([]);
           setSelectedMemberIds([]);
           setMembersLoading(false);
@@ -166,22 +179,28 @@ const Pipeline = () => {
 
       if (error || !data) {
         setCompanyMembers([]);
+        setMemberNamesById({});
         setMemberOptions([]);
         setSelectedMemberIds([]);
         setMembersLoading(false);
         return;
       }
 
-      const activeMembers = (data as Membro[])
+      const allMembers = data as Membro[];
+      const activeMembers = allMembers
         .filter((membro) => membro.membro_status === 'Ativado');
 
       const availableMembers = activeMembers
-        .filter((membro) => membro.membro_status === 'Ativado')
         .map((membro) => ({
           id: String(membro.membro_id),
           name: String(membro.membro_nome || '').trim() || 'Sem nome',
         }));
+      // Inclui membros desativados para que leads antigos ainda exportem o nome do responsável.
+      const namesById = Object.fromEntries(
+        allMembers.map((membro) => [String(membro.membro_id), String(membro.membro_nome || '').trim() || 'Sem nome'])
+      );
       setCompanyMembers(activeMembers);
+      setMemberNamesById(namesById);
       setMemberOptions(availableMembers);
       setSelectedMemberIds((prev) => prev.filter((memberId) => availableMembers.some((member) => member.id === memberId)));
       setMembersLoading(false);
@@ -381,12 +400,22 @@ const Pipeline = () => {
         }
         return v;
       };
+      const booleanColumns = new Set(['ativo_followup', 'followup_dinamico', 'followup_extendido']);
       const csv = [
         headers.join(','),
         ...rows.map((lead) =>
           selectedColumns
             .map((key) => {
               const raw = lead[key];
+              if (key === 'membro_id') {
+                const memberId = String(raw || '').trim();
+                if (!memberId) return escapeCSV('Sem responsável');
+                return escapeCSV(memberNamesById[memberId] || 'Membro removido');
+              }
+              if (booleanColumns.has(key)) {
+                if (raw === null || raw === undefined) return escapeCSV('');
+                return escapeCSV(raw === true || String(raw).toLowerCase() === 'true' ? 'Sim' : 'Não');
+              }
               if ((key === 'lead_nome_pessoa' || key === 'lead_nome_oportunidade') && (raw === null || raw === undefined || String(raw).trim() === '')) {
                 return escapeCSV('N/A');
               }

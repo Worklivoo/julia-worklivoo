@@ -51,7 +51,7 @@ export async function getLeadsByUser(user_id: string, membro_id?: string) {
   const excludedOrigins = '("worklivoo-treinamento","worklivoo-treinamento-manual","worklivoo-lixo")';
   let query = supabase
     .from('leads_v2')
-    .select('lead_id,created_at,update_mensagem,lead_etapa,lead_status,lead_nome_pessoa,lead_empresa,lead_telefone,lead_email,lead_canal_origem,lead_notas,lead_valor,user_id,lead_nome_oportunidade,ativo_followup,ativo_fluxo_cadencia,etapa_fluxo_followup,ativo_ia,membro_id,TRIAL,conversa,followup_dinamico')
+    .select('lead_id,created_at,update_mensagem,lead_etapa,lead_status,lead_nome_pessoa,lead_empresa,lead_telefone,lead_email,lead_canal_origem,lead_notas,lead_valor,user_id,lead_nome_oportunidade,ativo_followup,ativo_fluxo_cadencia,etapa_fluxo_followup,ativo_ia,membro_id,TRIAL,conversa,followup_dinamico,followup_extendido,tentativas_followup,item_interesse,link_produto_interessado')
     .eq('user_id', user_id)
     .not('lead_canal_origem', 'in', excludedOrigins)
     .or('lead_canal_origem.is.null,lead_canal_origem.not.ilike.%worklivoo-%');
