@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -10,7 +11,7 @@ import { ThumbsUp, ThumbsDown, RotateCcw, MessageCircle, Smartphone, Sparkles, P
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ConversationThread, getMessagePreviewText, normalizeMessageId, parseLeadsV2Conversa, parseTimestampzToDate, stripAiThinking, toTimestamp } from '@/components/ConversationThread';
+import { ConversationThread, extractLastMessagePreviewText, getMessagePreviewText, normalizeMessageId, parseLeadsV2Conversa, parseTimestampzToDate, stripAiThinking, toTimestamp } from '@/components/ConversationThread';
 import { useCRM } from '@/contexts/CRMContext';
 import { supabase } from '@/lib/supabase';
 import { getUserProfile } from '@/lib/supabase-utils';
@@ -31,6 +32,7 @@ type TrainingConversation = {
   update_mensagem?: string | null
   created_at?: string | null
   followup_dinamico?: boolean | null
+  conversa?: string
 }
 
 type MessageItem = {
@@ -75,6 +77,11 @@ const Conversas = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [conversations, setConversations] = useState<TrainingConversation[]>([]);
   const [messagesByConv, setMessagesByConv] = useState<Record<string, MessageItem[]>>({});
+  // Prévia (só a última mensagem) de cada conversa, calculada com uma extração leve
+  // (extractLastMessagePreviewText) em vez do parser completo. É o que a lista e a
+  // busca usam; o parser completo (parseLeadsV2Conversa) só roda sob demanda, para
+  // a conversa aberta no momento — ver o efeito de `selectedConvId` mais abaixo.
+  const [conversationPreview, setConversationPreview] = useState<Record<string, string>>({});
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [feedbackByMessage, setFeedbackByMessage] = useState<Record<string, 'up' | 'down'>>({});
   const [togglingAiByConv, setTogglingAiByConv] = useState<Record<string, boolean>>({});
@@ -96,6 +103,7 @@ const Conversas = () => {
   const [mobileView, setMobileView] = useState<'list' | 'thread'>('list');
   const isMobileThreadView = isMobile && mobileView === 'thread';
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const conversationListRef = useRef<HTMLDivElement | null>(null);
   const scrollMessagesToBottom = () => {
     const el = messagesRef.current;
     if (el) {
@@ -307,10 +315,12 @@ const Conversas = () => {
       }
     });
 
-  // Busca as conversas em páginas menores, ordenadas pela mais recente primeiro,
-  // e entrega cada página via onPage assim que chega — em vez de esperar buscar
-  // as milhares de linhas do usuário de uma vez só antes de mostrar qualquer coisa.
-  const CONVERSATIONS_PAGE_SIZE = 300;
+  // Busca as conversas em páginas, ordenadas pela mais recente primeiro, e entrega
+  // cada página via onPage assim que chega — em vez de esperar buscar as milhares
+  // de linhas do usuário de uma vez só antes de mostrar qualquer coisa. Como agora
+  // só extraímos a prévia leve por página (ver applyRowsIncrementally), 1000 por
+  // página é seguro e reduz o número de idas e vindas ao servidor.
+  const CONVERSATIONS_PAGE_SIZE = 1000;
   const fetchLeadsV2TrainingRowsPaged = async (
     uid: string,
     membroId: string | null | undefined,
@@ -353,27 +363,28 @@ const Conversas = () => {
     update_mensagem: (typeof r?.update_mensagem === 'undefined' ? null : r.update_mensagem),
     created_at: (typeof r?.created_at === 'undefined' ? null : r.created_at),
     followup_dinamico: Boolean(r?.followup_dinamico) || (typeof r?.followup_dinamico === 'undefined' ? null : r.followup_dinamico),
+    conversa: String(r?.conversa ?? ''),
   });
 
   // Processa uma página de linhas em pequenos pedaços, cedendo o main thread entre
-  // eles. O parse de `conversa` (parseLeadsV2Conversa) é a parte mais cara — com
-  // milhares de conversas, fazer tudo de uma vez trava a aba até terminar.
-  const PARSE_CHUNK_SIZE = 40;
+  // eles. Calcula só a prévia leve de cada conversa (extractLastMessagePreviewText) —
+  // bem mais barata que o parser completo (parseLeadsV2Conversa), que roda apenas
+  // para a conversa selecionada (sob demanda), nunca para as milhares da lista.
+  const PARSE_CHUNK_SIZE = 250;
   const applyRowsIncrementally = async (
     rows: any[],
     setConvs: React.Dispatch<React.SetStateAction<TrainingConversation[]>>,
-    setMsgs: React.Dispatch<React.SetStateAction<Record<string, MessageItem[]>>>
+    setPreviews: React.Dispatch<React.SetStateAction<Record<string, string>>>
   ) => {
     for (let i = 0; i < rows.length; i += PARSE_CHUNK_SIZE) {
       const slice = rows.slice(i, i + PARSE_CHUNK_SIZE);
       const newConvs: TrainingConversation[] = [];
-      const newMsgs: Record<string, MessageItem[]> = {};
+      const newPreviews: Record<string, string> = {};
       slice.forEach((r: any) => {
         newConvs.push(buildConversationRow(r));
         const leadId = String(r?.lead_id ?? '');
         if (!leadId) return;
-        const baseTs = toTimestamp(r?.update_mensagem) || toTimestamp(r?.created_at) || Date.now();
-        newMsgs[leadId] = parseLeadsV2Conversa(leadId, String(r?.conversa ?? ''), baseTs);
+        newPreviews[leadId] = extractLastMessagePreviewText(String(r?.conversa ?? ''));
       });
 
       if (newConvs.length > 0) {
@@ -383,8 +394,8 @@ const Conversas = () => {
           return additions.length > 0 ? [...prev, ...additions] : prev;
         });
       }
-      if (Object.keys(newMsgs).length > 0) {
-        setMsgs((prev) => ({ ...prev, ...newMsgs }));
+      if (Object.keys(newPreviews).length > 0) {
+        setPreviews((prev) => ({ ...prev, ...newPreviews }));
       }
 
       if (i + PARSE_CHUNK_SIZE < rows.length) await yieldToMain();
@@ -423,7 +434,7 @@ const Conversas = () => {
       try {
         await fetchLeadsV2TrainingRowsPaged(String(userIdForData), membroIdQueryFilter, async (rows) => {
           const filtered = rows.filter((r: any) => String(r?.lead_canal_origem || '') !== 'worklivoo-lixo');
-          await applyRowsIncrementally(filtered, setConversations, setMessagesByConv);
+          await applyRowsIncrementally(filtered, setConversations, setConversationPreview);
           filtered.forEach((r: any) => {
             const id = String(r?.lead_id ?? '');
             if (id) accumulatedIds.push(id);
@@ -542,6 +553,21 @@ const Conversas = () => {
     return () => clearTimeout(t);
   }, [selectedConvId]);
 
+  // Faz o parse completo (parseLeadsV2Conversa) só da conversa selecionada, quando
+  // ainda não foi feito. A lista inteira só carrega a prévia leve (ver
+  // applyRowsIncrementally); o histórico completo — com respostas encadeadas, ids
+  // de mensagem, badge de FollowUp Dinâmico etc. — só é necessário para a thread
+  // aberta na tela, então evitamos gastar isso com conversas que o usuário nunca abre.
+  useEffect(() => {
+    if (!selectedConvId) return;
+    if (messagesByConv[selectedConvId]) return;
+    const conv = conversations.find((c) => c.dify_conversation === selectedConvId);
+    if (!conv) return;
+    const baseTs = toTimestamp(conv.update_mensagem) || toTimestamp(conv.created_at) || Date.now();
+    const parsed = parseLeadsV2Conversa(selectedConvId, String(conv.conversa ?? ''), baseTs);
+    setMessagesByConv((prev) => (prev[selectedConvId] ? prev : { ...prev, [selectedConvId]: parsed }));
+  }, [selectedConvId, conversations]);
+
   const reloadMessages = async (options?: { showToast?: boolean }) => {
     if (!userIdForData || !membersResolved) return;
     if (loading) return;
@@ -559,7 +585,7 @@ const Conversas = () => {
 
       await fetchLeadsV2TrainingRowsPaged(String(userIdForData), membroIdQueryFilter, async (rows) => {
         const filtered = rows.filter((r: any) => String(r?.lead_canal_origem || '') !== 'worklivoo-lixo');
-        await applyRowsIncrementally(filtered, setConversations, setMessagesByConv);
+        await applyRowsIncrementally(filtered, setConversations, setConversationPreview);
         filtered.forEach((r: any) => {
           const id = String(r?.lead_id ?? '');
           if (id) accumulatedIds.push(id);
@@ -821,6 +847,7 @@ const Conversas = () => {
         user_id: String(inserted.user_id || userIdForData),
         lead_canal_origem: 'worklivoo-treinamento-manual',
         update_mensagem: now,
+        conversa: '',
       };
 
       setConversations((prev) => {
@@ -830,6 +857,7 @@ const Conversas = () => {
       setSelectedConvId(conversationId);
       if (isMobile) setMobileView('thread');
       setMessagesByConv((prev) => ({ ...prev, [conversationId]: [] }));
+      setConversationPreview((prev) => ({ ...prev, [conversationId]: '' }));
       toast({ title: 'Conversa manual criada', description: 'Lead criado com sucesso.' });
     } catch (e: any) {
       toast({ title: 'Erro de rede', description: e?.message || 'Não foi possível criar a conversa.' });
@@ -872,6 +900,7 @@ const Conversas = () => {
           current.push(optimisticUser);
           return { ...prev, [conv.dify_conversation]: current };
         });
+        setConversationPreview((prev) => ({ ...prev, [conv.dify_conversation]: msg }));
         setTimeout(scrollMessagesToBottom, 0);
 
         setTypingByConv((prev) => ({ ...prev, [conv.dify_conversation]: true }));
@@ -1143,13 +1172,11 @@ const Conversas = () => {
       const matchesMember = !showMemberFilter || matchesSelectedMemberFilter(memberId);
       if (!matchesMember) return false;
       if (!term) return true;
-      const msgs = messagesByConv[c.dify_conversation] || [];
-      const last = msgs[msgs.length - 1];
-      const preview = stripAiThinking((last?.content || last?.answer || '').toString()).toLowerCase();
+      const preview = String(conversationPreview[c.dify_conversation] || '').toLowerCase();
       const phoneTitle = formatPhone(c.dify_user || '');
       return phoneTitle.toLowerCase().includes(term) || preview.includes(term);
     });
-  }, [messagesByConv, orderedConversations, search, selectedOrigins, selectedMemberIds, selectedAdminMemberIds, showMemberFilter]);
+  }, [conversationPreview, orderedConversations, search, selectedOrigins, selectedMemberIds, selectedAdminMemberIds, showMemberFilter]);
 
   const originOptions = useMemo(() => {
     const origemSet = new Set<string>();
@@ -1179,6 +1206,17 @@ const Conversas = () => {
     if (selectedOrigins.length === 1) return originLabelByValue.get(selectedOrigins[0]) || selectedOrigins[0];
     return `${selectedOrigins.length} origens`;
   }, [originLabelByValue, selectedOrigins]);
+
+  // Com milhares de conversas, renderizar um <button> por conversa (com avatar,
+  // badges etc.) trava a rolagem e deixa qualquer atualização da lista lenta —
+  // o navegador tem que montar/reconciliar todos os nós de uma vez. O virtualizer
+  // só monta no DOM os itens realmente visíveis (+ uma margem de segurança).
+  const rowVirtualizer = useVirtualizer({
+    count: filteredConversations.length,
+    getScrollElement: () => conversationListRef.current,
+    estimateSize: () => 88,
+    overscan: 8,
+  });
 
   return (
     <div className={`${isMobileThreadView ? 'h-[calc(100dvh-80px)] min-h-0 overflow-hidden' : 'min-h-[calc(100dvh-80px)] bg-background'} md:flex md:h-auto md:min-h-[560px] md:flex-1 md:basis-0 md:flex-col md:overflow-visible`}>
@@ -1320,51 +1358,59 @@ const Conversas = () => {
                   )}
                 </div>
                 <Separator />
-                <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 md:px-3 md:py-3">
-                  {filteredConversations.map((c) => {
-                    const msgs = messagesByConv[c.dify_conversation] || [];
-                    const last = msgs[msgs.length - 1];
-                    const preview = getMessagePreviewText(stripAiThinking((last?.content || last?.answer || '').toString()));
-                    const origem = String(c.lead_canal_origem || '');
-                    const title = (origem === 'worklivoo-treinamento' || origem === 'worklivoo-treinamento-manual')
-                      ? 'TESTE'
-                      : formatPhone(c.dify_user || '');
-                    const lastUpdateLabel = formatConversationLastUpdate(c.update_mensagem || c.created_at);
-                    const isSelected = selectedConvId === c.dify_conversation;
-                    const colorClasses = getConversationColorClasses(c, isSelected);
-                    return (
-                      <button
-                        key={c.dify_conversation}
-                        className={`group flex min-h-[76px] w-full items-center rounded-2xl border border-border/40 px-3 py-3 text-left transition-colors ${colorClasses} ${filteredConversations.length > 1 ? 'mb-2' : ''}`}
-                        onClick={() => {
-                          setSelectedConvId(c.dify_conversation);
-                          if (isMobile) setMobileView('thread');
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9">
-                            <AvatarFallback className="bg-background/60">
-                              <Smartphone className="h-4 w-4" />
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</div>
-                              <div className="flex shrink-0 items-center gap-1.5">
-                                <FollowupDinamicoBadge active={c.followup_dinamico} />
-                                {!!lastUpdateLabel && (
-                                  <div className="shrink-0 text-[11px] font-medium text-muted-foreground">
-                                    {lastUpdateLabel}
+                <div ref={conversationListRef} className="min-h-0 flex-1 overflow-y-auto px-2 py-2 md:px-3 md:py-3">
+                  <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', width: '100%' }}>
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const c = filteredConversations[virtualRow.index];
+                      if (!c) return null;
+                      const preview = getMessagePreviewText(String(conversationPreview[c.dify_conversation] || ''));
+                      const origem = String(c.lead_canal_origem || '');
+                      const title = (origem === 'worklivoo-treinamento' || origem === 'worklivoo-treinamento-manual')
+                        ? 'TESTE'
+                        : formatPhone(c.dify_user || '');
+                      const lastUpdateLabel = formatConversationLastUpdate(c.update_mensagem || c.created_at);
+                      const isSelected = selectedConvId === c.dify_conversation;
+                      const colorClasses = getConversationColorClasses(c, isSelected);
+                      return (
+                        <div
+                          key={c.dify_conversation}
+                          ref={rowVirtualizer.measureElement}
+                          data-index={virtualRow.index}
+                          style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)`, paddingBottom: 8 }}
+                        >
+                          <button
+                            className={`group flex min-h-[76px] w-full items-center rounded-2xl border border-border/40 px-3 py-3 text-left transition-colors ${colorClasses}`}
+                            onClick={() => {
+                              setSelectedConvId(c.dify_conversation);
+                              if (isMobile) setMobileView('thread');
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-9 w-9">
+                                <AvatarFallback className="bg-background/60">
+                                  <Smartphone className="h-4 w-4" />
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</div>
+                                  <div className="flex shrink-0 items-center gap-1.5">
+                                    <FollowupDinamicoBadge active={c.followup_dinamico} />
+                                    {!!lastUpdateLabel && (
+                                      <div className="shrink-0 text-[11px] font-medium text-muted-foreground">
+                                        {lastUpdateLabel}
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+                                </div>
+                                <div className="line-clamp-1 text-xs text-muted-foreground group-hover:text-muted-foreground/90">{preview || '—'}</div>
                               </div>
                             </div>
-                            <div className="line-clamp-1 text-xs text-muted-foreground group-hover:text-muted-foreground/90">{preview || '—'}</div>
-                          </div>
+                          </button>
                         </div>
-                      </button>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                   {loading && conversations.length === 0 && (
                     <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
                   )}

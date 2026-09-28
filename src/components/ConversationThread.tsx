@@ -399,6 +399,37 @@ export const formatConversationDaySeparator = (value: unknown) => {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }).format(d);
 };
 
+// Extrai só o texto da última mensagem do bloco bruto de `conversa`, sem rodar o
+// parser completo (troca de papéis, ids, respostas encadeadas, FollowUp Dinâmico
+// etc.). Usado nas listas/prévias de conversas, que só mostram a última mensagem —
+// com milhares de conversas, parsear a thread inteira de cada uma só pra isso é o
+// maior custo de CPU da tela. A conversa completa (`parseLeadsV2Conversa`) só
+// precisa rodar para a conversa que está aberta no momento.
+export const extractLastMessagePreviewText = (conversaRaw: string): string => {
+  const text = String(conversaRaw || '');
+  if (!text) return '';
+  const lines = text.split('\n');
+  const headerRegex = /^(IA|CLIENTE)\s*(?:\(\s*[^)]*\s*\)\s*)*:\s*/i;
+  let lastHeaderLineIdx = -1;
+  let lastHeaderMatchLen = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = String(lines[i] ?? '').trimStart();
+    const m = trimmed.match(headerRegex);
+    if (m) {
+      lastHeaderLineIdx = i;
+      lastHeaderMatchLen = m[0].length;
+    }
+  }
+  let tail: string;
+  if (lastHeaderLineIdx >= 0) {
+    const firstLine = String(lines[lastHeaderLineIdx] ?? '').trimStart().slice(lastHeaderMatchLen);
+    tail = [firstLine, ...lines.slice(lastHeaderLineIdx + 1)].join('\n');
+  } else {
+    tail = text;
+  }
+  return stripAiThinking(tail).trim();
+};
+
 export const parseLeadsV2Conversa = (leadId: string, conversaRaw: string, baseTimestamp: number): ConversationThreadMessage[] => {
   const lines = String(conversaRaw || '').split('\n');
   let currentRole: 'assistant' | 'user' | null = null;
