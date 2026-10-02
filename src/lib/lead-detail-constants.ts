@@ -1,6 +1,6 @@
 import { UserPlus, PhoneCall, MessageCircle, Handshake, CircleDollarSign, type LucideIcon } from 'lucide-react';
 
-export interface Stage {
+interface Stage {
   id: string;
   name: string;
   icon: LucideIcon;
@@ -16,18 +16,3 @@ export const PIPELINE_STAGES: Stage[] = [
 ];
 
 export const NOTE_TRUNCATE_LENGTH = 200;
-
-export const DIALOG_SIZES = {
-  mobile: {
-    width: 'w-[95vw]',
-    height: 'h-[90vh]',
-    textareaHeight: 'h-[60vh]',
-    textareaRows: 20,
-  },
-  desktop: {
-    width: 'w-[60vw]',
-    height: 'h-[75vh]',
-    textareaHeight: 'h-[45vh]',
-    textareaRows: 16,
-  },
-} as const;

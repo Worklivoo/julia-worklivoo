@@ -102,7 +102,7 @@ export const getComunicadoRedirectUrl = (comunicadoId: number): string | null =>
   return COMUNICADO_REDIRECT_MAP[comunicadoId] ?? null;
 };
 
-export const fetchUsuarioV2Flags = async (
+const fetchUsuarioV2Flags = async (
   userId: string
 ): Promise<{ followup_dinamico: boolean | null } | null> => {
   const { data, error } = await supabase

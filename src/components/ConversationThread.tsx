@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Zap } from 'lucide-react';
+import { FileText, Zap, Rocket } from 'lucide-react';
 
 export type ConversationThreadMessage = {
   id?: string
@@ -10,6 +10,7 @@ export type ConversationThreadMessage = {
   reply_to_message_id?: string
   reply_preview?: string
   is_followup_dinamico?: boolean
+  is_followup_extendido?: boolean
 }
 
 export const toTimestamp = (value: unknown) => {
@@ -436,6 +437,7 @@ export const parseLeadsV2Conversa = (leadId: string, conversaRaw: string, baseTi
   let currentExternalId: string | null = null;
   let currentCreatedAt: string | null = null;
   let currentIsFollowUpDinamico: boolean = false;
+  let currentIsFollowUpExtendido: boolean = false;
   let buffer: string[] = [];
   const out: ConversationThreadMessage[] = [];
 
@@ -457,6 +459,7 @@ export const parseLeadsV2Conversa = (leadId: string, conversaRaw: string, baseTi
       content: text,
       created_at: currentCreatedAt ? currentCreatedAt : String(baseTimestamp + idx),
       is_followup_dinamico: currentIsFollowUpDinamico || undefined,
+      is_followup_extendido: currentIsFollowUpExtendido || undefined,
     });
   };
 
@@ -471,6 +474,9 @@ export const parseLeadsV2Conversa = (leadId: string, conversaRaw: string, baseTi
   };
   const extractIsFollowUpDinamico = (header: string) => {
     return /\(\s*FollowUp\s*Dinâmico\s*\)/i.test(header);
+  };
+  const extractIsFollowUpExtendido = (header: string) => {
+    return /\(\s*FollowUp\s*Extendido\s*\)/i.test(header);
   };
 
   for (const rawLine of lines) {
@@ -490,6 +496,7 @@ export const parseLeadsV2Conversa = (leadId: string, conversaRaw: string, baseTi
         currentExternalId = extractMessageId(header);
         currentCreatedAt = extractTimestampz(header);
         currentIsFollowUpDinamico = extractIsFollowUpDinamico(header);
+        currentIsFollowUpExtendido = extractIsFollowUpExtendido(header);
         buffer = [firstContentLine];
         continue;
       }
@@ -536,6 +543,7 @@ export const parseLeadsV2Conversa = (leadId: string, conversaRaw: string, baseTi
       id: `${baseId}-split-${index}-q`,
       created_at: derivedCreatedAt,
       is_followup_dinamico: base?.is_followup_dinamico,
+      is_followup_extendido: base?.is_followup_extendido,
       ...overrides,
     };
   };
@@ -759,6 +767,7 @@ export const ConversationThread = ({
             {ordered.map((m, idx, arr) => {
               const isAssistant = m.role === 'assistant' || m.role === 'bot';
               const isFollowUpDinamico = Boolean(m.is_followup_dinamico);
+              const isFollowUpExtendido = Boolean(m.is_followup_extendido);
               const text = stripAiThinking(((m.content || m.answer || '') as string) || '');
               const contentBlocks = getMessageRenderBlocks(text);
               const replyPreview = !isAssistant ? stripAiThinking(String((m as any)?.reply_preview || '')) : '';
@@ -777,11 +786,9 @@ export const ConversationThread = ({
               const baseId = normalizeMessageId(String(m.id || idx));
               const assistantActionsNode = isAssistant && assistantActions ? assistantActions(m, baseId, idx) : null;
 
-              const followupBorderClasses = isFollowUpDinamico
-                ? isAssistant
-                  ? 'border-2 border-amber-500/80 ring-2 ring-amber-400/40 shadow-[0_0_0_1px_rgba(245,158,11,0.3),0_4px_12px_rgba(245,158,11,0.18)]'
-                  : 'border-2 border-amber-500/70 ring-2 ring-amber-400/35 shadow-[0_0_0_1px_rgba(245,158,11,0.25),0_4px_12px_rgba(245,158,11,0.12)]'
-                : '';
+              // Follow-ups são identificados pela etiqueta preta; a borda só reforça, sem cor de acento.
+              const followupBorderClasses = isFollowUpDinamico || isFollowUpExtendido ? 'ring-1 ring-black/30' : '';
+              const isFollowUpTagged = isFollowUpDinamico || isFollowUpExtendido;
 
               return (
                 <div
@@ -797,17 +804,25 @@ export const ConversationThread = ({
                       </div>
                     </div>
                   )}
-                  <div className={`flex ${isAssistant ? 'justify-end' : 'justify-start'} ${isFollowUpDinamico ? 'relative' : ''}`}>
+                  <div className={`flex ${isAssistant ? 'justify-end' : 'justify-start'} ${isFollowUpTagged ? 'relative' : ''}`}>
                     {isFollowUpDinamico && (
                       <div
-                        className={`absolute ${isAssistant ? '-top-2.5 right-2' : '-top-2.5 left-2'} z-10 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 text-white text-[10px] font-extrabold px-2 py-0.5 shadow-md ring-1 ring-black/10`}
+                        className={`absolute ${isAssistant ? '-top-2.5 right-2' : '-top-2.5 left-2'} z-10 inline-flex items-center gap-1 rounded-full bg-[#141414] text-white text-[10px] font-extrabold px-2 py-0.5 shadow-sm`}
                       >
-                        <Zap className="h-3 w-3 drop-shadow-sm" strokeWidth={2.5} />
+                        <Zap className="h-3 w-3" strokeWidth={2.5} />
                         <span className="tracking-wide">FollowUp Dinâmico</span>
                       </div>
                     )}
+                    {isFollowUpExtendido && (
+                      <div
+                        className={`absolute ${isAssistant ? '-top-2.5 right-2' : '-top-2.5 left-2'} z-10 inline-flex items-center gap-1 rounded-full bg-[#141414] text-white text-[10px] font-extrabold px-2 py-0.5 shadow-sm`}
+                      >
+                        <Rocket className="h-3 w-3" strokeWidth={2.5} />
+                        <span className="tracking-wide">FollowUp Extendido</span>
+                      </div>
+                    )}
                     <div
-                      className={`relative whitespace-pre-line rounded-3xl px-4 py-2 text-sm shadow-sm ${followupBorderClasses} ${isAssistant ? 'max-w-[86%] bg-[#EBF57D] text-black md:max-w-[72%]' : 'max-w-[86%] bg-white/90 text-black md:max-w-[72%]'} ${isFollowUpDinamico ? 'mt-1.5' : ''}`}
+                      className={`relative whitespace-pre-line rounded-[14px] px-4 py-2 text-sm shadow-sm ${followupBorderClasses} ${isAssistant ? 'max-w-[86%] bg-[#d9fdd3] text-black md:max-w-[72%]' : 'max-w-[86%] bg-white text-black md:max-w-[72%]'} ${isFollowUpTagged ? 'mt-1.5' : ''}`}
                     >
                       {!!replyPreview && (
                         <div className="mb-2 rounded-2xl bg-black/5 px-3 py-2 text-xs text-black/70">

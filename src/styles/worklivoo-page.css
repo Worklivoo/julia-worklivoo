@@ -1,0 +1,907 @@
+/* ==========================================================================
+   Worklivoo — páginas de produto (painéis, cartões de dados, tabelas)
+   Segue design-worklivoo/design.md, seções 2, 3 e 5.
+   Importe worklivoo-tokens.css e worklivoo-components.css antes.
+
+   Regra geral dessas telas: densidade alta, contraste baixo, uma cor só de
+   acento. O limão já está no menu lateral, então não entra de novo no conteúdo.
+   ========================================================================== */
+
+/* O fundo da página escurece para --paper só nas telas migradas (opt-in). */
+.min-h-screen.bg-background:has(.wl-page) {
+  background: var(--paper);
+}
+
+/* --- cartão da página ----------------------------------------------------- */
+
+.wl-page {
+  padding: clamp(24px, 4vw, 56px);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-card);
+  background: var(--white);
+  box-shadow: var(--shadow-card);
+}
+
+@media (max-width: 640px) {
+  .wl-page {
+    border-radius: var(--radius-block);
+  }
+}
+
+.wl-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 56px;
+}
+
+.wl-page__title {
+  margin: 0;
+  max-width: 62ch;
+  font-size: clamp(30px, 4vw, 48px);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -.035em;
+  color: var(--ink);
+}
+
+/* --- seções --------------------------------------------------------------- */
+
+/* O fio vem de `.wl-section + .wl-section`: nada pode ficar entre duas seções. */
+.wl-section + .wl-section {
+  margin-top: 72px;
+  padding-top: 72px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 640px) {
+  .wl-section + .wl-section {
+    margin-top: 40px;
+    padding-top: 40px;
+  }
+
+  .wl-page__head {
+    margin-bottom: 40px;
+  }
+}
+
+.wl-section__head {
+  margin-bottom: 28px;
+}
+
+.wl-section__title {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -.02em;
+  color: var(--ink);
+}
+
+/* --- painel dentro do cartão --------------------------------------------- */
+
+.wl-panel {
+  padding: 20px;
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+}
+
+/* --- cartões de dados (stat) ---------------------------------------------- */
+
+.wl-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+}
+
+.wl-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 22px;
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+  transition: transform .22s var(--ease);
+}
+
+.wl-stat:hover {
+  transform: translateY(-1px);
+}
+
+.wl-stat__label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--wl-muted);
+}
+
+.wl-stat__value {
+  font-size: clamp(32px, 3vw, 40px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.wl-stat__unit {
+  font-size: .55em;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--muted-soft);
+}
+
+.wl-stat__meta {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--wl-muted);
+}
+
+.wl-stat__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+}
+
+/* Destaque da tela: o dado que importa, em preto (o limão já está no menu). */
+.wl-stat--ink {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.wl-stat--ink .wl-stat__label,
+.wl-stat--ink .wl-stat__meta {
+  color: var(--muted-soft);
+}
+
+.wl-stat--ink .wl-stat__value {
+  color: var(--white);
+}
+
+/* barra de progresso */
+.wl-meter {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--stone-deep);
+}
+
+.wl-meter__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ink);
+  transition: width .35s var(--ease);
+}
+
+.wl-stat--ink .wl-meter {
+  background: rgba(251, 251, 251, .18);
+}
+
+.wl-stat--ink .wl-meter__fill {
+  background: var(--white);
+}
+
+/* --- etiqueta (pílula) ---------------------------------------------------- */
+
+.wl-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 5px 11px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink);
+}
+
+.wl-pill--danger {
+  border-color: transparent;
+  color: var(--danger);
+}
+
+/* --- gráficos ------------------------------------------------------------- */
+
+.wl-chart-tip {
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  background: var(--ink);
+  box-shadow: var(--shadow-glass);
+  color: var(--white);
+}
+
+.wl-chart-tip__label {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.wl-chart-tip__value {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-soft);
+}
+
+.wl-chart-tip__value strong {
+  font-weight: 800;
+  color: var(--white);
+}
+
+/* funil no celular: azulejos */
+.wl-minis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wl-mini {
+  padding: 16px;
+  border-radius: var(--radius-tile);
+  background: var(--paper);
+}
+
+.wl-mini__value {
+  display: block;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.wl-mini__label {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wl-muted);
+}
+
+/* origem no celular: barras horizontais */
+.wl-bars {
+  display: grid;
+  gap: 18px;
+}
+
+.wl-bars__row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.wl-bars__name {
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.wl-bars__count {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* --- tabela de itens ------------------------------------------------------ */
+
+.wl-table {
+  display: grid;
+}
+
+.wl-table__row {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) 96px;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: var(--radius-tile);
+  transition: background .22s var(--ease);
+}
+
+.wl-table__row:last-child {
+  border-bottom: 0;
+}
+
+.wl-table__row:not(.wl-table__row--head):hover {
+  background: var(--paper);
+}
+
+.wl-table__row--head {
+  padding-top: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--wl-muted);
+}
+
+.wl-table__right {
+  text-align: right;
+}
+
+.wl-person {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.wl-avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--stone);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: var(--ink);
+}
+
+.wl-person__name {
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.wl-person__sub {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--wl-muted);
+}
+
+.wl-when__date {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.wl-when__time {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wl-muted);
+}
+
+/* No celular a tabela vira lista: avatar + nome. */
+@media (max-width: 640px) {
+  .wl-table__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wl-table__row--head,
+  .wl-table__origin,
+  .wl-table__when {
+    display: none;
+  }
+}
+
+/* --- estado vazio --------------------------------------------------------- */
+
+.wl-empty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 40px 20px;
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+  text-align: center;
+}
+
+.wl-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-tile);
+  background: var(--stone);
+  color: var(--ink);
+}
+
+.wl-empty__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.wl-empty__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.wl-empty__text {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--wl-muted);
+}
+
+/* --- seletor de período (popover, portal) --------------------------------- */
+
+.wl-pop.wl-scope {
+  width: 288px;
+  padding: 20px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-tile);
+  background: var(--white);
+  box-shadow: var(--shadow-card);
+  color: var(--ink);
+}
+
+.wl-pop__actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding-top: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-stat,
+  .wl-table__row,
+  .wl-meter__fill {
+    transition: none;
+  }
+
+  .wl-stat:hover {
+    transform: none;
+  }
+}
+
+.wl-person__text {
+  min-width: 0;
+}
+
+.wl-stat__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wl-stat__top .wl-stat__label {
+  padding-top: 3px;
+}
+
+/* o "i" mora no canto do cartão sem empurrar o rótulo */
+.wl-stat__top .wl-info {
+  margin: -3px -6px 0 0;
+}
+
+.wl-stat--ink .wl-info:hover,
+.wl-stat--ink .wl-info[data-state="delayed-open"],
+.wl-stat--ink .wl-info[data-state="instant-open"] {
+  background: rgba(251, 251, 251, .14);
+  color: var(--white);
+}
+
+/* ==========================================================================
+   Funil de leads — quadro kanban (design.md, seção 5)
+   Colunas: cabeçalho caixa alta 11,5px/800, contador à direita.
+   Cartões: brancos, raio 11px, nome 13px/700, metadado 12px/500.
+   Cartão em movimento ganha borda --lime (único uso de limão no quadro).
+   ========================================================================== */
+
+.wl-page--board {
+  padding: clamp(20px, 2.4vw, 32px);
+}
+
+.wl-page__head--compact {
+  margin-bottom: 28px;
+}
+
+.wl-page__head--compact .wl-page__title {
+  font-size: clamp(28px, 3vw, 36px);
+}
+
+/* --- barra de filtros ----------------------------------------------------- */
+
+.wl-toolbar {
+  --control-h: 42px;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.wl-toolbar__search {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.wl-toolbar .wl-input,
+.wl-toolbar .wl-btn {
+  font-size: 13px;
+}
+
+.wl-toolbar .wl-input.wl-toolbar__select {
+  width: 190px;
+}
+
+.wl-toolbar .wl-toolbar__members {
+  width: 220px;
+  justify-content: space-between;
+}
+
+.wl-toolbar__members span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wl-toolbar__members span span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wl-toolbar__members svg {
+  flex-shrink: 0;
+}
+
+/* Na barra, os botões de vidro ficam iguais aos campos (papel + fio). */
+.wl-toolbar .wl-btn--glass {
+  border-color: var(--line);
+  background: var(--paper);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.wl-toolbar .wl-btn--glass:hover:not(:disabled) {
+  border-color: var(--stone-deep);
+  background: var(--paper);
+}
+
+.wl-btn--icon {
+  width: var(--control-h);
+  padding: 0;
+}
+
+@media (max-width: 640px) {
+  .wl-toolbar .wl-input.wl-toolbar__select,
+  .wl-toolbar .wl-toolbar__members,
+  .wl-toolbar > .wl-btn:not(.wl-btn--icon),
+  .wl-toolbar__date,
+  .wl-toolbar__date .wl-btn {
+    width: 100%;
+  }
+}
+
+/* --- quadro --------------------------------------------------------------- */
+
+.wl-board {
+  --radius-lead: 11px;
+
+  display: flex;
+  gap: 16px;
+  padding-bottom: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--stone-deep) transparent;
+}
+
+.wl-col {
+  display: flex;
+  flex: 0 0 300px;
+  flex-direction: column;
+  width: 300px;
+  height: 600px;
+  padding: 16px;
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+  transition: background .22s var(--ease);
+}
+
+@media (max-width: 1024px) {
+  .wl-col {
+    height: 70vh;
+  }
+}
+
+.wl-col.is-over {
+  background: var(--stone);
+}
+
+.wl-col__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.wl-col__icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--wl-muted);
+}
+
+.wl-col__name {
+  margin: 0;
+  min-width: 0;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  line-height: 1.25;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.wl-col__count {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--white);
+  font-size: 11.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* Etiqueta "IA": colunas em que a Julia atua. Preta, para não gastar limão. */
+.wl-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--ink);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--white);
+}
+
+.wl-chip svg {
+  width: 10px;
+  height: 10px;
+}
+
+.wl-col__total {
+  margin: 0;
+  padding: 10px 2px 0;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--wl-muted);
+}
+
+.wl-col__list {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: 10px;
+  margin-top: 12px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.wl-col__list::-webkit-scrollbar {
+  display: none;
+}
+
+.wl-col__empty {
+  margin: 20px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  color: var(--muted-soft);
+}
+
+/* --- cartão de lead ------------------------------------------------------- */
+
+.wl-lead {
+  position: relative;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lead);
+  background: var(--white);
+  cursor: pointer;
+  transition: transform .22s var(--ease), box-shadow .22s var(--ease), border-color .22s var(--ease);
+}
+
+.wl-lead:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-glass);
+}
+
+.wl-lead:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Cartão em movimento: borda limão. */
+.wl-lead.is-dragging {
+  border-color: var(--lime);
+  box-shadow: var(--shadow-card);
+}
+
+.wl-lead--lost {
+  background: var(--stone);
+}
+
+.wl-lead--fu .wl-lead__name {
+  padding-right: 26px;
+}
+
+.wl-lead__name {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+/* origem do lead e estado da IA */
+.wl-lead__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.wl-lead .wl-pill {
+  border-color: transparent;
+  background: var(--paper);
+}
+
+.wl-lead--lost .wl-pill {
+  background: var(--white);
+}
+
+.wl-lead__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.wl-lead__time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--wl-muted);
+}
+
+.wl-lead__time svg {
+  width: 12px;
+  height: 12px;
+}
+
+.wl-lead__end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.wl-lead__value {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* Selos de estado (vendido, perdido, tarefas atrasadas) */
+.wl-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.wl-tag svg {
+  width: 11px;
+  height: 11px;
+}
+
+.wl-tag--won {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.wl-tag--lost {
+  background: var(--white);
+  color: var(--wl-muted);
+}
+
+.wl-tag--idle {
+  background: var(--stone);
+  color: var(--wl-muted);
+}
+
+.wl-tag--alert {
+  background: var(--danger);
+  color: var(--white);
+}
+
+/* Follow-up dinâmico enviado: ícone discreto no canto do cartão */
+.wl-lead__fu {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--stone);
+  color: var(--ink);
+}
+
+.wl-lead__fu svg {
+  width: 11px;
+  height: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-lead,
+  .wl-col {
+    transition: none;
+  }
+
+  .wl-lead:hover {
+    transform: none;
+  }
+}

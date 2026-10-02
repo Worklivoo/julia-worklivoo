@@ -65,60 +65,7 @@ export const updateUserProfile = async (userId: string, updates: UsuarioUpdate):
   return data
 }
 
-// Função para upload de avatar
-export const uploadAvatar = async (file: File, userId: string): Promise<string | null> => {
-  // Validar tipo de arquivo imagem
-  if (!file.type.startsWith('image/')) {
-    console.error('Arquivo não é uma imagem.');
-    return null;
-  }
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${userId}-avatar.${fileExt}`;
-
-  const { data, error } = await supabase.storage
-    .from('avatars')
-    .upload(fileName, file, {
-      cacheControl: '3600',
-      upsert: true // Permite sobrescrever avatar
-    });
-
-  if (error) {
-    console.error('Erro ao fazer upload do avatar:', error.message, error);
-    return null;
-  }
-
-  // Gerar URL pública
-  const { data: publicData } = supabase.storage
-    .from('avatars')
-    .getPublicUrl(fileName);
-
-  if (!publicData || !publicData.publicUrl) {
-    console.error('Erro ao gerar URL pública do avatar.');
-    return null;
-  }
-
-  return publicData.publicUrl;
-}
-
-// Função para deletar avatar antigo
-export const deleteAvatar = async (avatarUrl: string): Promise<boolean> => {
-  // Extrair nome do arquivo da URL
-  const fileName = avatarUrl.split('/').pop()
-  if (!fileName) return false
-
-  const { error } = await supabase.storage
-    .from('avatars')
-    .remove([fileName])
-
-  if (error) {
-    console.error('Erro ao deletar avatar:', error)
-    return false
-  }
-
-  return true
-}
-
-export type FonteDadosInput = {
+type FonteDadosInput = {
   tipo: string
   link: string
   body?: string | null
@@ -193,33 +140,6 @@ export const updateFonteDados = async (
     cliente: data.user_empresa ?? null,
   }
   return { data: normalized, error: null }
-}
-
-export const getBaseConhecimentoByUser = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('usuarios_v2')
-    .select('user_id, conhecimento_id, documento_id, prompt')
-    .eq('user_id', userId)
-    .single()
-  return { data, error }
-}
-
-export const updateBaseConhecimentoByUser = async (
-  userId: string,
-  updates: { conhecimento_id?: string | null; documento_id?: string | null; prompt?: string | null }
-) => {
-  const payload: Record<string, any> = {}
-  if (updates.conhecimento_id !== undefined) payload.conhecimento_id = updates.conhecimento_id
-  if (updates.documento_id !== undefined) payload.documento_id = updates.documento_id
-  if (updates.prompt !== undefined) payload.prompt = updates.prompt
-
-  const { data, error } = await supabase
-    .from('usuarios_v2')
-    .update(payload)
-    .eq('user_id', userId)
-    .select()
-    .single()
-  return { data, error }
 }
 
 export const getBaseConhecimentoV2ByUser = async (userId: string) => {
@@ -317,28 +237,6 @@ export const updateTelefoneQualificadoByUser = async (userId: string, telefone55
   return { data, error }
 }
 
-export const getMensagemSaudacaoPortalByUser = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('usuarios_v2')
-    .select('mensagem_saudacao_portal')
-    .eq('user_id', userId)
-    .single()
-  if (error) {
-    return { data: null, error }
-  }
-  return { data: (data as any)?.mensagem_saudacao_portal ?? null, error: null }
-}
-
-export const updateMensagemSaudacaoPortalByUser = async (userId: string, mensagem: string | null) => {
-  const { data, error } = await supabase
-    .from('usuarios_v2')
-    .update({ mensagem_saudacao_portal: mensagem })
-    .eq('user_id', userId)
-    .select('mensagem_saudacao_portal')
-    .single()
-  return { data, error }
-}
-
 export const getMensagemSaudacaoConfigByUser = async (userId: string) => {
   const { data, error } = await supabase
     .from('usuarios_v2')
@@ -374,28 +272,6 @@ export const updateMensagemSaudacaoConfigByUser = async (
     .select('mensagem_saudacao_portal,id_mensagem_saudacao_api_oficial_whatsapp')
     .single()
 
-  return { data, error }
-}
-
-export const getFrequenciaFollowupByUser = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('usuarios_v2')
-    .select('frequencia_followup')
-    .eq('user_id', userId)
-    .single()
-  if (error) {
-    return { data: null, error }
-  }
-  return { data: (data as any)?.frequencia_followup ?? null, error: null }
-}
-
-export const updateFrequenciaFollowupByUser = async (userId: string, frequencia: number | null) => {
-  const { data, error } = await supabase
-    .from('usuarios_v2')
-    .update({ frequencia_followup: frequencia })
-    .eq('user_id', userId)
-    .select('frequencia_followup')
-    .single()
   return { data, error }
 }
 

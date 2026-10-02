@@ -1,19 +1,35 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { useCRM } from '@/contexts/CRMContext';
-import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, ArrowLeft, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, Mail, Lock, ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, LoginFormData } from '@/schemas/auth';
 import { AlertDialog, AlertDialogContent, AlertDialogFooter } from '@/components/ui/alert-dialog';
 import termosDeUsoTexto from '@/terms/termos-de-uso.txt?raw';
+import '@/styles/worklivoo-tokens.css';
+import '@/styles/worklivoo-components.css';
+import '@/styles/worklivoo-auth.css';
 
-const escapeHtml = (value: string) =>
+// O Supabase devolve as mensagens de autenticação em inglês; traduz as mais comuns.
+const traduzirErroLogin = (message?: string) => {
+  const msg = (message || '').toLowerCase();
+  if (!msg) return 'Falha ao entrar. Verifique suas credenciais.';
+  if (msg.includes('invalid login credentials')) return 'E-mail ou senha incorretos.';
+  if (msg.includes('email not confirmed')) return 'Seu e-mail ainda não foi confirmado.';
+  if (msg.includes('too many requests') || msg.includes('rate limit')) {
+    return 'Muitas tentativas. Aguarde um instante e tente novamente.';
+  }
+  if (msg.includes('user not found')) return 'Usuário não encontrado.';
+  if (msg.includes('user is banned')) return 'Este acesso está bloqueado. Fale com o suporte.';
+  if (msg.includes('failed to fetch') || msg.includes('network')) {
+    return 'Falha de conexão. Verifique sua internet e tente novamente.';
+  }
+  return message as string;
+};
+
+const escapeHtml =(value: string) =>
   value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -202,7 +218,7 @@ const Auth = () => {
 
       navigate('/inicio');
     } else {
-      setLoginError(result.error || 'Falha ao entrar. Verifique suas credenciais.');
+      setLoginError(traduzirErroLogin(result.error));
     }
     setIsLoading(false);
   };
@@ -330,7 +346,7 @@ const Auth = () => {
         setResetMessage('Email de recuperação enviado! Verifique sua caixa de entrada.');
         setResetEmail('');
       }
-    } catch (error) {
+    } catch {
       setResetError('Erro inesperado. Tente novamente mais tarde.');
     } finally {
       setIsLoading(false);
@@ -338,249 +354,204 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{backgroundColor: '#F6F6F6'}}>
-      <div className="w-full max-w-md">
-        {/* Logo e Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-6">
-            <img 
-              src="/logo-worklivoo-amarela.png" 
-              alt="Worklivoo" 
-              className="h-16 w-auto rounded-xl shadow-lg"
-            />
-          </div>
+    <div className="wl-scope wl-auth">
+      <main className="wl-card">
+        <img src="/logo-worklivoo-fundo-preto.png" alt="Worklivoo" className="wl-brand" />
 
-        </div>
+        {showForgotPassword ? (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setShowForgotPassword(false);
+                setResetMessage('');
+                setResetError('');
+                setResetEmail('');
+              }}
+              className="wl-back"
+            >
+              <ArrowLeft aria-hidden="true" />
+              Voltar ao login
+            </button>
 
-        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-3xl">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-center text-2xl font-semibold text-slate-900">
-              {showForgotPassword ? 'Recuperar senha' : 'Acesse sua conta'}
-            </CardTitle>
-            <CardDescription className="text-center text-slate-600">
-              {showForgotPassword
-                ? 'Digite seu email para receber o link de recuperação'
-                : 'Entre com suas credenciais'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {showForgotPassword ? (
-              <div className="space-y-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <button
-                    onClick={() => {
-                      setShowForgotPassword(false);
-                      setResetMessage('');
-                      setResetError('');
-                      setResetEmail('');
-                    }}
-                    className="text-slate-600 hover:text-slate-800 transition-colors"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </button>
-                  <span className="text-sm text-slate-600">Voltar ao login</span>
+            <header className="wl-head">
+              <h1 className="wl-title">Recuperar senha</h1>
+              <p className="wl-lede">Digite seu e-mail para receber o link de recuperação.</p>
+            </header>
+
+            <form onSubmit={handleForgotPassword} className="wl-form">
+              <div className="wl-field">
+                <label htmlFor="reset-email" className="wl-label">E-mail</label>
+                <div className="wl-control">
+                  <Mail className="wl-control__icon" aria-hidden="true" />
+                  <input
+                    id="reset-email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className="wl-input wl-input--icon"
+                    required
+                  />
                 </div>
-                
-                <form onSubmit={handleForgotPassword} className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="reset-email" className="text-sm font-medium text-slate-700">
-                      E-mail
-                    </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                      <Input
-                        id="reset-email"
-                        type="email"
-                        placeholder="seu@email.com"
-                        value={resetEmail}
-                        onChange={(e) => setResetEmail(e.target.value)}
-                        className="pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  {resetMessage && (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm text-green-700">{resetMessage}</p>
-            </div>
-                  )}
-                  
-                  {resetError && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-700">{resetError}</p>
-            </div>
-                  )}
-                  
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-black hover:bg-gray-800 text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        Enviando...
-                      </div>
-                    ) : (
-                      "Enviar link de recuperação"
-                    )}
-                  </Button>
-                </form>
               </div>
-            ) : (
-              <>
-                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium text-slate-700">
-                        E-mail
-                      </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="seu@email.com"
-                        {...loginForm.register('email')}
-                        className={`pl-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${
-                          loginForm.formState.errors.email ? 'border-red-500' : ''
-                        }`}
-                      />
-                    </div>
-                    {loginForm.formState.errors.email && (
-                      <p className="text-sm text-red-600">{loginForm.formState.errors.email.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium text-slate-700">
-                        Senha
-                      </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                      <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Digite sua senha"
-                        {...loginForm.register('password')}
-                        className={`pl-10 pr-10 h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 ${
-                          loginForm.formState.errors.password ? 'border-red-500' : ''
-                        }`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    {loginForm.formState.errors.password && (
-                      <p className="text-sm text-red-600">{loginForm.formState.errors.password.message}</p>
-                    )}
-                  </div>
-                  {loginError && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-sm text-red-700">{loginError}</p>
-                    </div>
-                  )}
-                  <Button 
-                    type="submit" 
-                    className="w-full h-11 bg-black hover:bg-gray-800 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Entrando...
-                      </div>
-                    ) : (
-                      "Entrar na conta"
-                    )}
-                  </Button>
-                  <div className="flex flex-col items-center gap-2 mt-4">
-                    <button
-                      type="button"
-                      onClick={() => setShowForgotPassword(true)}
-                      className="text-xs text-gray-400 hover:text-gray-500 transition-colors"
-                    >
-                      Esqueci minha senha
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
-          </CardContent>
-        </Card>
-        
-        {/* Footer */}
-        <div className="text-center mt-8 space-y-2">
-          <p className="text-sm text-slate-500">
-            © 2025 Worklivoo. Todos os direitos reservados.
-          </p>
 
-        </div>
-      </div>
+              {resetMessage && <p className="wl-alert wl-alert--ok" role="status">{resetMessage}</p>}
+              {resetError && <p className="wl-alert" role="alert">{resetError}</p>}
+
+              <button type="submit" className="wl-btn wl-btn--lime wl-btn--block" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <span className="wl-spinner" aria-hidden="true" />
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    Enviar link de recuperação
+                    <ArrowRight className="wl-btn__arrow" aria-hidden="true" />
+                  </>
+                )}
+              </button>
+            </form>
+          </>
+        ) : (
+          <>
+            <header className="wl-head">
+              <p className="wl-eyebrow">Painel do cliente</p>
+              <h1 className="wl-title">Acesse sua conta</h1>
+            </header>
+
+            <form onSubmit={loginForm.handleSubmit(handleLogin)} className="wl-form">
+              <div className="wl-field">
+                <label htmlFor="email" className="wl-label">E-mail</label>
+                <div className="wl-control">
+                  <Mail className="wl-control__icon" aria-hidden="true" />
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="seu@email.com"
+                    aria-invalid={!!loginForm.formState.errors.email}
+                    {...loginForm.register('email')}
+                    className={`wl-input wl-input--icon ${loginForm.formState.errors.email ? 'is-invalid' : ''}`}
+                  />
+                </div>
+                {loginForm.formState.errors.email && (
+                  <p className="wl-error">{loginForm.formState.errors.email.message}</p>
+                )}
+              </div>
+
+              <div className="wl-field">
+                <label htmlFor="password" className="wl-label">Senha</label>
+                <div className="wl-control">
+                  <Lock className="wl-control__icon" aria-hidden="true" />
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    placeholder="Digite sua senha"
+                    aria-invalid={!!loginForm.formState.errors.password}
+                    {...loginForm.register('password')}
+                    className={`wl-input wl-input--icon wl-input--action ${loginForm.formState.errors.password ? 'is-invalid' : ''}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="wl-control__action"
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  >
+                    {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                  </button>
+                </div>
+                {loginForm.formState.errors.password && (
+                  <p className="wl-error">{loginForm.formState.errors.password.message}</p>
+                )}
+              </div>
+
+              {loginError && <p className="wl-alert" role="alert">{loginError}</p>}
+
+              <button type="submit" className="wl-btn wl-btn--lime wl-btn--block" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <span className="wl-spinner" aria-hidden="true" />
+                    Entrando...
+                  </>
+                ) : (
+                  <>
+                    Entrar na conta
+                    <ArrowRight className="wl-btn__arrow" aria-hidden="true" />
+                  </>
+                )}
+              </button>
+
+              <div className="wl-center">
+                <button type="button" onClick={() => setShowForgotPassword(true)} className="wl-link">
+                  Esqueci minha senha
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+      </main>
+
+      <p className="wl-foot">© {new Date().getFullYear()} Worklivoo. Todos os direitos reservados.</p>
 
       <AlertDialog open={showTermsModal} onOpenChange={(open) => console.log('[Terms] onOpenChange modal', { open })}>
-        <AlertDialogContent className="w-[95vw] max-w-6xl h-[90vh] max-h-[90vh] flex flex-col">
-          <div className="flex-1 overflow-auto rounded-md border bg-background p-6">
-            <div className="prose prose-slate prose-sm sm:prose-base max-w-none">
-              <div dangerouslySetInnerHTML={{ __html: termosFormatadosHtml }} />
-            </div>
+        <AlertDialogContent className="wl-scope wl-modal w-[95vw] max-w-6xl h-[90vh] max-h-[90vh] flex flex-col">
+          <div className="wl-terms">
+            <div dangerouslySetInnerHTML={{ __html: termosFormatadosHtml }} />
           </div>
-          {termsError ? (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-700">{termsError}</p>
-            </div>
-          ) : null}
+          {termsError ? <p className="wl-alert" role="alert">{termsError}</p> : null}
           <AlertDialogFooter className="mt-4">
-            <Button onClick={handleAcceptTerms} disabled={termsLoading} className="w-full">
-              {termsLoading ? 'Salvando...' : 'Aceitar Termos'}
-            </Button>
+            <button type="button" onClick={handleAcceptTerms} disabled={termsLoading} className="wl-btn wl-btn--lime wl-btn--block">
+              {termsLoading ? (
+                <>
+                  <span className="wl-spinner" aria-hidden="true" />
+                  Salvando...
+                </>
+              ) : (
+                'Aceitar Termos'
+              )}
+            </button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog open={showMemberUpdateModal} onOpenChange={(open) => console.log('[MemberUpdate] onOpenChange modal', { open })}>
-        <AlertDialogContent className="w-[95vw] max-w-md rounded-[28px] border border-black/10 bg-white p-8 shadow-2xl">
-          <div className="flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#EBF57D]">
-              <RefreshCw className="h-7 w-7 text-black" />
-            </div>
+        <AlertDialogContent className="wl-scope wl-modal w-[95vw] max-w-md">
+          <div className="wl-modal__icon">
+            <RefreshCw aria-hidden="true" />
           </div>
 
-          <div className="mt-6 space-y-3 text-center">
-            <h2 className="text-2xl font-semibold text-black">Nova Atualização Disponível!</h2>
-            <p className="text-sm leading-relaxed text-black/70">
+          <div className="wl-modal__body">
+            <h2 className="wl-title">Nova atualização disponível</h2>
+            <p className="wl-lede">
               Preparamos melhorias importantes para sua experiência. Para continuar utilizando a plataforma com total
               segurança e performance, é necessário aplicar a atualização agora.
             </p>
           </div>
 
-          {memberUpdateError ? (
-            <div className="mt-6 rounded-xl bg-[#EBF57D] p-4">
-              <p className="text-sm text-black">{memberUpdateError}</p>
-            </div>
-          ) : null}
+          {memberUpdateError ? <p className="wl-alert" role="alert">{memberUpdateError}</p> : null}
 
-          <AlertDialogFooter className="mt-8">
-            <Button
+          <AlertDialogFooter className="mt-2">
+            <button
+              type="button"
               onClick={handleConfirmMemberUpdate}
               disabled={memberUpdateLoading}
-              className="h-14 w-full rounded-xl bg-black text-base font-semibold text-white shadow-lg hover:bg-zinc-900"
+              className="wl-btn wl-btn--lime wl-btn--block"
             >
               {memberUpdateLoading ? (
-                <span className="flex items-center justify-center gap-3">
-                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                <>
+                  <span className="wl-spinner" aria-hidden="true" />
                   Atualizando...
-                </span>
+                </>
               ) : (
-                <span className="flex items-center justify-center gap-3">
-                  <RefreshCw className="h-5 w-5" />
-                  Atualizar Agora
-                </span>
+                <>
+                  <RefreshCw aria-hidden="true" width={16} height={16} />
+                  Atualizar agora
+                </>
               )}
-            </Button>
+            </button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

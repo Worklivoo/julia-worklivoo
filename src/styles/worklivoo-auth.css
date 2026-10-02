@@ -1,0 +1,160 @@
+/* ==========================================================================
+   Worklivoo — telas de acesso (login e cadastro)
+   Segue design-worklivoo/design.md. Os tokens vêm de worklivoo-tokens.css e os componentes de worklivoo-components.css
+   (importe-os antes deste arquivo).
+   ========================================================================== */
+
+/* --- página ------------------------------------------------------------- */
+
+.wl-auth{
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 32px 16px;
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+.wl-card{
+  width: 100%;
+  max-width: 440px;
+  padding: clamp(28px, 5vw, 44px);
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-block);
+  box-shadow: var(--shadow-card);
+  animation: wl-rise .35s var(--ease) both;
+}
+.wl-card--wide{ max-width: 720px }
+
+@keyframes wl-rise{
+  from{ opacity: 0; transform: translateY(10px) }
+  to{   opacity: 1; transform: none }
+}
+
+.wl-foot{
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-soft);
+  text-align: center;
+}
+
+/* --- cabeçalho ---------------------------------------------------------- */
+
+.wl-brand{
+  display: block;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 28px;
+  border-radius: var(--radius-tile);
+  object-fit: cover;
+}
+
+/* --- indicador de etapas ------------------------------------------------ */
+
+.wl-steps{
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.wl-steps__bar{
+  height: 4px;
+  border-radius: 999px;
+  background: var(--stone-deep);
+  transition: background .35s var(--ease);
+}
+.wl-steps__bar.is-on{ background: var(--ink) }
+
+/* --- diálogos (portal) -------------------------------------------------- */
+
+.wl-modal__icon{
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  border-radius: var(--radius-tile);
+  background: var(--stone);
+  color: var(--ink);
+}
+.wl-modal__icon svg{ width: 24px; height: 24px }
+.wl-modal__body{ display: grid; gap: 10px; text-align: center }
+.wl-modal__body .wl-title{ font-size: 21px; letter-spacing: -.02em }
+.wl-modal__body .wl-lede{ margin: 0 auto; max-width: 46ch }
+
+
+/* --- progresso do cadastro ---------------------------------------------- */
+
+.wl-progress{
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(20,20,20,.6);
+}
+.wl-progress__card{
+  width: 100%;
+  max-width: 420px;
+  padding: 28px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-panel);
+  background: var(--white);
+  box-shadow: var(--shadow-card);
+}
+.wl-progress__track{
+  height: 6px;
+  margin-top: 20px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--stone-deep);
+}
+.wl-progress__fill{
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ink);
+  transition: width .35s var(--ease);
+}
+.wl-progress__gap{ margin-top: 16px }
+.wl-progress__pct{
+  margin-top: 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  color: var(--wl-muted);
+}
+
+/* --- movimento reduzido ------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce){
+  .wl-card{ animation: none }
+  .wl-steps__bar, .wl-progress__fill{ transition: none }
+}
+
+/* --- redefinir senha e página não encontrada ---------------------------- */
+
+.wl-reset__wait{
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 12px 0;
+}
+.wl-reset__wait .wl-lede{ margin: 0 }
+
+.wl-notfound{
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.wl-notfound .wl-modal__icon{ margin: 0 0 4px }
+.wl-notfound .wl-eyebrow,
+.wl-notfound .wl-title,
+.wl-notfound .wl-lede{ margin: 0 }
+.wl-notfound .wl-btn{ margin-top: 12px }

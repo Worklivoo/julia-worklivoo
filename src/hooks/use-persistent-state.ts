@@ -63,19 +63,6 @@ export function usePersistentTab(pageKey: string, defaultTab: string) {
 }
 
 /**
- * Hook especializado para persistir estado de seções expandidas/colapsadas
- * @param pageKey - Identificador único da página
- * @param defaultSections - Objeto com seções e seus estados padrão
- * @returns [sections, setSections] - Estado das seções e função para alterá-las
- */
-export function usePersistentSections<T extends Record<string, boolean>>(
-  pageKey: string,
-  defaultSections: T
-) {
-  return usePersistentState(`${pageKey}-sections`, defaultSections);
-}
-
-/**
  * Hook especializado para persistir DateRange com conversão adequada de datas
  * @param key - Chave única para armazenar no localStorage
  * @param defaultValue - Valor padrão do DateRange

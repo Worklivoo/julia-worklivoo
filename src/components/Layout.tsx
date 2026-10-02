@@ -3,12 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import './Sidebar.css';
 import { AlertTriangle, Copy, QrCode, X } from 'lucide-react';
+import '@/styles/worklivoo-settings.css';
 import { toast } from 'sonner';
 import { useCRM } from '@/contexts/CRMContext';
 import { supabase } from '@/lib/supabase';
 import { asaasFetch, getAsaasApiKey } from '@/utils/asaas';
 import ComunicadoModal from '@/components/ComunicadoModal';
 import { NotificationPanel } from '@/components/NotificationPanel';
+import '@/styles/worklivoo-tokens.css';
+import '@/styles/worklivoo-components.css';
+import '@/styles/worklivoo-shell.css';
 import type { ComunicadoV2, TarefaAtrasada } from '@/types';
 import {
   fetchActiveComunicado,
@@ -47,6 +51,14 @@ const Layout = ({ children }: LayoutProps) => {
   const [currentComunicado, setCurrentComunicado] = useState<ComunicadoV2 | null>(null);
   const [planStatus, setPlanStatus] = useState<string | null>(null);
 
+  // Só em desenvolvimento: ?demo=atraso,tarefas,comunicado mostra o banner, as notificações e o comunicado de exemplo.
+  const demo = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('demo') || '' : '';
+  const demoTarefas: TarefaAtrasada[] | null = demo.includes('tarefas') ? [
+    { tarefa_id: 'd1', tarefa_titulo: 'Ligar para confirmar test drive', tarefa_descricao: null, lead_id: 1, lead_nome: 'Carlos Almeida', lead_oportunidade: 'Onix 1.0 Flex 2021', membro_nome: null, data_vencimento: new Date(Date.now() - 3 * 86400000).toISOString(), criado_em: new Date().toISOString() },
+    { tarefa_id: 'd2', tarefa_titulo: 'Enviar proposta de financiamento', tarefa_descricao: null, lead_id: 2, lead_nome: 'Marina Souza', lead_oportunidade: null, membro_nome: null, data_vencimento: new Date(Date.now() - 5 * 3600000).toISOString(), criado_em: new Date().toISOString() },
+    { tarefa_id: 'd3', tarefa_titulo: 'Retornar contato sobre troca do veículo', tarefa_descricao: null, lead_id: 3, lead_nome: 'Rafael Lima', lead_oportunidade: 'Toro Freedom 2023', membro_nome: null, data_vencimento: new Date(Date.now() - 20 * 60000).toISOString(), criado_em: new Date().toISOString() },
+  ] : null;
+  const demoComunicado: ComunicadoV2 = { comunicado_id: 1, comunicado_titulo: 'Novo: FollowUp Dinâmico', comunicado_imagem: null, comunicado_ativo: true, max_visualizacoes: 3, criado_em: null };
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [tarefasAtrasadas, setTarefasAtrasadas] = useState<TarefaAtrasada[]>([]);
   const [loadingTarefas, setLoadingTarefas] = useState(false);
@@ -458,33 +470,19 @@ const Layout = ({ children }: LayoutProps) => {
 
   const renderNpsScale = (params: { name: string; value: number | null; onChange: (v: number) => void }) => {
     return (
-      <div className="mt-4">
-        <div className="flex items-center justify-between gap-2">
-          {Array.from({ length: 11 }).map((_, i) => (
-            <div key={`${params.name}-label-${i}`} className="w-7 text-center text-xs font-bold text-gray-700">
-              {i}
-            </div>
-          ))}
-        </div>
-        <div className="mt-2 flex items-center justify-between gap-2">
-          {Array.from({ length: 11 }).map((_, i) => {
-            const selected = params.value === i;
-            return (
-              <button
-                key={`${params.name}-${i}`}
-                type="button"
-                aria-label={`${i}`}
-                className={[
-                  'w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors',
-                  selected ? 'border-black bg-black' : 'border-gray-400 bg-white hover:border-gray-600',
-                ].join(' ')}
-                onClick={() => params.onChange(i)}
-              >
-                <span className={selected ? 'w-3 h-3 rounded-full bg-[#EBF57D]' : 'w-3 h-3 rounded-full bg-transparent'} />
-              </button>
-            );
-          })}
-        </div>
+      <div className="wl-nps" role="radiogroup" aria-label="Nota de 0 a 10">
+        {Array.from({ length: 11 }).map((_, i) => (
+          <button
+            key={`${params.name}-${i}`}
+            type="button"
+            role="radio"
+            aria-checked={params.value === i}
+            className={`wl-nps__dot${params.value === i ? ' is-on' : ''}`}
+            onClick={() => params.onChange(i)}
+          >
+            {i}
+          </button>
+        ))}
       </div>
     );
   };
@@ -584,260 +582,207 @@ const Layout = ({ children }: LayoutProps) => {
     <div className="min-h-screen bg-background">
       <Sidebar
         onToggleNotifications={toggleNotifications}
-        unreadCount={tarefasAtrasadas.length}
+        unreadCount={(demoTarefas ?? tarefasAtrasadas).length}
         isNotificationsOpen={isNotificationsOpen}
       />
       <NotificationPanel
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
-        tarefas={tarefasAtrasadas}
+        tarefas={demoTarefas ?? tarefasAtrasadas}
         loading={loadingTarefas}
         onNavigateToLead={navigateToLead}
         onRefresh={buscarTarefasAtrasadas}
       />
       <main className="main-content">
-        {isPaymentOverdue && (
-          <div className="payment-overdue-banner mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="h-10 w-10 shrink-0 rounded-xl bg-red-100 flex items-center justify-center text-red-600">
-                <AlertTriangle size={20} />
+        {(isPaymentOverdue || demo.includes('atraso')) && (
+          <div className="wl-scope">
+            <div className="wl-banner" role="alert">
+              <span className="wl-banner__icon"><AlertTriangle aria-hidden="true" /></span>
+              <div className="wl-banner__text">
+                <p className="wl-banner__title">Pagamento em atraso</p>
+                <p className="wl-banner__desc">
+                  Sua fatura está pendente e o atendimento da Julia para novos leads está pausado. Faça o pagamento para reativar!
+                </p>
               </div>
-              <div>
-                <div className="text-sm font-black text-red-700">Pagamento em atraso</div>
-                <div className="text-sm text-red-600">
-                  Sua fatura esta pendente e o atendimento da Julia para novos leads esta pausado. Faça o pagamento para reativar!
-                </div>
-              </div>
+              <button type="button" className="wl-btn wl-btn--lime wl-btn--sm" onClick={() => navigate('/configuracoes?aba=assinatura')}>
+                Fazer pagamento
+              </button>
             </div>
-            <button
-              type="button"
-              className="shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-700 transition-colors"
-              onClick={() => navigate('/configuracoes?aba=assinatura')}
-            >
-              Fazer pagamento
-            </button>
           </div>
         )}
         {children}
       </main>
 
-      {needsNpsSurvey && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-xl rounded-[24px] bg-white shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-[#EBF57D] flex items-center justify-center text-black">
-                  <AlertTriangle size={22} />
-                </div>
-                <div>
-                  <div className="text-lg font-black text-black">Pesquisa de Satisfação</div>
-                  <div className="text-sm text-gray-500">Envie a pesquisa para continuar usando o painel</div>
-                </div>
-              </div>
-            </div>
+      {(needsNpsSurvey || demo.includes('nps')) && (
+        <div className="wl-scope wl-overlay wl-overlay--top" role="dialog" aria-modal="true" aria-labelledby="nps-titulo">
+          <div className="wl-modal wl-modal--md wl-overlay__card">
+            <header className="wl-modal__head">
+              <p className="wl-eyebrow">Pesquisa de satisfação · {npsStep + 1} de 3</p>
+              <h2 id="nps-titulo" className="wl-title wl-title--sm">Pesquisa de Satisfação</h2>
+              <p className="wl-lede">Envie a pesquisa para continuar usando o painel.</p>
+            </header>
 
-            <div className="px-6 py-6">
-              {npsError ? (
-                <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4">
-                  <div className="text-sm font-bold text-red-700">{npsError}</div>
-                </div>
+            <div className="wl-modal__stack">
+              {npsError ? <p className="wl-alert" role="alert">{npsError}</p> : null}
+
+              {npsStep === 0 ? (
+                <>
+                  <p className="wl-nps__q">
+                    De 0 a 10, como você avalia a rapidez e a eficiência do time da WORKLIVOO em resolver a sua solicitação?
+                  </p>
+                  {renderNpsScale({ name: 'nps_suporte', value: npsSuporte, onChange: setNpsSuporte })}
+                </>
               ) : null}
 
-              <div>
-                {npsStep === 0 ? (
-                  <>
-                    <div className="text-sm font-bold text-gray-800">
-                      De 0 a 10, como você avalia a rapidez e a eficiência do time da WORKLIVOO em resolver a sua solicitação?
-                    </div>
-                    {renderNpsScale({ name: 'nps_suporte', value: npsSuporte, onChange: setNpsSuporte })}
-                  </>
-                ) : null}
-
-                {npsStep === 1 ? (
-                  <>
-                    <div className="text-sm font-bold text-gray-800">
-                      De 0 a 10, como você avalia o desempenho das conversas da IA com os seus clientes?
-                    </div>
-                    {renderNpsScale({ name: 'nps_ia', value: npsIa, onChange: setNpsIa })}
-                  </>
-                ) : null}
-
-                {npsStep === 2 ? (
-                  <>
-                    <div className="text-sm font-bold text-gray-800">
-                      De 0 a 10, qual a probabilidade de você recomendar a WORKLIVOO para outras pessoas?
-                    </div>
-                    {renderNpsScale({ name: 'nps_padrao', value: npsPadrao, onChange: setNpsPadrao })}
-                  </>
-                ) : null}
-              </div>
-
-              <div className="mt-8 flex gap-4">
-                <button
-                  type="button"
-                  className="flex-1 py-3 rounded-2xl text-sm font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all disabled:opacity-60 disabled:hover:bg-transparent"
-                  disabled={isSubmittingNps || npsStep === 0}
-                  onClick={() => setNpsStep((s) => Math.max(0, s - 1))}
-                >
-                  Voltar
-                </button>
-
-                {npsStep < 2 ? (
-                  <button
-                    type="button"
-                    className="flex-1 py-3 rounded-2xl text-sm font-bold bg-[#EBF57D] text-black hover:bg-[#e3ef62] transition-all flex items-center justify-center disabled:opacity-60 disabled:hover:bg-[#EBF57D]"
-                    disabled={
-                      isSubmittingNps ||
-                      (npsStep === 0 && npsSuporte === null) ||
-                      (npsStep === 1 && npsIa === null)
-                    }
-                    onClick={() => setNpsStep((s) => Math.min(2, s + 1))}
-                  >
-                    Próxima
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="flex-1 py-3 rounded-2xl text-sm font-bold bg-[#EBF57D] text-black hover:bg-[#e3ef62] transition-all flex items-center justify-center disabled:opacity-60 disabled:hover:bg-[#EBF57D]"
-                    disabled={isSubmittingNps || npsSuporte === null || npsIa === null || npsPadrao === null}
-                    onClick={async () => {
-                      setIsSubmittingNps(true);
-                      setNpsError('');
-                      const result = await submitNps({
-                        nps_suporte: npsSuporte ?? -1,
-                        nps_ia: npsIa ?? -1,
-                        nps_padrao: npsPadrao ?? -1,
-                      });
-                      if (!result.success) {
-                        setNpsError(result.error || 'Não foi possível enviar o NPS. Tente novamente.');
-                        setIsSubmittingNps(false);
-                      }
-                    }}
-                  >
-                    {isSubmittingNps ? 'Enviando...' : 'Enviar NPS'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showPixReminder && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-xl rounded-[24px] bg-white shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-[#EBF57D] flex items-center justify-center text-black">
-                  <AlertTriangle size={22} />
-                </div>
-                <div>
-                  <div className="text-lg font-black text-black">PIX Gerado</div>
-                  <div className="text-sm text-gray-500">
-                    {pixDueDay ? `Vencimento dia ${pixDueDay}` : 'Vencimento'}
-                    {pixNextDueDate ? ` • ${formatLocalDmy(pixNextDueDate)}` : ''}
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="h-9 w-9 rounded-full hover:bg-gray-50 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
-                onClick={dismissReminder}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="px-6 py-6">
-              <p className="text-base text-gray-700 leading-relaxed">
-                Você tem um pagamento via PIX pendente. Clique abaixo para visualizar o QR Code e copiar o código.
-              </p>
-
-              <div className="mt-6 flex gap-4">
-                <button
-                  type="button"
-                  className="flex-1 py-3 rounded-2xl text-sm font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all"
-                  onClick={dismissReminder}
-                >
-                  Fechar
-                </button>
-                <button
-                  type="button"
-                  className="flex-1 py-3 rounded-2xl text-sm font-bold bg-[#EBF57D] text-black hover:bg-[#e3ef62] transition-all flex items-center justify-center gap-2"
-                  onClick={openPixQr}
-                >
-                  <QrCode size={18} />
-                  Ver PIX
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showPixQr && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-xl rounded-[24px] bg-white shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-black/5 flex items-center justify-center text-black">
-                  <QrCode size={18} />
-                </div>
-                <div className="text-lg font-black text-black">PIX</div>
-              </div>
-              <button
-                type="button"
-                className="h-9 w-9 rounded-full hover:bg-gray-50 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
-                onClick={() => setShowPixQr(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="px-6 py-6">
-              {isLoadingPixQr ? (
-                <div className="text-sm font-bold text-gray-500">Carregando PIX...</div>
-              ) : pixQrData ? (
+              {npsStep === 1 ? (
                 <>
-                  <div className="flex items-center justify-center">
-                    <img
-                      alt="QR Code PIX"
-                      className="w-64 h-64 rounded-2xl border border-gray-100"
-                      src={`data:image/png;base64,${pixQrData.encodedImage}`}
-                    />
-                  </div>
-
-                  <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Código PIX</div>
-                    <div className="text-xs font-bold text-gray-700 break-all">{pixQrData.payload}</div>
-                    <button
-                      type="button"
-                      className="mt-4 w-full py-3 rounded-2xl text-sm font-bold bg-black text-white hover:bg-black/90 transition-all flex items-center justify-center gap-2"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(pixQrData.payload);
-                          toast.success('Código PIX copiado!');
-                        } catch {
-                          toast.error('Não foi possível copiar o código.');
-                        }
-                      }}
-                    >
-                      <Copy size={16} />
-                      Copiar código
-                    </button>
-                  </div>
+                  <p className="wl-nps__q">
+                    De 0 a 10, como você avalia o desempenho das conversas da IA com os seus clientes?
+                  </p>
+                  {renderNpsScale({ name: 'nps_ia', value: npsIa, onChange: setNpsIa })}
                 </>
+              ) : null}
+
+              {npsStep === 2 ? (
+                <>
+                  <p className="wl-nps__q">
+                    De 0 a 10, qual a probabilidade de você recomendar a WORKLIVOO para outras pessoas?
+                  </p>
+                  {renderNpsScale({ name: 'nps_padrao', value: npsPadrao, onChange: setNpsPadrao })}
+                </>
+              ) : null}
+            </div>
+
+            <div className="wl-modal__foot wl-modal__foot--end">
+              <button
+                type="button"
+                className="wl-btn wl-btn--glass-ink"
+                disabled={isSubmittingNps || npsStep === 0}
+                onClick={() => setNpsStep((s) => Math.max(0, s - 1))}
+              >
+                Voltar
+              </button>
+
+              {npsStep < 2 ? (
+                <button
+                  type="button"
+                  className="wl-btn wl-btn--lime"
+                  disabled={
+                    isSubmittingNps ||
+                    (npsStep === 0 && npsSuporte === null) ||
+                    (npsStep === 1 && npsIa === null)
+                  }
+                  onClick={() => setNpsStep((s) => Math.min(2, s + 1))}
+                >
+                  Próxima
+                </button>
               ) : (
-                <div className="text-sm font-bold text-gray-500">Não foi possível carregar o PIX.</div>
+                <button
+                  type="button"
+                  className="wl-btn wl-btn--lime"
+                  disabled={isSubmittingNps || npsSuporte === null || npsIa === null || npsPadrao === null}
+                  onClick={async () => {
+                    setIsSubmittingNps(true);
+                    setNpsError('');
+                    const result = await submitNps({
+                      nps_suporte: npsSuporte ?? -1,
+                      nps_ia: npsIa ?? -1,
+                      nps_padrao: npsPadrao ?? -1,
+                    });
+                    if (!result.success) {
+                      setNpsError(result.error || 'Não foi possível enviar o NPS. Tente novamente.');
+                      setIsSubmittingNps(false);
+                    }
+                  }}
+                >
+                  {isSubmittingNps ? 'Enviando...' : 'Enviar NPS'}
+                </button>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {showComunicado && currentComunicado && (
+      {(showPixReminder || demo.includes('pix,') || demo.endsWith('pix')) && (
+        <div className="wl-scope wl-overlay" role="dialog" aria-modal="true" aria-labelledby="pix-lembrete-titulo">
+          <div className="wl-modal wl-modal--md wl-overlay__card">
+            <button type="button" className="wl-iconbtn wl-overlay__close" onClick={dismissReminder} aria-label="Fechar">
+              <X aria-hidden="true" />
+            </button>
+            <header className="wl-modal__head">
+              <h2 id="pix-lembrete-titulo" className="wl-title wl-title--sm">PIX gerado</h2>
+              <p className="wl-lede">
+                {pixDueDay ? `Vencimento dia ${pixDueDay}` : 'Vencimento'}
+                {pixNextDueDate ? ` · ${formatLocalDmy(pixNextDueDate)}` : ''}
+              </p>
+            </header>
+
+            <p className="wl-lede">
+              Você tem um pagamento via PIX pendente. Clique abaixo para visualizar o QR Code e copiar o código.
+            </p>
+
+            <div className="wl-modal__foot wl-modal__foot--end">
+              <button type="button" className="wl-btn wl-btn--glass-ink" onClick={dismissReminder}>
+                Fechar
+              </button>
+              <button type="button" className="wl-btn wl-btn--lime" onClick={openPixQr}>
+                <QrCode aria-hidden="true" width={16} height={16} />
+                Ver PIX
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(showPixQr || demo.includes('pixqr')) && (
+        <div className="wl-scope wl-overlay wl-overlay--up" role="dialog" aria-modal="true" aria-labelledby="pix-qr-titulo">
+          <div className="wl-modal wl-modal--md wl-overlay__card">
+            <button type="button" className="wl-iconbtn wl-overlay__close" onClick={() => setShowPixQr(false)} aria-label="Fechar">
+              <X aria-hidden="true" />
+            </button>
+            <header className="wl-modal__head">
+              <h2 id="pix-qr-titulo" className="wl-title wl-title--sm">PIX</h2>
+              <p className="wl-lede">Escaneie o QR Code ou copie o código.</p>
+            </header>
+
+            {isLoadingPixQr ? (
+              <p className="wl-clist__note wl-clist__note--center" role="status">Carregando PIX...</p>
+            ) : pixQrData ? (
+              <div className="wl-modal__stack">
+                <div className="wl-pay__qr" style={{ margin: '0 auto' }}>
+                  <img alt="QR Code PIX" src={`data:image/png;base64,${pixQrData.encodedImage}`} />
+                </div>
+
+                <div className="wl-set-box">
+                  <span className="wl-label">Código PIX</span>
+                  <span className="wl-kv__value wl-kv__value--mono">{pixQrData.payload}</span>
+                  <button
+                    type="button"
+                    className="wl-btn wl-btn--glass-ink wl-btn--block"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(pixQrData.payload);
+                        toast.success('Código PIX copiado!');
+                      } catch {
+                        toast.error('Não foi possível copiar o código.');
+                      }
+                    }}
+                  >
+                    <Copy aria-hidden="true" width={15} height={15} />
+                    Copiar código
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="wl-alert" role="alert">Não foi possível carregar o PIX.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {(demo.includes('comunicado') || (showComunicado && currentComunicado)) && (
         <ComunicadoModal
-          comunicado={currentComunicado}
+          comunicado={currentComunicado ?? demoComunicado}
           onClose={handleCloseComunicado}
         />
       )}

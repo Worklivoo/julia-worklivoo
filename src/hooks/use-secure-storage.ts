@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { encryptData, decryptData, isEncrypted } from '../utils/encryption'
+import { encryptData, decryptData } from '../utils/encryption'
 
 interface StoredItem {
   data: string

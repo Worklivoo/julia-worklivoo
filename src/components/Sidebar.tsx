@@ -1,23 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useTheme } from '@/contexts/ThemeContext';
 import { useCRM } from '@/contexts/CRMContext';
 
+import '@/styles/worklivoo-tokens.css';
 import './Sidebar.css';
-import { 
-  Home, 
-  MessageSquare,
-  Settings, 
-  ChevronLeft, 
-  Menu, 
-  X,
-  Sun,
-  Moon,
-  LogOut,
-  Contact,
-  Gift,
-  Bell
-} from 'lucide-react';
+import { Home, MessageSquare, Settings, ChevronLeft, Menu, X, LogOut, Contact, Gift, Bell } from 'lucide-react';
 
 interface SidebarProps {
   onToggleNotifications: () => void;
@@ -25,17 +12,8 @@ interface SidebarProps {
   isNotificationsOpen: boolean;
 }
 
-interface NavigationItem {
-  name: string;
-  path: string;
-  icon: React.ComponentType<any>;
-  tooltip: string;
-  highlight?: boolean;
-}
-
 const Sidebar = ({ onToggleNotifications, unreadCount, isNotificationsOpen }: SidebarProps) => {
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
   const { logout, user } = useCRM();
   const canAccessDashboard = !user?.isMembro || user?.membro_tipo === 'Administrador';
   
@@ -128,7 +106,7 @@ const Sidebar = ({ onToggleNotifications, unreadCount, isNotificationsOpen }: Si
   }, []);
 
   return (
-    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMenuActive ? 'menu-active' : ''}`}>
+    <aside className={`wl-scope sidebar ${isCollapsed ? 'collapsed' : ''} ${isMenuActive ? 'menu-active' : ''}`}>
       {/* Header do Sidebar */}
       <header className="sidebar-header">
         <div className="sidebar-logo">
@@ -160,12 +138,7 @@ const Sidebar = ({ onToggleNotifications, unreadCount, isNotificationsOpen }: Si
                 >
                   <div className="relative flex items-center justify-center">
                     <IconComponent className="nav-icon material-symbols-rounded" />
-                    {item.highlight && (
-                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                      </span>
-                    )}
+                    {item.highlight && <span className="nav-ping" aria-hidden="true" />}
                   </div>
                   <span className="nav-label">{item.name}</span>
                 </Link>
@@ -186,9 +159,7 @@ const Sidebar = ({ onToggleNotifications, unreadCount, isNotificationsOpen }: Si
               <div className="relative flex items-center justify-center">
                 <Bell className="nav-icon material-symbols-rounded" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
+                  <span className="nav-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
                 )}
               </div>
               <span className="nav-label">Notificações</span>

@@ -1,16 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ThumbsUp, ThumbsDown, RotateCcw, MessageCircle, Smartphone, Sparkles, Plus, User, ExternalLink, FileText, Power, Star, ArrowLeft, Send } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { ThumbsUp, ThumbsDown, RotateCcw, Sparkles, Plus, User, ExternalLink, FileText, Power, Star, ArrowLeft, Send, Rocket, Search, ChevronDown } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ConversationThread, extractLastMessagePreviewText, getMessagePreviewText, normalizeMessageId, parseLeadsV2Conversa, parseTimestampzToDate, stripAiThinking, toTimestamp } from '@/components/ConversationThread';
 import { useCRM } from '@/contexts/CRMContext';
 import { supabase } from '@/lib/supabase';
@@ -18,6 +11,64 @@ import { getUserProfile } from '@/lib/supabase-utils';
 import { useToast } from '@/hooks/use-toast';
 import { getMembrosByUser, type Membro } from '@/lib/membros';
 import { useIsMobile } from '@/hooks/use-mobile';
+import '@/styles/worklivoo-tokens.css';
+import '@/styles/worklivoo-components.css';
+import '@/styles/worklivoo-page.css';
+import '@/styles/worklivoo-lead.css';
+import '@/styles/worklivoo-chat.css';
+
+// Botão de ícone com dica (cabeçalho da conversa, reações).
+const IconTool = ({
+  label,
+  onClick,
+  disabled,
+  off,
+  className = '',
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  off?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button
+        type="button"
+        className={`wl-iconbtn ${off ? 'is-off' : ''} ${className}`.trim()}
+        aria-label={label}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick();
+        }}
+        disabled={disabled}
+      >
+        {children}
+      </button>
+    </TooltipTrigger>
+    <TooltipContent side="top" className="wl-scope wl-tip">{label}</TooltipContent>
+  </Tooltip>
+);
+
+// Selo "este lead recebeu follow-up" na lista (dinâmico: avião; extendido: foguete).
+const FollowupBadge = ({ kind, active }: { kind: 'dinamico' | 'extendido'; active?: boolean | null }) => {
+  if (!Boolean(active)) return null;
+  const label = kind === 'dinamico' ? 'Recebeu FollowUp Dinâmico' : 'Recebeu FollowUp Extendido';
+  const Icon = kind === 'dinamico' ? Send : Rocket;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="wl-fu" aria-label={label}>
+          <Icon aria-hidden="true" strokeWidth={2.25} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="end" className="wl-scope wl-tip">{label}</TooltipContent>
+    </Tooltip>
+  );
+};
 
 type TrainingConversation = {
   treinamento_id?: number
@@ -32,6 +83,7 @@ type TrainingConversation = {
   update_mensagem?: string | null
   created_at?: string | null
   followup_dinamico?: boolean | null
+  followup_extendido?: boolean | null
   conversa?: string
 }
 
@@ -44,6 +96,7 @@ type MessageItem = {
   reply_to_message_id?: string
   reply_preview?: string
   is_followup_dinamico?: boolean
+  is_followup_extendido?: boolean
 }
 
 const Conversas = () => {
@@ -51,27 +104,6 @@ const Conversas = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  const FollowupDinamicoBadge: React.FC<{ active?: boolean | null }> = ({ active }) => {
-    if (!Boolean(active)) return null;
-    return (
-      <TooltipProvider delayDuration={150}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              aria-label="Este lead recebeu FollowUp Dinâmico"
-              title="Este lead recebeu FollowUp Dinâmico"
-              className="relative inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full ring-1 ring-amber-500/25 shadow-[0_1px_2px_rgba(0,0,0,0.04)] bg-gradient-to-br from-amber-200 via-orange-200 to-rose-200 text-amber-900 dark:from-amber-500/30 dark:via-orange-500/30 dark:to-rose-500/30 dark:text-amber-100"
-            >
-              <Send strokeWidth={2.25} className="h-3 w-3" />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="top" align="end" className="text-xs">
-            Recebeu FollowUp Dinâmico
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  };
 
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -133,12 +165,6 @@ const Conversas = () => {
     return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }).format(d);
   };
 
-  const isManualConversation = (conv: TrainingConversation | null | undefined) => {
-    if (!conv) return false;
-    if (String(conv.lead_canal_origem || '') === 'worklivoo-treinamento-manual') return true;
-    return typeof conv.dify_user === 'string' && conv.dify_user.startsWith('worklivoo-manual-');
-  };
-
   const isEditableConversation = (conv: TrainingConversation | null | undefined) => {
     if (!conv) return false;
     if (!isNumericConversationId(conv.dify_conversation)) return false;
@@ -162,22 +188,6 @@ const Conversas = () => {
     return (last?.role || null) as string | null;
   };
 
-  const getConversationColorClasses = (conv: TrainingConversation, isSelected: boolean) => {
-    const origem = String(conv.lead_canal_origem || '');
-    if (origem === 'worklivoo-treinamento-manual') {
-      return isSelected
-        ? 'bg-[#EBF57D] ring-1 ring-primary/25'
-        : 'bg-[#EBF57D]/20 hover:bg-[#EBF57D]/35';
-    }
-    if (origem === 'worklivoo-treinamento') {
-      return isSelected
-        ? 'bg-sky-500/15 ring-1 ring-sky-400/40'
-        : 'bg-sky-500/5 hover:bg-sky-500/10';
-    }
-    return isSelected
-      ? 'bg-muted ring-1 ring-primary/25'
-      : 'hover:bg-muted/60';
-  };
 
   const formatPhone = (raw: string) => {
     const digits = String(raw || '').replace(/\D/g, '');
@@ -332,7 +342,7 @@ const Conversas = () => {
     while (true) {
       let query = supabaseAny
         .from('leads_v2')
-        .select('lead_id,lead_telefone,user_id,membro_id,lead_etapa,conversa,update_mensagem,created_at,lead_canal_origem,ativo_ia,ativo_followup,followup_dinamico')
+        .select('lead_id,lead_telefone,user_id,membro_id,lead_etapa,conversa,update_mensagem,created_at,lead_canal_origem,ativo_ia,ativo_followup,followup_dinamico,followup_extendido')
         .eq('user_id', uid)
         .order('update_mensagem', { ascending: false, nullsFirst: false })
         .order('lead_id', { ascending: false })
@@ -363,6 +373,7 @@ const Conversas = () => {
     update_mensagem: (typeof r?.update_mensagem === 'undefined' ? null : r.update_mensagem),
     created_at: (typeof r?.created_at === 'undefined' ? null : r.created_at),
     followup_dinamico: Boolean(r?.followup_dinamico) || (typeof r?.followup_dinamico === 'undefined' ? null : r.followup_dinamico),
+    followup_extendido: Boolean(r?.followup_extendido) || (typeof r?.followup_extendido === 'undefined' ? null : r.followup_extendido),
     conversa: String(r?.conversa ?? ''),
   });
 
@@ -466,58 +477,6 @@ const Conversas = () => {
     };
     loadConversations();
   }, [membersResolved, membroIdQueryFilter, userIdForData]);
-
-  useEffect(() => {
-    const main = document.querySelector('.main-content') as HTMLElement | null;
-    if (!main) return;
-    const prev = {
-      paddingLeft: main.style.paddingLeft,
-      paddingRight: main.style.paddingRight,
-      paddingTop: main.style.paddingTop,
-      paddingBottom: main.style.paddingBottom,
-      height: main.style.height,
-      overflow: main.style.overflow,
-      overflowX: main.style.overflowX,
-      overflowY: main.style.overflowY,
-      display: main.style.display,
-      flexDirection: main.style.flexDirection,
-    };
-    main.classList.add('main-content--flush');
-    main.style.paddingLeft = isMobile ? '0' : prev.paddingLeft;
-    main.style.paddingRight = isMobile ? '0' : prev.paddingRight;
-    main.style.paddingTop = isMobile ? '80px' : '0';
-    main.style.paddingBottom = '0';
-    if (isMobile) {
-      if (isMobileThreadView) {
-        main.style.height = 'calc(100dvh - 80px)';
-        main.style.overflow = 'hidden';
-      } else {
-        main.style.height = 'auto';
-        main.style.overflow = 'auto';
-      }
-    } else {
-      // A página ocupa a altura da tela (o card de conversas preenche o espaço restante),
-      // mas o próprio main rola quando o conteúdo (ex.: aviso de pagamento) passa da tela.
-      main.style.height = '100dvh';
-      main.style.display = 'flex';
-      main.style.flexDirection = 'column';
-      main.style.overflowX = 'hidden';
-      main.style.overflowY = 'auto';
-    }
-    return () => {
-      main.classList.remove('main-content--flush');
-      main.style.overflowX = prev.overflowX;
-      main.style.overflowY = prev.overflowY;
-      main.style.display = prev.display;
-      main.style.flexDirection = prev.flexDirection;
-      main.style.paddingLeft = prev.paddingLeft;
-      main.style.paddingRight = prev.paddingRight;
-      main.style.paddingTop = prev.paddingTop;
-      main.style.paddingBottom = prev.paddingBottom;
-      main.style.height = prev.height;
-      main.style.overflow = prev.overflow;
-    };
-  }, [isMobile, isMobileThreadView]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -1218,536 +1177,428 @@ const Conversas = () => {
     overscan: 8,
   });
 
+  const selectedConv = conversations.find((x) => x.dify_conversation === selectedConvId) || null;
+  const selOrigem = String(selectedConv?.lead_canal_origem || '');
+  const selIsTest = selOrigem === 'worklivoo-treinamento' || selOrigem === 'worklivoo-treinamento-manual';
+  const selIsRealLead = !selOrigem.includes('worklivoo-');
+  const selTitle = selIsTest ? 'TESTE' : formatPhone(selectedConv?.dify_user || '');
+  const selAiActive = isLeadAiActive(selectedConv?.ativo_ia);
+  const selAiBusy = !!selectedConv?.dify_conversation && !!togglingAiByConv[selectedConv.dify_conversation];
+  const selCanQualify = !['oportunidade qualificada', 'orçamento/negociação', 'orcamento/negociacao', 'venda'].includes(
+    String(selectedConv?.lead_etapa || '').trim().toLowerCase()
+  );
+  const canCompose = isEditableConversation(selectedConv);
+  const isWaitingReply = !!selectedConvId && !!typingByConv[selectedConvId];
+  const composerBlocked = sendingChat || isWaitingReply || getLastMessageRoleForConversation(selectedConvId) === 'user';
+
+  const toggleOrigin = (value: string, checked: boolean) =>
+    setSelectedOrigins((prev) => {
+      const set = new Set(prev);
+      if (checked) set.add(value);
+      else set.delete(value);
+      return Array.from(set);
+    });
+
+  const toggleMember = (value: string, checked: boolean) =>
+    setSelectedMemberIds((prev) => {
+      const set = new Set(prev);
+      if (checked) set.add(value);
+      else set.delete(value);
+      return Array.from(set);
+    });
+
   return (
-    <div className={`${isMobileThreadView ? 'h-[calc(100dvh-80px)] min-h-0 overflow-hidden' : 'min-h-[calc(100dvh-80px)] bg-background'} md:flex md:h-auto md:min-h-[560px] md:flex-1 md:basis-0 md:flex-col md:overflow-visible`}>
-      <div className={`${isMobileThreadView ? 'h-[calc(100dvh-80px)] min-h-0' : 'min-h-[calc(100dvh-80px)]'} p-2 md:flex md:h-auto md:min-h-0 md:flex-1 md:flex-col md:p-6`}>
-        <Card className={`${isMobileThreadView ? 'h-[calc(100dvh-96px)] min-h-0' : 'min-h-[calc(100dvh-96px)]'} overflow-hidden rounded-[22px] border-border/60 bg-card/70 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/60 md:flex md:h-auto md:min-h-0 md:flex-1 md:flex-col md:rounded-3xl`}>
-          <CardContent className={`${isMobileThreadView ? 'h-[calc(100dvh-96px)] min-h-0' : 'min-h-[calc(100dvh-96px)]'} flex flex-col overflow-hidden p-0 md:h-auto md:min-h-0 md:flex-1`}>
-            <div className={`${isMobileThreadView ? 'hidden' : 'flex'} flex-col gap-3 border-b border-border/70 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6 md:py-4`}>
-              <div className="min-w-0">
-                <div className="truncate text-base font-semibold tracking-tight md:text-lg">Todas as conversas da IA</div>
-                <div className="text-xs text-muted-foreground">Analise todas as conversas da IA para melhorar o atendimento</div>
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:flex md:items-center">
-                <Button
-                  variant="secondary"
-                  onClick={() => createNewConversation('manual')}
-                  disabled={loading || !!creatingConversation}
-                  className="h-10 gap-2 rounded-full md:min-w-[140px]"
+    <TooltipProvider delayDuration={150}>
+      <div className="wl-scope wl-page wl-page--chat">
+        <header className={`wl-chat-head ${isMobileThreadView ? 'hidden' : ''}`}>
+          <div>
+            <p className="wl-eyebrow">Atendimento da Julia</p>
+            <h1 className="wl-chat-head__title">Conversas</h1>
+            <p className="wl-lede">Analise todas as conversas da IA para melhorar o atendimento.</p>
+          </div>
+          <div className="wl-chat-head__actions">
+            <button
+              type="button"
+              className="wl-btn wl-btn--glass-ink"
+              onClick={() => createNewConversation('manual')}
+              disabled={loading || !!creatingConversation}
+            >
+              <Plus aria-hidden="true" width={16} height={16} />
+              Nova manual
+            </button>
+            <button
+              type="button"
+              className="wl-btn wl-btn--lime"
+              onClick={() => createNewConversation('ia')}
+              disabled={loading || !!creatingConversation}
+            >
+              <Sparkles aria-hidden="true" width={16} height={16} />
+              Nova com IA
+            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="wl-btn wl-btn--glass wl-btn--icon"
+                  aria-label="Recarregar"
+                  onClick={() => reloadMessages({ showToast: true })}
+                  disabled={loading}
                 >
-                  <Plus className="h-4 w-4" />
-                  Nova manual
-                </Button>
-                <Button
-                  onClick={() => createNewConversation('ia')}
-                  disabled={loading || !!creatingConversation}
-                  className="h-10 gap-2 rounded-full md:min-w-[140px]"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Nova com IA
-                </Button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => reloadMessages({ showToast: true })}
-                        disabled={loading}
-                        className="h-10 w-full rounded-full sm:w-10"
-                      >
-                        <RotateCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Recarregar</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                  <RotateCcw aria-hidden="true" width={16} height={16} className={loading ? 'animate-spin' : ''} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="wl-scope wl-tip">Recarregar</TooltipContent>
+            </Tooltip>
+          </div>
+        </header>
+
+        <div className={`wl-chatwork ${isMobileThreadView ? 'is-thread' : ''}`}>
+          {/* Lista de conversas */}
+          <aside className={`wl-clist ${isMobile && mobileView === 'thread' ? 'is-hidden' : ''}`}>
+            <div className="wl-clist__head">
+              <h2 className="wl-clist__title">Conversas</h2>
+              <div className="wl-control">
+                <Search className="wl-control__icon" aria-hidden="true" />
+                <input
+                  className="wl-input wl-input--icon"
+                  placeholder="Buscar por número ou mensagem"
+                  aria-label="Buscar conversas"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-            </div>
-            <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-              <div className={`${isMobile && mobileView === 'thread' ? 'hidden' : 'flex'} w-full min-h-0 flex-col border-b border-border/70 bg-muted/20 md:flex md:w-[360px] md:border-b-0 md:border-r`}>
-                <div className="sticky top-0 z-10 bg-background/70 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-5 md:py-4">
-                  <div className="mb-2 text-sm font-semibold">Conversas</div>
-                  <Input
-                    placeholder="Buscar por número ou mensagem"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="h-9 bg-background/80"
-                  />
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="mt-2 h-9 w-full justify-between rounded-md border border-input bg-background/80 px-2 text-sm font-normal"
-                      >
-                        {selectedOriginLabel}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-[320px] max-h-[320px] overflow-y-auto">
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="wl-btn wl-btn--glass">
+                    <span>{selectedOriginLabel}</span>
+                    <ChevronDown aria-hidden="true" width={16} height={16} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="wl-scope wl-menu w-[320px] max-h-[320px] overflow-y-auto">
+                  <DropdownMenuCheckboxItem
+                    className="wl-menu__item"
+                    checked={selectedOrigins.length === 0}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(checked) => {
+                      if (checked) setSelectedOrigins([]);
+                    }}
+                  >
+                    Todas
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator className="wl-menu__sep" />
+                  {originOptions
+                    .filter((o) => o.value !== 'all')
+                    .map((opt) => (
                       <DropdownMenuCheckboxItem
-                        checked={selectedOrigins.length === 0}
+                        key={opt.value}
+                        className="wl-menu__item"
+                        checked={selectedOrigins.includes(opt.value)}
                         onSelect={(e) => e.preventDefault()}
-                        onCheckedChange={(checked) => {
-                          if (checked) setSelectedOrigins([]);
+                        onCheckedChange={(checked) => toggleOrigin(opt.value, Boolean(checked))}
+                      >
+                        {opt.label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {showMemberFilter && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className="wl-btn wl-btn--glass">
+                      <span>{selectedMemberLabel}</span>
+                      <ChevronDown aria-hidden="true" width={16} height={16} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="wl-scope wl-menu w-[320px] max-h-[320px] overflow-y-auto">
+                    <DropdownMenuCheckboxItem
+                      className="wl-menu__item"
+                      checked={selectedMemberIds.length === 0}
+                      onSelect={(e) => e.preventDefault()}
+                      onCheckedChange={(checked) => {
+                        if (checked) setSelectedMemberIds([]);
+                      }}
+                    >
+                      Todos os membros
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuSeparator className="wl-menu__sep" />
+                    {memberOptions.map((opt) => (
+                      <DropdownMenuCheckboxItem
+                        key={opt.value}
+                        className="wl-menu__item"
+                        checked={selectedMemberIds.includes(opt.value)}
+                        onSelect={(e) => e.preventDefault()}
+                        onCheckedChange={(checked) => toggleMember(opt.value, Boolean(checked))}
+                      >
+                        {opt.label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+
+            <div ref={conversationListRef} className="wl-clist__scroll">
+              <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', width: '100%' }}>
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const c = filteredConversations[virtualRow.index];
+                  if (!c) return null;
+                  const preview = getMessagePreviewText(String(conversationPreview[c.dify_conversation] || ''));
+                  const origem = String(c.lead_canal_origem || '');
+                  const title = (origem === 'worklivoo-treinamento' || origem === 'worklivoo-treinamento-manual')
+                    ? 'TESTE'
+                    : formatPhone(c.dify_user || '');
+                  const lastUpdateLabel = formatConversationLastUpdate(c.update_mensagem || c.created_at);
+                  const isSelected = selectedConvId === c.dify_conversation;
+                  return (
+                    <div
+                      key={c.dify_conversation}
+                      ref={rowVirtualizer.measureElement}
+                      data-index={virtualRow.index}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)`, paddingBottom: 4 }}
+                    >
+                      <button
+                        type="button"
+                        className={`wl-crow ${isSelected ? 'is-selected' : ''}`}
+                        aria-current={isSelected ? 'true' : undefined}
+                        onClick={() => {
+                          setSelectedConvId(c.dify_conversation);
+                          if (isMobile) setMobileView('thread');
                         }}
                       >
-                        Todas
-                      </DropdownMenuCheckboxItem>
-                      <DropdownMenuSeparator />
-                      {originOptions
-                        .filter((o) => o.value !== 'all')
-                        .map((opt) => (
-                          <DropdownMenuCheckboxItem
-                            key={opt.value}
-                            checked={selectedOrigins.includes(opt.value)}
-                            onSelect={(e) => e.preventDefault()}
-                            onCheckedChange={(checked) => {
-                              setSelectedOrigins((prev) => {
-                                const set = new Set(prev);
-                                if (checked) set.add(opt.value);
-                                else set.delete(opt.value);
-                                return Array.from(set);
-                              });
-                            }}
-                          >
-                            {opt.label}
-                          </DropdownMenuCheckboxItem>
-                        ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  {showMemberFilter && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="mt-2 h-9 w-full justify-between rounded-md border border-input bg-background/80 px-2 text-sm font-normal"
-                        >
-                          {selectedMemberLabel}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-[320px] max-h-[320px] overflow-y-auto">
-                        <DropdownMenuCheckboxItem
-                          checked={selectedMemberIds.length === 0}
-                          onSelect={(e) => e.preventDefault()}
-                          onCheckedChange={(checked) => {
-                            if (checked) setSelectedMemberIds([]);
+                        <span className="wl-crow__top">
+                          <span className="wl-crow__title">{title}</span>
+                          <span className="wl-crow__meta">
+                            <FollowupBadge kind="dinamico" active={c.followup_dinamico} />
+                            <FollowupBadge kind="extendido" active={c.followup_extendido} />
+                            {!!lastUpdateLabel && <span className="wl-crow__time">{lastUpdateLabel}</span>}
+                          </span>
+                        </span>
+                        <span className="wl-crow__preview">{preview || '—'}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              {loading && conversations.length === 0 && <p className="wl-clist__note">Carregando...</p>}
+              {!loading && loadingMore && <p className="wl-clist__note">Carregando mais conversas…</p>}
+              {!loading && !loadingMore && conversations.length === 0 && (
+                <p className="wl-clist__note wl-clist__note--center">Nenhuma conversa disponível</p>
+              )}
+            </div>
+          </aside>
+
+          {/* Conversa */}
+          <section className={`wl-thread ${isMobile && mobileView === 'list' ? 'is-hidden' : ''}`} aria-label="Mensagens da conversa">
+            <header className="wl-thread__head">
+              {selectedConvId ? (
+                <>
+                  {isMobile && (
+                    <button type="button" className="wl-iconbtn" aria-label="Voltar para a lista" onClick={() => setMobileView('list')}>
+                      <ArrowLeft aria-hidden="true" />
+                    </button>
+                  )}
+                  <span className="wl-thread__avatar" aria-hidden="true"><User /></span>
+                  <div className="wl-thread__who">
+                    <p className="wl-thread__name">{selTitle}</p>
+                    <div className="wl-thread__sub">
+                      {selIsRealLead && selOrigem && <span className="wl-pill wl-pill--soft">{selOrigem}</span>}
+                      {selIsRealLead && (
+                        <span className={`wl-tag ${selAiActive ? 'wl-tag--won' : 'wl-tag--idle'}`}>
+                          {selAiActive ? 'IA ativa' : 'IA pausada'}
+                        </span>
+                      )}
+                      {!selIsRealLead && <span className="wl-tag wl-tag--idle">Treinamento</span>}
+                    </div>
+                  </div>
+                  <div className="wl-thread__tools">
+                    <IconTool label="Recarregar" onClick={() => reloadMessages({ showToast: true })} disabled={loading}>
+                      <RotateCcw aria-hidden="true" className={loading ? 'animate-spin' : ''} />
+                    </IconTool>
+                    {selIsRealLead && (
+                      <>
+                        <IconTool
+                          label="Abrir WhatsApp"
+                          onClick={() => {
+                            const phoneDigits = String(selectedConv?.dify_user || '').replace(/\D/g, '');
+                            if (!phoneDigits) return;
+                            window.open(`https://wa.me/${phoneDigits}`, '_blank', 'noopener,noreferrer');
                           }}
                         >
-                          Todos os membros
-                        </DropdownMenuCheckboxItem>
-                        <DropdownMenuSeparator />
-                        {memberOptions.map((opt) => (
-                          <DropdownMenuCheckboxItem
-                            key={opt.value}
-                            checked={selectedMemberIds.includes(opt.value)}
-                            onSelect={(e) => e.preventDefault()}
-                            onCheckedChange={(checked) => {
-                              setSelectedMemberIds((prev) => {
-                                const set = new Set(prev);
-                                if (checked) set.add(opt.value);
-                                else set.delete(opt.value);
-                                return Array.from(set);
-                              });
-                            }}
-                          >
-                            {opt.label}
-                          </DropdownMenuCheckboxItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-                <Separator />
-                <div ref={conversationListRef} className="min-h-0 flex-1 overflow-y-auto px-2 py-2 md:px-3 md:py-3">
-                  <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', width: '100%' }}>
-                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                      const c = filteredConversations[virtualRow.index];
-                      if (!c) return null;
-                      const preview = getMessagePreviewText(String(conversationPreview[c.dify_conversation] || ''));
-                      const origem = String(c.lead_canal_origem || '');
-                      const title = (origem === 'worklivoo-treinamento' || origem === 'worklivoo-treinamento-manual')
-                        ? 'TESTE'
-                        : formatPhone(c.dify_user || '');
-                      const lastUpdateLabel = formatConversationLastUpdate(c.update_mensagem || c.created_at);
-                      const isSelected = selectedConvId === c.dify_conversation;
-                      const colorClasses = getConversationColorClasses(c, isSelected);
-                      return (
-                        <div
-                          key={c.dify_conversation}
-                          ref={rowVirtualizer.measureElement}
-                          data-index={virtualRow.index}
-                          style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)`, paddingBottom: 8 }}
+                          <ExternalLink aria-hidden="true" />
+                        </IconTool>
+                        <IconTool
+                          label="Abrir lead"
+                          onClick={() => {
+                            const leadId = String(selectedConv?.dify_conversation || '').trim();
+                            if (!leadId) return;
+                            window.open(`/lead/${leadId}`, '_blank');
+                          }}
                         >
-                          <button
-                            className={`group flex min-h-[76px] w-full items-center rounded-2xl border border-border/40 px-3 py-3 text-left transition-colors ${colorClasses}`}
-                            onClick={() => {
-                              setSelectedConvId(c.dify_conversation);
-                              if (isMobile) setMobileView('thread');
-                            }}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-9 w-9">
-                                <AvatarFallback className="bg-background/60">
-                                  <Smartphone className="h-4 w-4" />
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</div>
-                                  <div className="flex shrink-0 items-center gap-1.5">
-                                    <FollowupDinamicoBadge active={c.followup_dinamico} />
-                                    {!!lastUpdateLabel && (
-                                      <div className="shrink-0 text-[11px] font-medium text-muted-foreground">
-                                        {lastUpdateLabel}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="line-clamp-1 text-xs text-muted-foreground group-hover:text-muted-foreground/90">{preview || '—'}</div>
-                              </div>
-                            </div>
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {loading && conversations.length === 0 && (
-                    <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
-                  )}
-                  {!loading && loadingMore && (
-                    <div className="px-3 py-2 text-xs text-muted-foreground">Carregando mais conversas…</div>
-                  )}
-                  {!loading && !loadingMore && conversations.length === 0 && (
-                    <div className="px-3 py-6 text-center text-sm text-muted-foreground">Nenhuma conversa disponível</div>
-                  )}
-                </div>
-              </div>
-              <div className={`${isMobile && mobileView === 'list' ? 'hidden' : 'flex'} min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-background to-muted/20 md:flex`}>
-                <div className="sticky top-0 z-10 flex-shrink-0 border-b border-border/70 bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                  <div className="flex items-center gap-3 px-4 py-3 md:px-6">
-                    {selectedConvId ? (
-                      <>
-                        {isMobile && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 shrink-0 rounded-full md:hidden"
-                            onClick={() => setMobileView('list')}
-                          >
-                            <ArrowLeft className="h-4 w-4" />
-                          </Button>
+                          <FileText aria-hidden="true" />
+                        </IconTool>
+                        {selCanQualify && (
+                          <IconTool label="Qualificar lead" onClick={() => setQualifyDialogOpen(true)}>
+                            <Star aria-hidden="true" />
+                          </IconTool>
                         )}
-                        <Avatar className="h-9 w-9">
-                          <AvatarFallback className="bg-muted/50">
-                            <User className="h-4 w-4" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex min-w-0 flex-1 items-center gap-3">
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-semibold">
-                              {(() => {
-                                const sel = conversations.find((x) => x.dify_conversation === selectedConvId);
-                                const origem = String(sel?.lead_canal_origem || '');
-                                return (origem === 'worklivoo-treinamento' || origem === 'worklivoo-treinamento-manual')
-                                  ? 'TESTE'
-                                  : formatPhone(sel?.dify_user || '');
-                              })()}
-                            </div>
-                            <div className="text-xs text-muted-foreground">Mensagens</div>
-                          </div>
-                          <div className="flex items-center gap-1 rounded-full bg-background/70 p-1 shadow-sm ring-1 ring-border/60">
-                            <TooltipProvider delayDuration={150}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-full"
-                                    onClick={() => reloadMessages({ showToast: true })}
-                                    disabled={loading}
-                                  >
-                                    <RotateCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Recarregar</TooltipContent>
-                              </Tooltip>
-                              {(() => {
-                                const sel = conversations.find((x) => x.dify_conversation === selectedConvId);
-                                const origem = String(sel?.lead_canal_origem || '');
-                                if (origem.includes('worklivoo-')) return null;
-                                return (
-                                  <>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-8 w-8 rounded-full"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            const sel = conversations.find((x) => x.dify_conversation === selectedConvId);
-                                            const rawPhone = String(sel?.dify_user || '');
-                                            const phoneDigits = rawPhone.replace(/\D/g, '');
-                                            if (!phoneDigits) return;
-                                            window.open(`https://wa.me/${phoneDigits}`, '_blank', 'noopener,noreferrer');
-                                          }}
-                                        >
-                                          <ExternalLink className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Abrir WhatsApp</TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-8 w-8 rounded-full"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            const sel = conversations.find((x) => x.dify_conversation === selectedConvId);
-                                            const leadId = String(sel?.dify_conversation || '').trim();
-                                            if (!leadId) return;
-                                            window.open(`/lead/${leadId}`, '_blank');
-                                          }}
-                                        >
-                                          <FileText className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Abrir Lead</TooltipContent>
-                                    </Tooltip>
-                                    {(() => {
-                                      const sel = conversations.find((x) => x.dify_conversation === selectedConvId);
-                                      const leadEtapa = String(sel?.lead_etapa || '').trim().toLowerCase();
-                                      if (['oportunidade qualificada', 'orçamento/negociação', 'orcamento/negociacao', 'venda'].includes(leadEtapa)) return null;
-                                      return (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-8 w-8 rounded-full"
-                                              onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                setQualifyDialogOpen(true);
-                                              }}
-                                            >
-                                              <Star className="h-4 w-4" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>Qualificar Lead</TooltipContent>
-                                        </Tooltip>
-                                      );
-                                    })()}
-                                    {(() => {
-                                      const sel = conversations.find((x) => x.dify_conversation === selectedConvId);
-                                      const active = isLeadAiActive(sel?.ativo_ia);
-                                      const busy = !!sel?.dify_conversation && !!togglingAiByConv[sel.dify_conversation];
-                                      return (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              className={`h-8 w-8 rounded-full ${active ? 'text-green-600 hover:bg-green-500/10' : 'text-red-600 hover:bg-red-500/10'}`}
-                                              onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                toggleLeadAiActive();
-                                              }}
-                                              disabled={busy}
-                                            >
-                                              <Power className="h-4 w-4" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>{active ? 'Desativar a IA' : 'Ativar a IA'}</TooltipContent>
-                                        </Tooltip>
-                                      );
-                                    })()}
-                                  </>
-                                );
-                              })()}
-                            </TooltipProvider>
-                          </div>
-                        </div>
+                        <IconTool
+                          label={selAiActive ? 'Desativar a IA' : 'Ativar a IA'}
+                          onClick={() => toggleLeadAiActive()}
+                          disabled={selAiBusy}
+                          off={!selAiActive}
+                        >
+                          <Power aria-hidden="true" />
+                        </IconTool>
                       </>
-                    ) : (
-                      <div className="text-sm font-semibold">Selecione uma conversa</div>
                     )}
                   </div>
+                </>
+              ) : (
+                <p className="wl-thread__name">Selecione uma conversa</p>
+              )}
+            </header>
+
+            <ConversationThread
+              key={selectedConvId || 'none'}
+              messages={selectedConvId ? (selectedMessages as any) : []}
+              containerRef={messagesRef}
+              className="wl-thread__msgs"
+              style={{
+                backgroundImage: "url('/wallpaper%20conversa%20wpp.png')",
+                backgroundRepeat: 'repeat',
+                backgroundSize: '360px auto',
+              }}
+              emptyState={
+                <div className="wl-thread__empty">
+                  <div>
+                    <p className="wl-empty__title">{selectedConvId ? 'Nenhuma mensagem' : 'Conversas'}</p>
+                    <p className="wl-empty__text">
+                      {selectedConvId
+                        ? 'Clique em “Recarregar” para buscar as mensagens desta conversa.'
+                        : 'Escolha uma conversa na lista para visualizar as mensagens.'}
+                    </p>
+                  </div>
                 </div>
-                <Dialog open={qualifyDialogOpen} onOpenChange={setQualifyDialogOpen}>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Deseja qualificar este lead?</DialogTitle>
-                      <DialogDescription>
-                        Ao confirmar a qualificação deste lead, ele será encaminhado para a fila de distribuição de leads e direcionado ao responsável designado para atendimento.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter className="gap-2 sm:justify-end">
-                      <Button variant="outline" onClick={() => setQualifyDialogOpen(false)} disabled={qualifyingLead}>
-                        Não
-                      </Button>
-                      <Button onClick={handleQualifySelectedLead} disabled={qualifyingLead}>
-                        {qualifyingLead ? 'Enviando...' : 'Sim'}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-                <ConversationThread
-                  key={selectedConvId || 'none'}
-                  messages={selectedConvId ? (selectedMessages as any) : []}
-                  containerRef={messagesRef}
-                  className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6"
-                  style={{
-                    backgroundImage: "url('/wallpaper%20conversa%20wpp.png')",
-                    backgroundRepeat: 'repeat',
-                    backgroundSize: '360px auto',
-                  }}
-                  emptyState={
-                    selectedConvId ? (
-                      <div className="flex h-full items-center justify-center">
-                        <div className="max-w-md text-center">
-                          <div className="text-sm font-semibold">Nenhuma mensagem</div>
-                          <div className="mt-1 text-sm text-muted-foreground">Clique em “Recarregar” para buscar as mensagens desta conversa.</div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <div className="max-w-md text-center">
-                          <div className="text-sm font-semibold">Conversas</div>
-                          <div className="mt-1 text-sm text-muted-foreground">Escolha uma conversa na lista para visualizar as mensagens.</div>
-                        </div>
-                      </div>
-                    )
-                  }
-                  assistantActions={(m, baseId, idx) => (
-                    <div className="-mt-2.5 flex justify-end pr-2">
-                      <div className="inline-flex items-center gap-0.5 rounded-full bg-background/80 px-0.5 py-0.5 shadow-sm ring-1 ring-border/60">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className={`h-6 w-6 p-0 transition-transform ${feedbackByMessage[baseId] === 'up' ? 'scale-105' : ''}`}
-                                onClick={() => sendPositive(String(m.id || idx))}
-                              >
-                                <ThumbsUp className={`h-3 w-3 ${feedbackByMessage[baseId] === 'up' ? 'text-green-600' : 'text-muted-foreground'}`} />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Gostei</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className={`h-6 w-6 p-0 transition-transform ${feedbackByMessage[baseId] === 'down' ? 'scale-105' : ''}`}
-                                onClick={() => {
-                                  setFeedbackMessageId(String(m.id || idx));
-                                  setFeedbackText('');
-                                  setFeedbackModalOpen(true);
-                                }}
-                              >
-                                <ThumbsDown className={`h-3 w-3 ${feedbackByMessage[baseId] === 'down' ? 'text-red-600' : 'text-muted-foreground'}`} />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Não gostei</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </div>
-                  )}
-                  afterMessages={
-                    (() => {
-                      const sel = conversations.find((x) => x.dify_conversation === selectedConvId);
-                      const manual = isEditableConversation(sel);
-                      const typing = !!selectedConvId && typingByConv[selectedConvId];
-                      if (!manual || !typing) return null;
-                      return (
-                        <div className="flex justify-end">
-                          <div className="max-w-[86%] rounded-3xl bg-[#EBF57D] px-4 py-2 text-sm shadow-sm md:max-w-[72%]">
-                            <div className="flex items-center gap-1">
-                              <span className="h-2 w-2 animate-bounce rounded-full bg-black/40" style={{ animationDelay: '0ms' }}></span>
-                              <span className="h-2 w-2 animate-bounce rounded-full bg-black/40" style={{ animationDelay: '100ms' }}></span>
-                              <span className="h-2 w-2 animate-bounce rounded-full bg-black/40" style={{ animationDelay: '200ms' }}></span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()
-                  }
-                />
-                {(() => {
-                  const sel = conversations.find((x) => x.dify_conversation === selectedConvId);
-                  return isEditableConversation(sel);
-                })() && (
-                  <div className="flex-shrink-0 border-t border-border/70 bg-background/70 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        placeholder="Digite sua mensagem"
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          const isWaiting = !!selectedConvId && !!typingByConv[selectedConvId];
-                          const lastRole = getLastMessageRoleForConversation(selectedConvId);
-                          const isBlockedByLastMessage = lastRole === 'user';
-                          if (e.key === 'Enter' && !sendingChat && !isWaiting && !isBlockedByLastMessage && chatInput.trim()) {
-                            e.preventDefault();
-                            sendManualMessage();
-                          }
-                        }}
-                        disabled={(() => {
-                          const isWaiting = !!selectedConvId && !!typingByConv[selectedConvId];
-                          const lastRole = getLastMessageRoleForConversation(selectedConvId);
-                          const isBlockedByLastMessage = lastRole === 'user';
-                          return sendingChat || isWaiting || isBlockedByLastMessage;
-                        })()}
-                        className="h-10 flex-1 bg-background/80"
-                      />
-                      <Button
-                        onClick={sendManualMessage}
-                        disabled={(() => {
-                          const isWaiting = !!selectedConvId && !!typingByConv[selectedConvId];
-                          const lastRole = getLastMessageRoleForConversation(selectedConvId);
-                          const isBlockedByLastMessage = lastRole === 'user';
-                          return sendingChat || isWaiting || isBlockedByLastMessage || !chatInput.trim();
-                        })()}
-                        className="h-10 gap-2"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                        Enviar
-                      </Button>
+              }
+              assistantActions={(m, baseId, idx) => (
+                <div className="wl-reactrow">
+                  <div className="wl-react">
+                    <IconTool
+                      label="Gostei"
+                      className={feedbackByMessage[baseId] === 'up' ? 'is-on' : ''}
+                      onClick={() => sendPositive(String(m.id || idx))}
+                    >
+                      <ThumbsUp aria-hidden="true" />
+                    </IconTool>
+                    <IconTool
+                      label="Não gostei"
+                      className={feedbackByMessage[baseId] === 'down' ? 'is-on-down' : ''}
+                      onClick={() => {
+                        setFeedbackMessageId(String(m.id || idx));
+                        setFeedbackText('');
+                        setFeedbackModalOpen(true);
+                      }}
+                    >
+                      <ThumbsDown aria-hidden="true" />
+                    </IconTool>
+                  </div>
+                </div>
+              )}
+              afterMessages={
+                canCompose && !!selectedConvId && typingByConv[selectedConvId] ? (
+                  <div className="wl-typing" aria-label="A IA está digitando">
+                    <div className="wl-typing__bubble">
+                      <span className="wl-typing__dot" style={{ animationDelay: '0ms' }} />
+                      <span className="wl-typing__dot" style={{ animationDelay: '120ms' }} />
+                      <span className="wl-typing__dot" style={{ animationDelay: '240ms' }} />
                     </div>
                   </div>
-                )}
+                ) : null
+              }
+            />
+
+            {canCompose && (
+              <div className="wl-compose">
+                <input
+                  className="wl-input"
+                  placeholder="Digite sua mensagem"
+                  aria-label="Mensagem"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !composerBlocked && chatInput.trim()) {
+                      e.preventDefault();
+                      sendManualMessage();
+                    }
+                  }}
+                  disabled={composerBlocked}
+                />
+                <button
+                  type="button"
+                  className="wl-btn wl-btn--glass-ink"
+                  onClick={sendManualMessage}
+                  disabled={composerBlocked || !chatInput.trim()}
+                >
+                  <Send aria-hidden="true" width={16} height={16} />
+                  Enviar
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
+
+        <Dialog open={qualifyDialogOpen} onOpenChange={setQualifyDialogOpen}>
+          <DialogContent className="wl-scope wl-modal wl-modal--sm">
+            <DialogHeader className="wl-modal__head">
+              <DialogTitle className="wl-title wl-title--sm">Deseja qualificar este lead?</DialogTitle>
+              <DialogDescription className="wl-lede">
+                Ao confirmar a qualificação deste lead, ele será encaminhado para a fila de distribuição de leads e direcionado ao responsável designado para atendimento.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="wl-modal__foot wl-modal__foot--end">
+              <div className="wl-modal__foot-actions">
+                <button type="button" className="wl-btn wl-btn--glass-ink" onClick={() => setQualifyDialogOpen(false)} disabled={qualifyingLead}>
+                  Não
+                </button>
+                <button type="button" className="wl-btn wl-btn--lime" onClick={handleQualifySelectedLead} disabled={qualifyingLead}>
+                  {qualifyingLead ? 'Enviando...' : 'Sim'}
+                </button>
               </div>
             </div>
-            <Dialog open={feedbackModalOpen} onOpenChange={setFeedbackModalOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Fornecer Feedback</DialogTitle>
-                  <DialogDescription>Por favor, explique o que deu errado na mensagem e como gostaria que fosse.</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-2">
-                  <Label htmlFor="feedback-text">Mensagem</Label>
-                  <Textarea id="feedback-text" value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} placeholder="Descreva seu feedback" />
-                </div>
-                <DialogFooter>
-                  <Button onClick={sendFeedback} disabled={sendingFeedback}>
-                    Enviar
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </Card>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={feedbackModalOpen} onOpenChange={setFeedbackModalOpen}>
+          <DialogContent className="wl-scope wl-modal sm:max-w-[520px]">
+            <DialogHeader className="wl-modal__head">
+              <DialogTitle className="wl-title wl-title--sm">Fornecer feedback</DialogTitle>
+              <DialogDescription className="wl-lede">
+                Por favor, explique o que deu errado na mensagem e como gostaria que fosse.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="wl-field">
+              <label className="wl-label" htmlFor="feedback-text">Mensagem</label>
+              <textarea
+                id="feedback-text"
+                className="wl-input"
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="Descreva seu feedback"
+              />
+            </div>
+            <div className="wl-modal__foot wl-modal__foot--end">
+              <div className="wl-modal__foot-actions">
+                <button type="button" className="wl-btn wl-btn--lime" onClick={sendFeedback} disabled={sendingFeedback}>
+                  {sendingFeedback ? 'Enviando...' : 'Enviar'}
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
 

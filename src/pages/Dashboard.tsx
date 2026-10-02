@@ -1,20 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { DateRange } from "@/components/DateRangePicker";
 import { startOfMonth, endOfMonth, startOfDay, endOfDay } from "date-fns";
 import { DateRangePicker } from "@/components/DateRangePicker";
 
 import { useCRM } from '@/contexts/CRMContext';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Users, Target, Activity, ArrowUpRight, ArrowDownRight, BarChart3, Clock } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { Users } from 'lucide-react';
 import { getLeadsByUser } from '@/lib/leads';
+import InfoTip from '@/components/InfoTip';
 import { Lead } from '@/types';
+import '@/styles/worklivoo-tokens.css';
+import '@/styles/worklivoo-components.css';
+import '@/styles/worklivoo-page.css';
+
+// Cores dos gráficos vêm dos tokens (o recharts aceita var() nos atributos SVG).
+const CHART = {
+  bar: 'var(--ink)',
+  grid: 'var(--line)',
+  tick: 'var(--muted-soft)',
+  cursor: 'var(--line-soft)',
+};
+
+const ChartTip = ({ active, payload, label }: { active?: boolean; payload?: { value?: number }[]; label?: string }) => {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="wl-chart-tip">
+      <p className="wl-chart-tip__label">{label}</p>
+      <p className="wl-chart-tip__value"><strong>{payload[0].value}</strong> leads</p>
+    </div>
+  );
+};
 
 type LeadsV2DashboardRow = {
   lead_id?: number;
@@ -257,440 +273,220 @@ const Dashboard = () => {
     };
   }, [filteredLeadsPlano]);
 
+
+  const planoUsadoPct = planoLeads > 0 ? (leadsPlanoDoPeriodo.leadsNoPeriodo.length / planoLeads) * 100 : 0;
+  const planoExcedentes = leadsPlanoDoPeriodo.leadsNoPeriodo.length - planoLeads;
+  const maxOrigem = Math.max(1, ...sourceData.map((o) => o.value));
+
+  const stageShortNames: Record<string, string> = {
+    'Entrada Lead': 'Entrada',
+    'Tentando Contato': 'Contato',
+    'Contato Realizado': 'Realizado',
+    'Oport. Qualificada': 'Qualificada',
+    'Orçam./Neg.': 'Orç./Neg.',
+    'Venda': 'Venda',
+  };
+
+  const getInitials = (name: string) =>
+    (name || '?').split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
+
+  const recentLeads = [...leadsDoPeriodo.leadsAbertosNoPeriodo]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
+
+  const renderBarChart = (data: { name: string; value: number }[], height: number, bottom: number) => (
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} margin={{ top: 24, right: 12, left: -12, bottom }}>
+        <CartesianGrid vertical={false} stroke={CHART.grid} />
+        <XAxis dataKey="name" tick={{ fill: CHART.tick, fontSize: 11.5, fontWeight: 500 }} axisLine={false} tickLine={false} />
+        <YAxis allowDecimals={false} tick={{ fill: CHART.tick, fontSize: 11.5, fontWeight: 500 }} axisLine={false} tickLine={false} />
+        <RechartsTooltip cursor={{ fill: CHART.cursor }} content={<ChartTip />} />
+        <Bar dataKey="value" fill={CHART.bar} radius={[8, 8, 0, 0]} maxBarSize={56}>
+          <LabelList dataKey="value" position="top" fill={CHART.bar} fontSize={12} fontWeight={800} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+
   return (
-    <TooltipProvider>
-      <div className="space-y-8 p-6">
-        {/* Header com Avatar e Informações */}
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent light-welcome-title">
-              Bem-vindo, {user?.nome || 'Usuário'}!
-            </h1>
-            <p className="text-muted-foreground mt-1 text-lg">Resultados gerais da Julia</p>
-            <Badge variant="secondary" className="mt-2 rounded-full">
-              <Activity className="w-3 h-3 mr-1" />
-              Dashboard Atualizado
-            </Badge>
-          </div>
-          <div className="flex justify-end">
-            <DateRangePicker
-              dateRange={dateRange}
-              onDateRangeChange={handleDateRangeChange}
-              placeholder="Selecione o período"
-            />
-          </div>
+    <div className="wl-scope wl-page">
+      <header className="wl-page__head">
+        <div>
+          <p className="wl-eyebrow">Resultados gerais da Julia</p>
+          <h1 className="wl-page__title">Bem-vindo, {user?.nome || 'Usuário'}!</h1>
         </div>
-        
-        <Separator className="my-8" />
+        <DateRangePicker
+          variant="worklivoo"
+          dateRange={dateRange}
+          onDateRangeChange={handleDateRangeChange}
+          placeholder="Selecione o período"
+        />
+      </header>
 
-        {/* Métricas principais */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Card do Plano de Leads */}
-              <Card className="bg-gradient-to-br from-card to-card/50 border-border rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="text-sm font-medium">Plano de Leads</CardDescription>
-                    <div className="p-2 bg-[#EBF57D]/20 rounded-xl">
-                      <Activity className="w-5 h-5 text-foreground" />
-                    </div>
-                  </div>
-                  <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-2">
-                    {leadsPlanoDoPeriodo.leadsNoPeriodo.length}/{planoLeads}
-                    {leadsPlanoDoPeriodo.leadsNoPeriodo.length <= planoLeads ? 
-                      <ArrowUpRight className="w-4 h-4 text-green-500" /> : 
-                      <ArrowDownRight className="w-4 h-4 text-red-500" />
-                    }
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <Progress 
-                      value={Math.min((leadsPlanoDoPeriodo.leadsNoPeriodo.length / planoLeads) * 100, 100)} 
-                      className="h-2"
-                    />
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{Math.round((leadsPlanoDoPeriodo.leadsNoPeriodo.length / planoLeads) * 100)}% usado</span>
-                      <span>{Math.max(0, planoLeads - leadsPlanoDoPeriodo.leadsNoPeriodo.length)} restantes</span>
-                    </div>
-                    {typeof user?.dia_vencimento === 'number' && user.dia_vencimento > 0 && (
-                      <div className="text-[11px] text-muted-foreground">
-                        Ciclo fecha dia {user.dia_vencimento}
-                      </div>
-                    )}
-                    {leadsPlanoDoPeriodo.leadsNoPeriodo.length > planoLeads && (
-                      <Badge variant="destructive" className="rounded-full text-xs">
-                        +{leadsPlanoDoPeriodo.leadsNoPeriodo.length - planoLeads} excedentes
-                      </Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-br from-card to-card/50 border-border rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="text-sm font-medium">Total de Leads em Aberto</CardDescription>
-                    <div className="p-2 bg-[#EBF57D]/20 rounded-xl">
-                  <Users className="w-5 h-5 text-foreground" />
-                    </div>
-                  </div>
-                  <CardTitle className="text-4xl font-bold text-foreground flex items-center gap-2">
-                    {leadsDoPeriodo.leadsAbertosNoPeriodo.length}
-                    <ArrowUpRight className="w-5 h-5 text-green-500" />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="rounded-full text-xs">
-                      +{leadsDoPeriodo.leadsAbertosNoPeriodo.length} este período
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-br from-card to-card/50 border-border rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="text-sm font-medium">Oportunidades Qualificadas</CardDescription>
-                    <div className="p-2 bg-[#EBF57D]/20 rounded-xl">
-                      <Target className="w-5 h-5 text-foreground" />
-                    </div>
-                  </div>
-                  <CardTitle className="text-4xl font-bold text-foreground flex items-center gap-2">
-                    {leadsDoPeriodo.leadsQualificadosNoPeriodo.length}
-                    <TrendingUp className="w-5 h-5 text-foreground" />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="rounded-full text-xs">
-                      {leadsDoPeriodo.leadsNoPeriodo.length} leads no período
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-br from-card to-card/50 border-border rounded-2xl hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="text-sm font-medium">Taxa de Conversão</CardDescription>
-                    <div className="p-2 bg-[#EBF57D]/20 rounded-xl">
-                      <TrendingUp className="w-5 h-5 text-foreground" />
-                    </div>
-                  </div>
-                  <CardTitle className="text-4xl font-bold text-foreground flex items-center gap-2">
-                    {leadsDoPeriodo.taxaConversaoQualificados.toFixed(1)}%
-                    {leadsDoPeriodo.taxaConversaoQualificados > 20 ? 
-                      <ArrowUpRight className="w-5 h-5 text-green-500" /> : 
-                      <ArrowDownRight className="w-5 h-5 text-red-500" />
-                    }
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Progress value={leadsDoPeriodo.taxaConversaoQualificados} className="h-3 rounded-full" />
-                </CardContent>
-              </Card>
-
-
+      <section className="wl-section" aria-labelledby="dash-resumo">
+        <div className="wl-section__head">
+          <h2 id="dash-resumo" className="wl-section__title">Resumo do período</h2>
+          <p className="wl-lede">Números dos leads que entraram no período selecionado.</p>
         </div>
 
-        {/* Gráficos */}
-        <div className="grid grid-cols-1 gap-8">
-          {/* Funil de Leads - Desktop: Gráfico, Mobile: Cards */}
-          {isMobile ? (
-            <Card className="bg-gradient-to-br from-card to-card/50 border-border rounded-2xl shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[#EBF57D]/20 rounded-xl">
-                    <BarChart3 className="w-6 h-6 text-foreground" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl font-bold">Funil de Leads</CardTitle>
-                    <CardDescription className="text-sm">Distribuição atual do funil de vendas</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  {stageData.map((stage, index) => {
-                    const stageNames = {
-                      'Entrada Lead': 'Entrada',
-                      'Tentando Contato': 'Contato',
-                      'Contato Realizado': 'Realizado',
-                      'Oport. Qualificada': 'Qualificada',
-                      'Orçam./Neg.': 'Orç./Neg.',
-                      'Venda': 'Venda'
-                    };
-                    const colors = ['bg-[#EBF57D]', 'bg-muted', 'bg-accent', 'bg-secondary', 'bg-orange-200', 'bg-green-200'];
-                    return (
-                      <div key={stage.name} className="bg-muted/30 rounded-xl p-4 text-center">
-                        <div className={`w-12 h-12 ${colors[index]} rounded-full flex items-center justify-center mx-auto mb-2`}>
-                           <span className="font-bold text-lg" style={{color: index === 0 ? '#000000' : ''}}>{stage.value}</span>
-                         </div>
-                        <p className="text-sm font-medium text-foreground">{stageNames[stage.name] || stage.name}</p>
-                        <p className="text-xs text-muted-foreground">leads</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="bg-gradient-to-br from-card to-card/50 border-border rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[#EBF57D]/20 rounded-xl">
-                    <BarChart3 className="w-6 h-6 text-foreground" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl font-bold">Funil de Leads</CardTitle>
-                    <CardDescription className="text-sm">Distribuição atual do funil de vendas</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-muted/30 rounded-xl p-4">
-                  <ResponsiveContainer width="100%" height={380}>
-                    <BarChart data={stageData} margin={{ top: 20, right: 30, left: 5, bottom: 40 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                      <XAxis 
-                        dataKey="name" 
-                        stroke="#9CA3AF" 
-                        fontSize={11} 
-                        tick={{ fill: '#9CA3AF' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis 
-                        stroke="#9CA3AF" 
-                        fontSize={11} 
-                        tick={{ fill: '#9CA3AF' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <RechartsTooltip 
-                        content={({ active, payload, label }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
-                                <p className="font-medium text-popover-foreground">{label}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  <span className="font-bold dark:text-[#EBF57D] text-black">{payload[0].value}</span> leads
-                                </p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Bar 
-                        dataKey="value" 
-                        fill="#EBF57D" 
-                        radius={[8, 8, 0, 0]} 
-                        className="hover:opacity-80 transition-opacity"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Origem dos Leads - Desktop: Gráfico, Mobile: Cards */}
-          {isMobile ? (
-            <Card className="bg-gradient-to-br from-card to-card/50 border-border rounded-2xl shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[#EBF57D]/20 rounded-xl">
-                     <TrendingUp className="w-6 h-6 text-foreground" />
-                   </div>
-                  <div>
-                    <CardTitle className="text-xl font-bold">Origem dos Leads</CardTitle>
-                    <CardDescription className="text-sm">Principais canais de aquisição</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                   {sourceData.map((origin, index) => {
-                     const gradients = [
-                        'bg-primary',
-                        'bg-muted', 
-                        'bg-accent',
-                        'bg-secondary',
-                        'bg-border'
-                      ];
-                     return (
-                       <div key={origin.name} className="bg-muted/30 rounded-xl p-4">
-                         <div className="flex items-center justify-between">
-                           <div className="flex items-center gap-3">
-                             <div className={`w-4 h-8 ${gradients[index]} rounded-lg`}></div>
-                             <div>
-                               <p className="font-medium text-foreground">{origin.name}</p>
-                               <p className="text-xs text-muted-foreground">Canal de origem</p>
-                             </div>
-                           </div>
-                           <div className="text-right">
-                             <p className="text-2xl font-bold text-foreground">{origin.value}</p>
-                             <p className="text-xs text-muted-foreground">leads</p>
-                           </div>
-                         </div>
-                       </div>
-                     );
-                   })}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="bg-gradient-to-br from-card to-card/50 border-border rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[#EBF57D]/20 rounded-xl">
-                     <TrendingUp className="w-6 h-6 text-foreground" />
-                   </div>
-                  <div>
-                    <CardTitle className="text-xl font-bold">Origem dos Leads</CardTitle>
-                    <CardDescription className="text-sm">Principais canais de aquisição</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-muted/30 rounded-xl p-4">
-                  <ResponsiveContainer width="100%" height={320}>
-                    <BarChart data={sourceData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                      <XAxis 
-                        dataKey="name" 
-                        stroke="#9CA3AF" 
-                        fontSize={11} 
-                        tick={{ fill: '#9CA3AF' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis 
-                        stroke="#9CA3AF" 
-                        fontSize={11} 
-                        tick={{ fill: '#9CA3AF' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <RechartsTooltip 
-                        content={({ active, payload, label }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
-                                <p className="font-medium text-popover-foreground">{label}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  <span className="font-bold dark:text-[#EBF57D] text-black">{payload[0].value}</span> leads
-                                </p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Bar 
-                        dataKey="value" 
-                        fill="#EBF57D" 
-                        radius={[8, 8, 0, 0]} 
-                        className="hover:opacity-80 transition-opacity"
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Atividade recente */}
-        <Card className="bg-gradient-to-br from-card to-card/50 border-border rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300">
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#EBF57D]/20 rounded-xl">
-                <Clock className="w-6 h-6 text-foreground" />
-              </div>
-              <div>
-                <CardTitle className="text-xl font-bold">Leads Recentes</CardTitle>
-                <CardDescription className="text-sm">Últimas oportunidades do período selecionado</CardDescription>
-              </div>
+        <div className="wl-stats">
+          <article className="wl-stat">
+            <div className="wl-stat__top">
+              <span className="wl-stat__label">Plano de leads</span>
+              <InfoTip label="Plano de leads">
+                <p><strong>Leads recebidos no período</strong> em relação ao limite do seu plano ({planoLeads} leads).</p>
+                <p>Leads de teste (trial) não entram na conta. O período padrão é o seu ciclo de cobrança.</p>
+              </InfoTip>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {leadsDoPeriodo.leadsAbertosNoPeriodo
-                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                .slice(0, 5)
-                .map((lead) => {
-                  
-                  return (
-                    <div key={lead.id} className={`group ${isMobile ? 'p-3' : 'p-4'} bg-muted/30 border border-border/50 rounded-xl hover:bg-muted/50 hover:border-[#EBF57D]/20 transition-all duration-300 hover:shadow-md`}>
-                      {isMobile ? (
-                         // Versão Mobile Simplificada
-                         <div className="flex items-center gap-3">
-                           <Avatar className="h-8 w-8 flex-shrink-0">
-                             <AvatarFallback className="text-xs font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
-                                {(lead.leadName || '?').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                              </AvatarFallback>
-                           </Avatar>
-                           <div className="flex-1 min-w-0">
-                             <h4 className="font-medium text-foreground text-sm leading-relaxed break-words">
-                               {lead.opportunityName}
-                             </h4>
-                           </div>
-                         </div>
-                      ) : (
-                        // Versão Desktop Original
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <Avatar className="h-10 w-10 flex-shrink-0">
-                              <AvatarFallback className="text-sm font-semibold" style={{backgroundColor: '#EBF57D', color: '#000000'}}>
-                                {(lead.leadName || '?').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-foreground dark:group-hover:text-[#EBF57D] group-hover:text-primary-foreground transition-colors">
-                                {lead.opportunityName}
-                              </h4>
-                              <div className="flex items-center gap-2 mt-1">
-                                <p className="text-sm text-muted-foreground">{lead.leadName}</p>
-                                <Separator orientation="vertical" className="h-3" />
-                                <Badge variant="outline" className="text-xs rounded-full">
-                                  {lead.source || 'Sem origem'}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <p className="text-sm font-medium text-foreground">
-                                {new Date(lead.createdAt).toLocaleDateString('pt-BR')}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(lead.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              
-              {leadsDoPeriodo.leadsAbertosNoPeriodo.length === 0 && (
-                <div className="text-center py-8">
-                  <div className="p-4 bg-muted/30 rounded-xl">
-                    <Users className="w-12 h-12 text-foreground mx-auto mb-3" />
-                    <p className="text-muted-foreground">Nenhum lead encontrado neste período</p>
-                    <p className="text-sm text-muted-foreground mt-1">Novos leads aparecerão aqui quando criados</p>
+            <span className="wl-stat__value">
+              {leadsPlanoDoPeriodo.leadsNoPeriodo.length}
+              <span className="wl-stat__unit">/{planoLeads}</span>
+            </span>
+            <div className="wl-meter" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(Math.round(planoUsadoPct), 100)}>
+              <div className="wl-meter__fill" style={{ width: `${Math.min(planoUsadoPct, 100)}%` }} />
+            </div>
+            <div className="wl-stat__foot">
+              <p className="wl-stat__meta">{Math.round(planoUsadoPct)}% usado</p>
+              <p className="wl-stat__meta">{Math.max(0, planoLeads - leadsPlanoDoPeriodo.leadsNoPeriodo.length)} restantes</p>
+            </div>
+            {typeof user?.dia_vencimento === 'number' && user.dia_vencimento > 0 && (
+              <p className="wl-stat__meta">Ciclo fecha dia {user.dia_vencimento}</p>
+            )}
+            {planoExcedentes > 0 && (
+              <span className="wl-pill wl-pill--danger">+{planoExcedentes} excedentes</span>
+            )}
+          </article>
+
+          <article className="wl-stat">
+            <div className="wl-stat__top">
+              <span className="wl-stat__label">Leads em aberto</span>
+              <InfoTip label="Leads em aberto">
+                <p><strong>Leads do período ainda em andamento</strong>: não foram marcados como vendidos nem como perdidos.</p>
+              </InfoTip>
+            </div>
+            <span className="wl-stat__value">{leadsDoPeriodo.leadsAbertosNoPeriodo.length}</span>
+            <p className="wl-stat__meta">
+              Ativos entre os {leadsDoPeriodo.leadsNoPeriodo.length} leads do período
+            </p>
+          </article>
+
+          <article className="wl-stat">
+            <div className="wl-stat__top">
+              <span className="wl-stat__label">Oportunidades qualificadas</span>
+              <InfoTip label="Oportunidades qualificadas">
+                <p><strong>Leads do período que chegaram</strong> às etapas Oportunidade qualificada, Orçamento/Negociação ou Venda.</p>
+                <p>Contam mesmo que o lead tenha sido perdido depois.</p>
+              </InfoTip>
+            </div>
+            <span className="wl-stat__value">{leadsDoPeriodo.leadsQualificadosNoPeriodo.length}</span>
+            <p className="wl-stat__meta">{leadsDoPeriodo.leadsNoPeriodo.length} leads no período</p>
+          </article>
+
+          <article className="wl-stat wl-stat--ink">
+            <div className="wl-stat__top">
+              <span className="wl-stat__label">Taxa de conversão</span>
+              <InfoTip label="Taxa de conversão">
+                <p><strong>Oportunidades qualificadas ÷ total de leads</strong> do período.</p>
+                <p>Mostra quantos leads viraram oportunidade, não quantos viraram venda.</p>
+              </InfoTip>
+            </div>
+            <span className="wl-stat__value">{leadsDoPeriodo.taxaConversaoQualificados.toFixed(1)}%</span>
+            <div className="wl-meter" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(leadsDoPeriodo.taxaConversaoQualificados)}>
+              <div className="wl-meter__fill" style={{ width: `${Math.min(leadsDoPeriodo.taxaConversaoQualificados, 100)}%` }} />
+            </div>
+            <p className="wl-stat__meta">Qualificados sobre o total de leads</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="wl-section" aria-labelledby="dash-funil">
+        <div className="wl-section__head">
+          <h2 id="dash-funil" className="wl-section__title">Funil de leads</h2>
+          <p className="wl-lede">Distribuição atual do funil de vendas.</p>
+        </div>
+
+        {isMobile ? (
+          <div className="wl-minis">
+            {stageData.map((stage) => (
+              <div key={stage.name} className="wl-mini">
+                <span className="wl-mini__value">{stage.value}</span>
+                <span className="wl-mini__label">{stageShortNames[stage.name] || stage.name}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="wl-panel">{renderBarChart(stageData, 380, 24)}</div>
+        )}
+      </section>
+
+      <section className="wl-section" aria-labelledby="dash-origem">
+        <div className="wl-section__head">
+          <h2 id="dash-origem" className="wl-section__title">Origem dos leads</h2>
+          <p className="wl-lede">Principais canais de aquisição.</p>
+        </div>
+
+        {isMobile ? (
+          <div className="wl-bars">
+            {sourceData.map((origin) => (
+              <div key={origin.name}>
+                <div className="wl-bars__row-head">
+                  <span className="wl-bars__name">{origin.name}</span>
+                  <span className="wl-bars__count">{origin.value}</span>
+                </div>
+                <div className="wl-meter">
+                  <div className="wl-meter__fill" style={{ width: `${(origin.value / maxOrigem) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="wl-panel">{renderBarChart(sourceData, 320, 8)}</div>
+        )}
+      </section>
+
+      <section className="wl-section" aria-labelledby="dash-recentes">
+        <div className="wl-section__head">
+          <h2 id="dash-recentes" className="wl-section__title">Leads recentes</h2>
+          <p className="wl-lede">Últimas oportunidades do período selecionado.</p>
+        </div>
+
+        {recentLeads.length > 0 ? (
+          <div className="wl-table">
+            <div className="wl-table__row wl-table__row--head" aria-hidden="true">
+              <span>Lead</span>
+              <span>Origem</span>
+              <span className="wl-table__right">Entrada</span>
+            </div>
+            {recentLeads.map((lead) => (
+              <div key={lead.id} className="wl-table__row">
+                <div className="wl-person">
+                  <span className="wl-avatar" aria-hidden="true">{getInitials(lead.leadName)}</span>
+                  <div className="wl-person__text">
+                    <p className="wl-person__name">{lead.opportunityName}</p>
+                    <p className="wl-person__sub">{lead.leadName}</p>
                   </div>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </TooltipProvider>
+                <div className="wl-table__origin">
+                  <span className="wl-pill">{lead.source || 'Sem origem'}</span>
+                </div>
+                <div className="wl-table__right wl-table__when">
+                  <p className="wl-when__date">{new Date(lead.createdAt).toLocaleDateString('pt-BR')}</p>
+                  <p className="wl-when__time">
+                    {new Date(lead.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="wl-empty">
+            <span className="wl-empty__icon"><Users aria-hidden="true" /></span>
+            <p className="wl-empty__title">Nenhum lead encontrado neste período</p>
+            <p className="wl-empty__text">Novos leads aparecerão aqui quando criados.</p>
+          </div>
+        )}
+      </section>
+    </div>
   );
 };
 

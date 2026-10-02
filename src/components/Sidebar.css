@@ -1,34 +1,32 @@
-/* Importing Google Fonts - Poppins */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+/* ==========================================================================
+   Menu lateral — padrão Worklivoo (design-worklivoo/design.md)
+   Tokens vêm de src/styles/worklivoo-tokens.css (classe `wl-scope` no <aside>).
+
+   Regra do produto: o fundo do menu é SEMPRE o limão principal (--lime,
+   #EBF57D). Por isso o limão não aparece em mais nenhum elemento aqui dentro:
+   o item ativo é preto, o hover é vidro branco.
+   ========================================================================== */
 
 .sidebar {
+  --glass-white: rgba(255, 255, 255, .52);
+
   position: fixed;
   width: 270px;
   margin: 16px;
-  border-radius: 16px;
-  background: hsl(var(--card));
-  border: none;
   height: calc(100vh - 32px);
-  transition: all 0.4s ease;
+  border: none;
+  border-radius: var(--radius-block);
+  background: var(--lime);
+  box-shadow: var(--shadow-card);
   z-index: 50;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-/* Modo Light - Cores específicas */
-[data-theme="light"] .sidebar {
-  background: #EBF57D;
-  border: none;
-}
-
-/* Modo Dark - Cores específicas */
-[data-theme="dark"] .sidebar {
-  background: #EBF57D;
-  border: none;
+  transition: width .35s var(--ease), height .35s var(--ease);
 }
 
 .sidebar.collapsed {
   width: 85px;
 }
+
+/* --- cabeçalho ------------------------------------------------------------ */
 
 .sidebar .sidebar-header {
   display: flex;
@@ -39,36 +37,19 @@
   border-bottom: none;
 }
 
-/* Modo Light - Header */
-[data-theme="light"] .sidebar .sidebar-header {
-  border-bottom: none;
+.sidebar-header .sidebar-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Modo Dark - Header */
-[data-theme="dark"] .sidebar .sidebar-header {
-  border-bottom: none;
-}
-
-.sidebar-header .header-logo img,
 .sidebar-header .sidebar-logo .logo-image {
-  width: 60px;
-  height: 60px;
+  width: 52px;
+  height: 52px;
   display: block;
   object-fit: contain;
-  border-radius: 50%;
-}
-
-.sidebar-header .sidebar-logo .logo-rounded {
-  border-radius: 12px;
-}
-
-.sidebar.collapsed .sidebar-header .sidebar-logo .logo-image {
-  width: 40px;
-  height: 40px;
-}
-
-.sidebar.collapsed .sidebar-header .sidebar-logo .logo-rounded {
-  border-radius: 8px;
+  border-radius: var(--radius-tile);
+  transition: width .35s var(--ease), height .35s var(--ease), border-radius .35s var(--ease);
 }
 
 .sidebar.collapsed .sidebar-header {
@@ -76,39 +57,43 @@
   padding: 25px 10px;
 }
 
-.sidebar-header .sidebar-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.sidebar.collapsed .sidebar-header .sidebar-logo .logo-image {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
 }
 
+/* botão de recolher / abrir menu */
 .sidebar-header .toggler {
   height: 35px;
   width: 35px;
-  color: hsl(var(--foreground));
-  border: none;
-  cursor: pointer;
   display: flex;
-  background: hsl(var(--background));
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  transition: 0.4s ease;
-  border: 1px solid hsl(var(--border));
+  border: none;
+  border-radius: var(--radius-control);
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: var(--shadow-glass);
+  cursor: pointer;
+  transition: transform .22s var(--ease), background .22s var(--ease);
 }
 
-/* Modo Light - Toggler */
-[data-theme="light"] .sidebar-header .toggler {
-  color: #1a1a1a;
-  background: #ffffff;
-  border: 1px solid #d4e06a;
+.sidebar-header .toggler:hover {
+  background: var(--white);
+  transform: translateY(-1px);
 }
 
-/* Modo Dark - Toggler */
-[data-theme="dark"] .sidebar-header .toggler {
-  color: #1a1a1a;
-  background: #ffffff;
-  border: 1px solid #d4e06a;
+.sidebar-header .toggler:focus-visible,
+.sidebar-nav .nav-link:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.sidebar-header .toggler svg {
+  width: 20px;
+  height: 20px;
+  transition: transform .35s var(--ease);
 }
 
 .sidebar-header .sidebar-toggler {
@@ -124,30 +109,15 @@
   transform: translate(-4px, 65px);
 }
 
-.sidebar-header .toggler:hover {
-  background: hsl(var(--accent));
-}
-
-/* Modo Light - Toggler hover */
-[data-theme="light"] .sidebar-header .toggler:hover {
-  background: #f0f8a0;
-}
-
-/* Modo Dark - Toggler hover */
-[data-theme="dark"] .sidebar-header .toggler:hover {
-  background: #f0f8a0;
-}
-
-.sidebar-header .toggler svg {
-  font-size: 1.75rem;
-  transition: 0.4s ease;
-  width: 20px;
-  height: 20px;
+.sidebar.collapsed .sidebar-header .toggler:hover {
+  transform: translate(-4px, 64px);
 }
 
 .sidebar.collapsed .sidebar-header .toggler svg {
   transform: rotate(180deg);
 }
+
+/* --- navegação ------------------------------------------------------------ */
 
 .sidebar-nav .nav-list {
   list-style: none;
@@ -156,7 +126,7 @@
   padding: 0 15px;
   flex-direction: column;
   transform: translateY(15px);
-  transition: 0.4s ease;
+  transition: transform .35s var(--ease);
 }
 
 .sidebar.collapsed .sidebar-nav .primary-nav {
@@ -164,116 +134,154 @@
 }
 
 .sidebar-nav .nav-link {
-  color: hsl(var(--foreground));
+  position: relative;
   display: flex;
   gap: 12px;
-  white-space: nowrap;
-  border-radius: 8px;
-  padding: 12px 15px;
   align-items: center;
-  text-decoration: none;
-  transition: 0.4s ease;
-  background: transparent;
-  border: none;
-  cursor: pointer;
   width: 100%;
+  padding: 12px 15px;
+  border: none;
+  border-radius: var(--radius-tile);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
   text-align: left;
-}
-
-/* Modo Light - Nav Link */
-[data-theme="light"] .sidebar-nav .nav-link {
-  color: #1a1a1a;
-}
-
-/* Modo Dark - Nav Link */
-[data-theme="dark"] .sidebar-nav .nav-link {
-  color: #1a1a1a;
-}
-
-.sidebar.collapsed .sidebar-nav .nav-link {
-  border-radius: 12px;
-}
-
-.sidebar .sidebar-nav .nav-link .nav-label {
-  transition: opacity 0.3s ease;
-  font-weight: 500;
-}
-
-.sidebar.collapsed .sidebar-nav .nav-link .nav-label {
-  opacity: 0;
-  pointer-events: none;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .22s var(--ease), color .22s var(--ease), box-shadow .22s var(--ease);
 }
 
 .sidebar-nav .nav-link:hover {
-  color: hsl(var(--primary));
-  background: hsl(var(--accent));
+  background: var(--glass-white);
+  color: var(--ink);
 }
 
-/* Modo Light - Nav Link hover */
-[data-theme="light"] .sidebar-nav .nav-link:hover {
-  color: #1a1a1a;
-  background: #f0f8a0;
+/* Item atual: preto sólido, texto branco. */
+.sidebar-nav .nav-link.active,
+.sidebar-nav .nav-link.active:hover {
+  background: var(--ink);
+  color: var(--white);
+  box-shadow: var(--shadow-glass);
 }
 
-/* Modo Dark - Nav Link hover */
-[data-theme="dark"] .sidebar-nav .nav-link:hover {
-  color: #1a1a1a;
-  background: #f0f8a0;
+.sidebar .sidebar-nav .nav-link .nav-label {
+  transition: opacity .22s var(--ease);
 }
 
-.sidebar-nav .nav-link.active {
-  color: hsl(var(--primary));
-  background: hsl(var(--primary) / 0.1);
+/* Recolhido: o rótulo sai do fluxo (senão ocupa espaço invisível e o ícone
+   fica deslocado para a esquerda) e o ícone se centraliza no bloco. */
+.sidebar.collapsed .sidebar-nav .nav-link {
+  justify-content: center;
 }
 
-/* Modo Light - Nav Link active */
-[data-theme="light"] .sidebar-nav .nav-link.active {
-  color: #1a1a1a;
-  background: #F6F6F6;
-}
-
-/* Modo Dark - Nav Link active */
-[data-theme="dark"] .sidebar-nav .nav-link.active {
-  color: #1a1a1a;
-  background: #F6F6F6;
+.sidebar.collapsed .sidebar-nav .nav-link .nav-label {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .sidebar-nav .nav-item {
   position: relative;
 }
 
+.sidebar-nav .nav-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* Rodapé do menu: fio separa notificações e sair da navegação principal. */
+.sidebar-nav .secondary-nav {
+  position: absolute;
+  bottom: 30px;
+  width: 100%;
+}
+
+.sidebar-nav .secondary-nav::before {
+  content: '';
+  display: block;
+  height: 1px;
+  margin: 0 15px 8px;
+  background: var(--line);
+}
+
+.sidebar-nav .logout-button:hover {
+  color: var(--danger);
+}
+
+/* Contador de tarefas atrasadas */
+.sidebar-nav .nav-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  box-shadow: 0 0 0 2px var(--lime);
+  color: var(--white);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Ponto de destaque ("Indique e Ganhe") — preto, sem colorir de novo. */
+.sidebar-nav .nav-ping {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+}
+
+.sidebar-nav .nav-ping::before,
+.sidebar-nav .nav-ping::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--ink);
+}
+
+.sidebar-nav .nav-ping::before {
+  animation: wl-ping 1.6s var(--ease) infinite;
+  opacity: .45;
+}
+
+.sidebar-nav .nav-link.active .nav-ping::before,
+.sidebar-nav .nav-link.active .nav-ping::after {
+  background: var(--lime);
+}
+
+@keyframes wl-ping {
+  from { transform: scale(1); opacity: .45; }
+  to   { transform: scale(2.4); opacity: 0; }
+}
+
+/* Dica ao passar o mouse com o menu recolhido */
 .sidebar-nav .nav-tooltip {
   position: absolute;
   top: -10px;
-  opacity: 0;
-  color: hsl(var(--foreground));
-  display: none;
-  pointer-events: none;
-  padding: 6px 12px;
-  border-radius: 8px;
-  white-space: nowrap;
-  background: hsl(var(--background));
-  border: 1px solid hsl(var(--border));
   left: calc(100% + 25px);
-  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
-  transition: 0s;
-  font-size: 0.875rem;
-  font-weight: 500;
+  display: none;
+  padding: 7px 12px;
+  border-radius: var(--radius-control);
+  background: var(--ink);
+  box-shadow: var(--shadow-glass);
+  color: var(--white);
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
   z-index: 100;
-}
-
-/* Modo Light - Tooltip */
-[data-theme="light"] .sidebar-nav .nav-tooltip {
-  color: #1a1a1a;
-  background: #ffffff;
-  border: 1px solid #d4e06a;
-}
-
-/* Modo Dark - Tooltip */
-[data-theme="dark"] .sidebar-nav .nav-tooltip {
-  color: #1a1a1a;
-  background: #ffffff;
-  border: 1px solid #d4e06a;
 }
 
 .sidebar.collapsed .sidebar-nav .nav-tooltip {
@@ -284,80 +292,11 @@
   opacity: 1;
   pointer-events: auto;
   transform: translateY(50%);
-  transition: all 0.4s ease;
+  transition: opacity .22s var(--ease);
 }
 
-.sidebar-nav .secondary-nav {
-  position: absolute;
-  bottom: 30px;
-  width: 100%;
-}
+/* --- telas pequenas ------------------------------------------------------- */
 
-/* Estilos específicos para elementos do sidebar */
-.sidebar-nav .nav-icon {
-  font-size: 1.5rem;
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-}
-
-/* Toggle de tema */
-.sidebar-nav .theme-toggle {
-  justify-content: flex-start;
-  padding: 12px 15px;
-}
-
-.sidebar.collapsed .sidebar-nav .theme-toggle .nav-label {
-  display: none;
-}
-
-/* Perfil do usuário */
-.sidebar-nav .user-profile {
-  cursor: default;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-}
-
-.sidebar-nav .nav-avatar {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-}
-
-/* Botão de logout */
-.sidebar-nav .logout-button {
-  color: hsl(var(--destructive));
-}
-
-.sidebar-nav .logout-button:hover {
-  color: hsl(var(--destructive));
-  background: hsl(var(--destructive) / 0.1);
-}
-
-/* Modo Light - Logout button */
-[data-theme="light"] .sidebar-nav .logout-button {
-  color: #dc2626;
-}
-
-[data-theme="light"] .sidebar-nav .logout-button:hover {
-  color: #dc2626;
-  background: #fecaca;
-}
-
-/* Modo Dark - Logout button */
-[data-theme="dark"] .sidebar-nav .logout-button {
-  color: #dc2626;
-}
-
-[data-theme="dark"] .sidebar-nav .logout-button:hover {
-  color: #dc2626;
-  background: #fecaca;
-}
-
-/* Responsive media query code for small screens */
 @media (max-width: 1024px) {
   .sidebar {
     height: 56px;
@@ -372,37 +311,60 @@
     overflow-y: auto;
   }
 
+  /* No celular o estado "recolhido" (salvo no localStorage do desktop) não vale:
+     o menu é sempre a barra superior com gaveta. */
+  .sidebar.collapsed {
+    width: calc(100% - 26px);
+  }
+
+  .sidebar.collapsed .sidebar-header {
+    justify-content: space-between;
+    padding: 8px 10px;
+  }
+
+  .sidebar.collapsed .sidebar-header .toggler,
+  .sidebar.collapsed .sidebar-header .toggler:hover {
+    transform: none;
+  }
+
+  .sidebar.collapsed .sidebar-nav .primary-nav {
+    transform: translateY(15px);
+  }
+
+  .sidebar.collapsed .sidebar-nav .nav-link {
+    justify-content: flex-start;
+  }
+
+  .sidebar.collapsed .sidebar-nav .nav-link .nav-label {
+    position: static;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebar.collapsed .sidebar-nav .nav-tooltip {
+    display: none;
+  }
+
   .sidebar .sidebar-header {
     position: sticky;
     top: 0;
     z-index: 20;
-    border-radius: 16px;
-    background: hsl(var(--card));
     padding: 8px 10px;
-    border-bottom: none;
+    border-radius: var(--radius-block);
+    background: var(--lime);
   }
 
-  /* Modo Light - Header mobile */
-[data-theme="light"] .sidebar .sidebar-header {
-  background: #EBF57D;
-}
-
-/* Modo Dark - Header mobile */
-[data-theme="dark"] .sidebar .sidebar-header {
-  background: #EBF57D;
-}
-
-  .sidebar-header .header-logo img,
   .sidebar-header .sidebar-logo .logo-image {
     width: 40px;
     height: 40px;
+    border-radius: 12px;
   }
 
   .sidebar-header .sidebar-toggler,
   .sidebar-nav .nav-item:hover .nav-tooltip {
     display: none;
   }
-  
+
   .sidebar-header .menu-toggler {
     display: flex;
     height: 30px;
@@ -410,7 +372,6 @@
   }
 
   .sidebar-header .menu-toggler svg {
-    font-size: 1.3rem;
     width: 16px;
     height: 16px;
   }
@@ -422,13 +383,6 @@
   .sidebar-nav .nav-link {
     gap: 10px;
     padding: 10px;
-    font-size: 0.94rem;
-  }
-
-  .sidebar-nav .nav-link .nav-icon {
-    font-size: 1.37rem;
-    width: 20px;
-    height: 20px;
   }
 
   .sidebar-nav .secondary-nav {
@@ -437,44 +391,24 @@
     margin: 40px 0 30px;
   }
 
-  .sidebar-nav .theme-toggle {
-    justify-content: flex-start;
-  }
-
-  .sidebar-nav .theme-switch {
-    margin-left: auto;
+  .sidebar-nav .secondary-nav::before {
+    margin: 0 10px 8px;
   }
 }
 
-/* Animações suaves */
-.sidebar * {
-  transition: all 0.3s ease;
-}
-
-/* Remove scrollbar do sidebar */
+/* Barra de rolagem do menu fica invisível */
 .sidebar::-webkit-scrollbar {
   display: none;
   width: 0;
   height: 0;
 }
 
-.sidebar::-webkit-scrollbar-track {
-  display: none;
-}
+/* --- área principal ------------------------------------------------------- */
 
-.sidebar::-webkit-scrollbar-thumb {
-  display: none;
-}
-
-.sidebar::-webkit-scrollbar-corner {
-  display: none;
-}
-
-/* Layout responsivo */
 .main-content {
   margin-left: 286px;
   padding: 1.5rem;
-  transition: all 0.3s ease-in-out;
+  transition: margin-left .3s var(--ease);
   min-height: 100vh;
 }
 
@@ -484,12 +418,6 @@
     padding: 1rem !important;
     padding-top: 80px !important; /* Espaçamento para o sidebar mobile */
   }
-}
-
-/* Páginas que zeram o padding do main (ex.: Conversas): dá respiro ao aviso de pagamento */
-.main-content.main-content--flush > .payment-overdue-banner {
-  margin-top: 1.5rem;
-  margin-bottom: 0;
 }
 
 /* Ajuste quando sidebar está colapsado */
@@ -503,204 +431,13 @@
   }
 }
 
-/* ===== Botão de Notificações no Sidebar ===== */
-.sidebar-nav .notifications-button.active {
-  color: #1a1a1a;
-  background: #F6F6F6;
-}
-
-/* ===== Overlay (fundo escuro) ===== */
-.notifications-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  z-index: 55;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.25s ease, visibility 0.25s ease;
-}
-
-.notifications-overlay.visible {
-  opacity: 1;
-  visibility: visible;
-}
-
-/* ===== Painel Lateral de Notificações ===== */
-.notification-panel {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  width: 380px;
-  height: calc(100vh - 32px);
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
-  z-index: 60;
-  transform: translateX(calc(-100% - 32px));
-  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid #f1f5f9;
-}
-
-.notification-panel.open {
-  transform: translateX(0);
-}
-
-.notification-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 20px 16px;
-  border-bottom: 1px solid #f1f5f9;
-  flex-shrink: 0;
-}
-
-.notification-panel-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 8px 16px;
-}
-
-.notification-panel-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.notification-panel-list::-webkit-scrollbar-thumb {
-  background: #e5e7eb;
-  border-radius: 999px;
-}
-
-.notification-panel-list::-webkit-scrollbar-thumb:hover {
-  background: #d1d5db;
-}
-
-.notification-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 60px 24px;
-}
-
-.notification-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.notification-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: background 0.18s ease;
-  position: relative;
-}
-
-.notification-item:hover {
-  background: #f9fafb;
-}
-
-.notification-item.unread {
-  background: #fafbff;
-}
-
-.notification-item.unread:hover {
-  background: #f4f6ff;
-}
-
-.notification-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.notification-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.notification-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.notification-title {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #111827;
-  line-height: 1.35;
-  margin: 0;
-}
-
-.notification-date {
-  font-size: 11px;
-  color: #9ca3af;
-  font-weight: 500;
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.notification-message {
-  font-size: 12.5px;
-  color: #6b7280;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.notification-item-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding-top: 2px;
-}
-
-.notification-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #2563eb;
-  flex-shrink: 0;
-}
-
-/* ===== Responsividade ===== */
-@media (max-width: 1024px) {
-  .notification-panel {
-    top: 0;
-    left: 0;
-    width: 100%;
-    max-width: 420px;
-    height: 100vh;
-    border-radius: 0;
-    transform: translateX(-100%);
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar * {
+    transition: none !important;
   }
 
-  .notification-panel-header {
-    padding: 16px 20px 14px;
-  }
-}
-
-@media (max-width: 480px) {
-  .notification-panel {
-    max-width: 100%;
+  .sidebar-nav .nav-ping::before {
+    animation: none;
   }
 }

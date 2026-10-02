@@ -17,7 +17,7 @@ export interface LeadTarefa {
   atualizado_em: string;
 }
 
-export interface LeadTarefaInput {
+interface LeadTarefaInput {
   tarefa_titulo: string;
   tarefa_descricao?: string;
   data_vencimento?: string | null;
@@ -337,7 +337,7 @@ export function useLeadTarefas({ leadId, user }: { leadId: string | undefined; u
   };
 }
 
-export type TarefaStatus = 'concluida' | 'atrasada' | 'pendente' | 'sem_prazo';
+type TarefaStatus = 'concluida' | 'atrasada' | 'pendente' | 'sem_prazo';
 
 export const getTarefaStatus = (tarefa: Pick<LeadTarefa, 'tarefa_concluida' | 'data_vencimento'>): TarefaStatus => {
   if (tarefa.tarefa_concluida) return 'concluida';

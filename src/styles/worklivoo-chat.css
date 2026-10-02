@@ -1,0 +1,444 @@
+/* ==========================================================================
+   Worklivoo — página de conversas
+   Segue design-worklivoo/design.md (seção 5, "Conversa").
+   Lista à esquerda (--paper), conversa à direita fiel ao WhatsApp:
+   fundo #efeae2 com padrão, balão enviado #d9fdd3, recebido branco.
+   ========================================================================== */
+
+.wl-page--chat {
+  padding: clamp(16px, 2vw, 28px);
+}
+
+.wl-chat-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.wl-chat-head__title {
+  margin: 0;
+  font-size: clamp(26px, 3vw, 34px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -.03em;
+  color: var(--ink);
+}
+
+.wl-chat-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- área de trabalho ------------------------------------------------------ */
+
+.wl-chatwork {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 16px;
+  height: clamp(520px, calc(100vh - 272px), 940px);
+}
+
+@media (max-width: 1024px) {
+  .wl-chatwork {
+    grid-template-columns: minmax(0, 1fr);
+    height: calc(100dvh - 230px);
+    min-height: 480px;
+  }
+
+  .wl-chatwork.is-thread {
+    height: calc(100dvh - 150px);
+  }
+
+  .wl-chatwork > .is-hidden {
+    display: none;
+  }
+}
+
+/* --- lista ---------------------------------------------------------------- */
+
+.wl-clist {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+}
+
+.wl-clist__head {
+  display: grid;
+  gap: 8px;
+  padding: 16px 16px 12px;
+}
+
+.wl-clist__title {
+  margin: 0 0 4px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.wl-clist .wl-input {
+  height: 40px;
+  background: var(--white);
+  font-size: 13px;
+}
+
+.wl-clist .wl-btn--glass {
+  justify-content: space-between;
+  width: 100%;
+  height: 40px;
+  border-color: transparent;
+  background: var(--white);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  font-size: 13px;
+}
+
+.wl-clist .wl-btn--glass:hover:not(:disabled) {
+  background: var(--stone);
+}
+
+.wl-clist__scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 8px 8px;
+  overflow-y: auto;
+  /* rola normalmente, sem mostrar a barra */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.wl-clist__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.wl-crow {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--radius-tile);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background .22s var(--ease), box-shadow .22s var(--ease);
+}
+
+.wl-crow:hover {
+  background: var(--stone);
+}
+
+.wl-crow:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.wl-crow.is-selected {
+  background: var(--white);
+  box-shadow: var(--shadow-glass);
+}
+
+.wl-crow__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wl-crow__title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.wl-crow__meta {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.wl-crow__time {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--wl-muted);
+}
+
+.wl-crow__preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wl-muted);
+}
+
+.wl-clist__note {
+  padding: 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--wl-muted);
+}
+
+.wl-clist__note--center {
+  padding: 32px 12px;
+  text-align: center;
+}
+
+/* ícone de follow-up enviado (dinâmico: avião, extendido: foguete) */
+.wl-fu {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--stone);
+  color: var(--ink);
+}
+
+.wl-crow.is-selected .wl-fu {
+  background: var(--paper);
+}
+
+.wl-fu svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* --- conversa ------------------------------------------------------------- */
+
+.wl-thread {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-panel);
+  background: #efeae2;
+}
+
+.wl-thread__head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--white);
+}
+
+.wl-thread__avatar {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--stone);
+  color: var(--ink);
+}
+
+.wl-thread__avatar svg {
+  width: 16px;
+  height: 16px;
+}
+
+.wl-thread__who {
+  flex: 1;
+  min-width: 0;
+}
+
+.wl-thread__name {
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.wl-thread__sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.wl-thread__tools {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.wl-iconbtn.is-off {
+  color: var(--danger);
+}
+
+.wl-thread__msgs {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+@media (min-width: 768px) {
+  .wl-thread__msgs {
+    padding: 16px 24px;
+  }
+}
+
+.wl-thread__empty {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  text-align: center;
+}
+
+.wl-thread__empty p {
+  margin: 0;
+}
+
+.wl-thread__empty .wl-empty__title {
+  margin-bottom: 4px;
+}
+
+.wl-compose {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--white);
+}
+
+.wl-compose .wl-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* reações (gostei / não gostei) sob a mensagem da IA */
+.wl-react {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+  margin-right: 4px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--white);
+  box-shadow: var(--shadow-glass);
+}
+
+.wl-react .wl-iconbtn {
+  width: 24px;
+  height: 24px;
+}
+
+.wl-react .wl-iconbtn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.wl-react .wl-iconbtn.is-on {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.wl-react .wl-iconbtn.is-on-down {
+  background: var(--danger);
+  color: var(--white);
+}
+
+.wl-reactrow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* digitando... (balão enviado, como no WhatsApp) */
+.wl-typing {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.wl-typing__bubble {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: #d9fdd3;
+  box-shadow: 0 1px 2px rgba(20, 20, 20, .08);
+}
+
+.wl-typing__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(20, 20, 20, .4);
+  animation: wl-bounce 1s var(--ease) infinite;
+}
+
+@keyframes wl-bounce {
+  0%, 100% { transform: translateY(0) }
+  50% { transform: translateY(-4px) }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-typing__dot {
+    animation: none;
+  }
+
+  .wl-crow {
+    transition: none;
+  }
+}
+
+/* No celular o cabeçalho da conversa quebra em duas linhas: nome e etiquetas em
+   cima, ferramentas embaixo. */
+@media (max-width: 640px) {
+  .wl-thread__head {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+  }
+
+  .wl-thread__avatar {
+    display: none;
+  }
+
+  .wl-thread__who {
+    flex-basis: 0;
+    min-width: 120px;
+  }
+
+  .wl-thread__sub {
+    flex-wrap: wrap;
+  }
+
+  .wl-thread__tools {
+    flex-basis: 100%;
+    justify-content: space-between;
+    padding-top: 6px;
+    border-top: 1px solid var(--line-soft);
+  }
+}

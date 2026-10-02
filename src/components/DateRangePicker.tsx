@@ -23,13 +23,16 @@ interface DateRangePickerProps {
   onDateRangeChange?: (dateRange: DateRange) => void
   placeholder?: string
   className?: string
+  /** "worklivoo" aplica o padrão visual de design-worklivoo; o padrão antigo segue como default. */
+  variant?: "default" | "worklivoo"
 }
 
 export function DateRangePicker({
   dateRange,
   onDateRangeChange,
   placeholder = "Selecione o período",
-  className
+  className,
+  variant = "default"
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [startDate, setStartDate] = React.useState<string>(
@@ -72,6 +75,53 @@ export function DateRangePicker({
     }
     return placeholder
   }, [dateRange, placeholder])
+
+  if (variant === "worklivoo") {
+    return (
+      <div className={className}>
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" className="wl-btn wl-btn--glass">
+              <CalendarIcon className="h-4 w-4" aria-hidden="true" />
+              {displayText}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="wl-scope wl-pop" align="end">
+            <div className="wl-form">
+              <div className="wl-field">
+                <label htmlFor="start-date" className="wl-label">Data inicial</label>
+                <input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="wl-input"
+                />
+              </div>
+              <div className="wl-field">
+                <label htmlFor="end-date" className="wl-label">Data final</label>
+                <input
+                  id="end-date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="wl-input"
+                />
+              </div>
+              <div className="wl-pop__actions">
+                <button type="button" onClick={handleClear} className="wl-btn wl-btn--glass-ink wl-btn--sm">
+                  Limpar
+                </button>
+                <button type="button" onClick={handleApply} className="wl-btn wl-btn--lime wl-btn--sm">
+                  Aplicar
+                </button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    )
+  }
 
   return (
     <div className={cn("grid gap-2", className)}>

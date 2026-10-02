@@ -1,0 +1,640 @@
+/* ==========================================================================
+   Worklivoo — página do lead
+   Segue design-worklivoo/design.md. Importe tokens, components e page antes.
+
+   Estrutura: cartão da página → cabeçalho → duas colunas.
+   Esquerda: painéis (--paper, raio 22px) com os dados. Direita: abas com a
+   conversa (fiel ao WhatsApp), anotações e tarefas.
+   O limão fica só na ação principal do cabeçalho (o menu já é limão).
+   ========================================================================== */
+
+/* --- cabeçalho ------------------------------------------------------------ */
+
+.wl-lp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.wl-lp-head__who {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.wl-lp-head__title {
+  margin: 0;
+  max-width: 28ch;
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -.03em;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+.wl-lp-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.wl-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.wl-pill--ink {
+  border-color: transparent;
+  background: var(--ink);
+  color: var(--white);
+}
+
+.wl-pill--soft {
+  border-color: transparent;
+  background: var(--paper);
+}
+
+.wl-pill--danger-soft {
+  border-color: transparent;
+  background: var(--stone);
+  color: var(--wl-muted);
+}
+
+/* --- grade ---------------------------------------------------------------- */
+
+.wl-lp-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .wl-lp-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.wl-lp-side {
+  display: grid;
+  gap: 16px;
+}
+
+/* --- painéis da esquerda --------------------------------------------------- */
+
+.wl-lp-card {
+  padding: 20px;
+  border-radius: var(--radius-panel);
+  background: var(--paper);
+}
+
+.wl-lp-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.wl-lp-card__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -.02em;
+  color: var(--ink);
+}
+
+.wl-lp-card__sub {
+  margin: 3px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wl-muted);
+}
+
+/* No painel (fundo --paper) o botão de vidro ganha corpo branco. */
+.wl-lp-card .wl-btn--glass {
+  border-color: transparent;
+  background: var(--white);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.wl-lp-card .wl-btn--glass:hover:not(:disabled) {
+  background: var(--stone);
+}
+
+.wl-lp-card .wl-input {
+  background: var(--white);
+}
+
+.wl-dl {
+  display: grid;
+  gap: 16px;
+}
+
+.wl-dl__item {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wl-dl__value {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+.wl-dl__value--soft {
+  font-weight: 500;
+  color: var(--wl-muted);
+}
+
+.wl-dl__value--text {
+  font-weight: 500;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.wl-dl__value--num {
+  font-variant-numeric: tabular-nums;
+}
+
+.wl-lp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.wl-control__prefix--solo {
+  left: 14px;
+}
+
+.wl-input--money {
+  padding-left: 42px !important;
+}
+
+/* --- etapas --------------------------------------------------------------- */
+
+.wl-stage {
+  display: grid;
+  gap: 12px;
+}
+
+.wl-stage__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wl-stepper {
+  display: flex;
+  align-items: center;
+}
+
+.wl-stepper__dot {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--stone);
+  color: var(--wl-muted);
+  cursor: pointer;
+  transition: transform .22s var(--ease), background .22s var(--ease), color .22s var(--ease);
+}
+
+.wl-stepper__dot svg {
+  width: 13px;
+  height: 13px;
+}
+
+.wl-stepper__dot:hover {
+  transform: translateY(-1px);
+}
+
+.wl-stepper__dot:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.wl-stepper__dot.is-done {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.wl-stepper__dot.is-current {
+  border-color: var(--ink);
+  background: var(--white);
+  color: var(--ink);
+}
+
+.wl-stepper__line {
+  flex: 1;
+  height: 2px;
+  min-width: 4px;
+  background: var(--stone-deep);
+}
+
+.wl-stepper__line.is-done {
+  background: var(--ink);
+}
+
+/* --- área da direita ------------------------------------------------------ */
+
+.wl-lp-main {
+  min-width: 0;
+}
+
+.wl-lp-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.wl-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-tile);
+  background: var(--paper);
+}
+
+.wl-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--wl-muted);
+  cursor: pointer;
+  transition: background .22s var(--ease), color .22s var(--ease), box-shadow .22s var(--ease);
+}
+
+.wl-tab svg {
+  width: 15px;
+  height: 15px;
+}
+
+.wl-tab:hover {
+  color: var(--ink);
+}
+
+.wl-tab:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.wl-tab[aria-selected="true"],
+.wl-tab[aria-checked="true"] {
+  background: var(--white);
+  box-shadow: var(--shadow-glass);
+  color: var(--ink);
+}
+
+.wl-tab__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ink);
+  font-size: 9.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--white);
+}
+
+.wl-chat {
+  height: clamp(480px, calc(100vh - 300px), 780px);
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-panel);
+}
+
+.wl-lp-list {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  max-height: clamp(480px, calc(100vh - 300px), 780px);
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+/* --- anotação e tarefa ---------------------------------------------------- */
+
+.wl-note {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-tile);
+  background: var(--paper);
+  transition: opacity .22s var(--ease);
+}
+
+.wl-note--pinned {
+  background: var(--stone);
+}
+
+.wl-note.is-busy {
+  opacity: .6;
+  pointer-events: none;
+}
+
+.wl-note__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wl-note__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wl-muted);
+}
+
+.wl-note__meta strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.wl-note__tools {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.wl-note__body {
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+
+.wl-note__body--soft {
+  color: var(--wl-muted);
+}
+
+.wl-iconbtn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--wl-muted);
+  cursor: pointer;
+  transition: background .22s var(--ease), color .22s var(--ease);
+}
+
+.wl-iconbtn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.wl-iconbtn:hover:not(:disabled) {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+
+.wl-iconbtn:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.wl-iconbtn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.wl-iconbtn--danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.wl-textlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--wl-muted);
+  cursor: pointer;
+  transition: color .22s var(--ease);
+}
+
+.wl-textlink svg {
+  width: 14px;
+  height: 14px;
+}
+
+.wl-textlink:hover {
+  color: var(--ink);
+}
+
+.wl-task {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--radius-tile);
+  background: var(--paper);
+  transition: opacity .22s var(--ease);
+}
+
+.wl-task.is-busy {
+  opacity: .6;
+  pointer-events: none;
+}
+
+.wl-task__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.wl-task__title.is-done {
+  text-decoration: line-through;
+  color: var(--wl-muted);
+}
+
+.wl-task__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--wl-muted);
+}
+
+.wl-task__meta strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.wl-task__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wl-task__meta svg {
+  width: 12px;
+  height: 12px;
+}
+
+.wl-task__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wl-task__form {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.wl-check {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  padding: 0;
+  border: 2px solid var(--stone-deep);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--white);
+  cursor: pointer;
+  transition: background .22s var(--ease), border-color .22s var(--ease);
+}
+
+.wl-check svg {
+  width: 12px;
+  height: 12px;
+}
+
+.wl-check:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.wl-check.is-on {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.wl-check:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* selos extras (somam-se aos de worklivoo-page.css) */
+.wl-tag--plain {
+  background: var(--white);
+  color: var(--ink);
+}
+
+.wl-checkline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.wl-checkline input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ink);
+}
+
+.wl-btn--danger {
+  background: var(--danger);
+  color: var(--white);
+}
+
+.wl-btn--danger:hover:not(:disabled) {
+  background: var(--ink);
+}
+
+.wl-modal--sm.wl-scope {
+  max-width: 440px;
+}
+
+.wl-modal__stack {
+  display: grid;
+  gap: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-stepper__dot,
+  .wl-tab,
+  .wl-iconbtn,
+  .wl-check,
+  .wl-note,
+  .wl-task {
+    transition: none;
+  }
+
+  .wl-stepper__dot:hover {
+    transform: none;
+  }
+}
+
+.wl-min0 {
+  min-width: 0;
+}
+
+.wl-modal__foot.wl-modal__foot--end {
+  justify-content: flex-end;
+}

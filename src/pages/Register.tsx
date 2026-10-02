@@ -1,9 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { useCRM } from '@/contexts/CRMContext';
 import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +8,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, RegisterFormData } from '@/schemas/auth';
 import { DEFAULT_PROMPTS } from '@/constants/prompts';
+import '@/styles/worklivoo-tokens.css';
+import '@/styles/worklivoo-components.css';
+import '@/styles/worklivoo-auth.css';
 
 const Registrar = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -355,427 +353,370 @@ const Registrar = () => {
     }
   };
 
-  const inputClassName = (hasError: boolean) =>
-    `h-12 rounded-xl bg-slate-50 border-slate-200 focus:border-primary focus:ring-primary/20 focus:bg-white text-slate-900 placeholder:text-slate-400 transition-colors ${hasError ? 'border-red-500' : ''}`;
+  const inputClass = (hasError: boolean, extra = '') =>
+    `wl-input ${extra} ${hasError ? 'is-invalid' : ''}`.replace(/\s+/g, ' ').trim();
+
+  const errors = registerForm.formState.errors;
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4 bg-[#F6F6F6]">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-28 -left-28 h-80 w-80 rounded-full bg-[#EBF57D]/45 blur-3xl" />
-        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-slate-200/70 blur-3xl" />
-      </div>
-      <div className={`w-full ${isAuthVerified ? 'max-w-2xl' : 'max-w-md'}`}>
-        <Card className="border-0 shadow-2xl bg-white/85 backdrop-blur-sm rounded-3xl ring-1 ring-black/5 overflow-hidden">
-          <div className="h-1 w-full bg-gradient-to-r from-[#EBF57D] via-[#EBF57D]/70 to-transparent" />
-          {!isAuthVerified ? (
-            <>
-              <CardHeader className="items-center text-center space-y-2 pb-6 pt-10">
-                <div className="h-14 w-14 rounded-2xl overflow-hidden shadow-md bg-white ring-1 ring-black/5">
-                  <img
-                    src="/logo-worklivoo-amarela.png"
-                    alt="Worklivoo"
-                    className="h-full w-full object-cover"
+    <div className="wl-scope wl-auth">
+      <main className={`wl-card ${isAuthVerified ? 'wl-card--wide' : ''}`}>
+        <img src="/logo-worklivoo-fundo-preto.png" alt="Worklivoo" className="wl-brand" />
+
+        {!isAuthVerified ? (
+          <>
+            <header className="wl-head">
+              <p className="wl-eyebrow">Acesso interno</p>
+              <h1 className="wl-title">Área restrita</h1>
+              <p className="wl-lede">Digite a chave de acesso para continuar.</p>
+            </header>
+
+            <form onSubmit={handleVerifyAuth} className="wl-form">
+              <div className="wl-field">
+                <label htmlFor="auth-gate-password" className="wl-label">Chave de acesso</label>
+                <div className="wl-control">
+                  <Lock className="wl-control__icon" aria-hidden="true" />
+                  <input
+                    id="auth-gate-password"
+                    type="password"
+                    placeholder="Senha de acesso"
+                    value={authPasswordInput}
+                    onChange={(e) => setAuthPasswordInput(e.target.value)}
+                    className="wl-input wl-input--icon"
+                    required
+                    autoFocus
                   />
                 </div>
-                <CardTitle className="text-3xl font-semibold text-slate-900">Área Restrita</CardTitle>
-                <CardDescription className="text-base text-slate-500">
-                  Digite a chave de acesso para continuar
-                </CardDescription>
-              </CardHeader>
+              </div>
 
-              <CardContent className="pt-0 px-6 sm:px-8 pb-8">
-                <form onSubmit={handleVerifyAuth} className="space-y-5">
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5" />
-                    <Input
-                      id="auth-gate-password"
-                      type="password"
-                      placeholder="Senha de acesso"
-                      value={authPasswordInput}
-                      onChange={(e) => setAuthPasswordInput(e.target.value)}
-                      className="pl-12 h-14 rounded-2xl bg-slate-50 border-slate-200 focus:border-primary focus:ring-primary/20 text-slate-900 placeholder:text-slate-400"
-                      required
-                      autoFocus
-                    />
+              <button type="submit" className="wl-btn wl-btn--lime wl-btn--block">
+                Acessar painel
+                <ArrowRight className="wl-btn__arrow" aria-hidden="true" />
+              </button>
+            </form>
+
+            <p className="wl-rule">
+              Protegido por criptografia de ponta a ponta.
+              <br />
+              Julia Worklivoo
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="wl-steps" role="img" aria-label={`Etapa ${registerStep} de 2`}>
+              <span className="wl-steps__bar is-on" />
+              <span className={`wl-steps__bar ${registerStep === 2 ? 'is-on' : ''}`} />
+            </div>
+
+            <header className="wl-head">
+              <p className="wl-eyebrow">Etapa {registerStep} de 2</p>
+              <h1 className="wl-title">Cadastro de cliente</h1>
+              <p className="wl-lede">
+                {registerStep === 1
+                  ? 'Preencha os dados abaixo para criar a conta.'
+                  : 'Defina o plano e revise o prompt do cliente.'}
+              </p>
+            </header>
+
+            <form onSubmit={registerForm.handleSubmit(handleRegister)} className="wl-form">
+              {registerStep === 1 ? (
+                <>
+                  <div className="wl-field">
+                    <label htmlFor="name" className="wl-label">Nome completo</label>
+                    <div className="wl-control">
+                      <User className="wl-control__icon" aria-hidden="true" />
+                      <input
+                        id="name"
+                        type="text"
+                        placeholder="Seu nome completo"
+                        {...registerForm.register('name')}
+                        required
+                        className={inputClass(!!errors.name, 'wl-input--icon')}
+                      />
+                    </div>
+                    {errors.name && <p className="wl-error">{errors.name.message}</p>}
                   </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full h-14 rounded-2xl bg-black hover:bg-black/90 active:bg-black text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 active:scale-[0.99] active:translate-y-px"
-                  >
-                    <span>Acessar Painel</span>
-                    <ArrowRight className="h-5 w-5 ml-2" />
-                  </Button>
+                  <div className="wl-grid">
+                    <div className="wl-field">
+                      <label htmlFor="register-email" className="wl-label">E-mail</label>
+                      <div className="wl-control">
+                        <Mail className="wl-control__icon" aria-hidden="true" />
+                        <input
+                          id="register-email"
+                          type="email"
+                          placeholder="seu@email.com"
+                          {...registerForm.register('email')}
+                          required
+                          className={inputClass(!!errors.email, 'wl-input--icon')}
+                        />
+                      </div>
+                      {errors.email && <p className="wl-error">{errors.email.message}</p>}
+                    </div>
 
-                  <div className="pt-5 border-t border-slate-200 text-center text-xs text-slate-400 space-y-1">
-                    <p>Protegido por criptografia de ponta a ponta.</p>
-                    <p>Julia Worklivoo</p>
+                    <div className="wl-field">
+                      <label htmlFor="phone" className="wl-label">Telefone</label>
+                      <div className="wl-control">
+                        <Phone className="wl-control__icon" aria-hidden="true" />
+                        <span className="wl-control__prefix">55</span>
+                        <input
+                          id="phone"
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="12999999999"
+                          value={registerForm.watch('telefone').replace(/^55/, '')}
+                          onChange={(e) => {
+                            const rest = normalizeTelefoneRest(e.target.value);
+                            registerForm.setValue('telefone', `55${rest}`, { shouldDirty: true, shouldValidate: true });
+                          }}
+                          onBlur={() => registerForm.trigger('telefone')}
+                          required
+                          className={inputClass(!!errors.telefone, 'wl-input--prefix')}
+                        />
+                      </div>
+                      {errors.telefone && <p className="wl-error">{errors.telefone.message}</p>}
+                    </div>
                   </div>
-                </form>
-              </CardContent>
-            </>
-          ) : (
-            <>
-              <CardHeader className="px-6 sm:px-8 pt-10 pb-6">
-                <div className="flex items-start gap-4">
-                  <div className="h-12 w-12 rounded-2xl overflow-hidden bg-white ring-1 ring-black/5 shadow-sm">
-                    <img
-                      src="/logo-worklivoo-amarela.png"
-                      alt="Worklivoo"
-                      className="h-full w-full object-cover"
-                    />
+
+                  <div className="wl-grid">
+                    <div className="wl-field">
+                      <label htmlFor="company" className="wl-label">Nome da empresa</label>
+                      <div className="wl-control">
+                        <Building className="wl-control__icon" aria-hidden="true" />
+                        <input
+                          id="company"
+                          type="text"
+                          placeholder="Nome da sua empresa"
+                          value={registerForm.watch('empresa')}
+                          onChange={(e) => {
+                            registerForm.setValue('empresa', normalizeEmpresaLive(e.target.value), { shouldDirty: true, shouldValidate: true });
+                          }}
+                          onBlur={() => {
+                            registerForm.setValue('empresa', normalizeEmpresaFinal(registerForm.getValues('empresa')), { shouldDirty: true, shouldValidate: true });
+                            registerForm.trigger('empresa');
+                          }}
+                          required
+                          className={inputClass(!!errors.empresa, 'wl-input--icon')}
+                        />
+                      </div>
+                      {errors.empresa && <p className="wl-error">{errors.empresa.message}</p>}
+                    </div>
+
+                    <div className="wl-field">
+                      <label htmlFor="user-tipo" className="wl-label">Tipo de cliente</label>
+                      <Select value={registerForm.watch('user_tipo')} onValueChange={(v) => registerForm.setValue('user_tipo', v as RegisterFormData['user_tipo'], { shouldDirty: true, shouldValidate: true })}>
+                        <SelectTrigger id="user-tipo" className={inputClass(!!errors.user_tipo)}>
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent className="wl-scope wl-menu">
+                          <SelectItem value="Loja de Carros" className="wl-menu__item">Loja de Carros</SelectItem>
+                          <SelectItem value="Imobiliaria" className="wl-menu__item">Imobiliaria</SelectItem>
+                          <SelectItem value="Outros" className="wl-menu__item">Outros</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errors.user_tipo && <p className="wl-error">{errors.user_tipo.message as string}</p>}
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <CardTitle className="text-2xl font-semibold text-slate-900">Cadastro de Cliente</CardTitle>
-                    <CardDescription className="text-sm text-slate-500">
-                      Preencha os dados abaixo para criar sua conta.
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
 
-              <CardContent className="pt-0 px-6 sm:px-8 pb-10">
-                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-5">
-                    {registerStep === 1 ? (
-                      <>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="name" className="text-xs font-semibold tracking-wider text-slate-500">NOME COMPLETO</Label>
-                          <div className="relative">
-                            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                            <Input
-                              id="name"
-                              type="text"
-                              placeholder="Seu nome completo"
-                              {...registerForm.register('name')}
-                              required
-                              className={`pl-11 ${inputClassName(!!registerForm.formState.errors.name)}`}
-                            />
-                          </div>
-                          {registerForm.formState.errors.name && (
-                            <p className="text-sm text-red-600">{registerForm.formState.errors.name.message}</p>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="register-email" className="text-xs font-semibold tracking-wider text-slate-500">E-MAIL</Label>
-                            <div className="relative">
-                              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                              <Input
-                                id="register-email"
-                                type="email"
-                                placeholder="seu@email.com"
-                                {...registerForm.register('email')}
-                                required
-                                className={`pl-11 ${inputClassName(!!registerForm.formState.errors.email)}`}
-                              />
-                            </div>
-                            {registerForm.formState.errors.email && (
-                              <p className="text-sm text-red-600">{registerForm.formState.errors.email.message}</p>
-                            )}
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <Label htmlFor="phone" className="text-xs font-semibold tracking-wider text-slate-500">TELEFONE</Label>
-                            <div className="relative">
-                              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                              <span className="absolute left-11 top-1/2 -translate-y-1/2 text-slate-600 text-sm font-medium select-none">55</span>
-                              <Input
-                                id="phone"
-                                type="text"
-                                inputMode="numeric"
-                                placeholder="12999999999"
-                                value={registerForm.watch('telefone').replace(/^55/, '')}
-                                onChange={(e) => {
-                                  const rest = normalizeTelefoneRest(e.target.value);
-                                  registerForm.setValue('telefone', `55${rest}`, { shouldDirty: true, shouldValidate: true });
-                                }}
-                                onBlur={() => registerForm.trigger('telefone')}
-                                required
-                                className={`pl-16 ${inputClassName(!!registerForm.formState.errors.telefone)}`}
-                              />
-                            </div>
-                            {registerForm.formState.errors.telefone && (
-                              <p className="text-sm text-red-600">{registerForm.formState.errors.telefone.message}</p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="company" className="text-xs font-semibold tracking-wider text-slate-500">NOME DA EMPRESA</Label>
-                            <div className="relative">
-                              <Building className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                              <Input
-                                id="company"
-                                type="text"
-                                placeholder="Nome da sua empresa"
-                                value={registerForm.watch('empresa')}
-                                onChange={(e) => {
-                                  registerForm.setValue('empresa', normalizeEmpresaLive(e.target.value), { shouldDirty: true, shouldValidate: true });
-                                }}
-                                onBlur={() => {
-                                  registerForm.setValue('empresa', normalizeEmpresaFinal(registerForm.getValues('empresa')), { shouldDirty: true, shouldValidate: true });
-                                  registerForm.trigger('empresa');
-                                }}
-                                required
-                                className={`pl-11 ${inputClassName(!!registerForm.formState.errors.empresa)}`}
-                              />
-                            </div>
-                            {registerForm.formState.errors.empresa && (
-                              <p className="text-sm text-red-600">{registerForm.formState.errors.empresa.message}</p>
-                            )}
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <Label htmlFor="user-tipo" className="text-xs font-semibold tracking-wider text-slate-500">TIPO DE CLIENTE</Label>
-                            <Select value={registerForm.watch('user_tipo')} onValueChange={(v) => registerForm.setValue('user_tipo', v as RegisterFormData['user_tipo'], { shouldDirty: true, shouldValidate: true })}>
-                              <SelectTrigger className={`w-full ${inputClassName(!!registerForm.formState.errors.user_tipo)}`}>
-                                <SelectValue placeholder="Selecione o tipo" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Loja de Carros" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Loja de Carros</SelectItem>
-                                <SelectItem value="Imobiliaria" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Imobiliaria</SelectItem>
-                                <SelectItem value="Outros" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Outros</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            {registerForm.formState.errors.user_tipo && (
-                              <p className="text-sm text-red-600">{registerForm.formState.errors.user_tipo.message as string}</p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label htmlFor="whatsapp-group-link" className="text-xs font-semibold tracking-wider text-slate-500">ID DO GRUPO DO WHATSAPP</Label>
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <Input
-                              id="whatsapp-group-link"
-                              type="text"
-                              placeholder="Cole o link do convite do grupo"
-                              {...whatsappGroupField}
-                              onChange={(e) => {
-                                whatsappGroupField.onChange(e);
-                                setIsWhatsappGroupValidated(false);
-                                setWhatsappGroupValidationError(null);
-                                setWhatsappGroupValidationSuccess(null);
-                              }}
-                              className={inputClassName(!!whatsappGroupValidationError)}
-                            />
-                            <Button
-                              type="button"
-                              className="h-12 rounded-xl bg-white text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 shadow-sm"
-                              onClick={validateWhatsappGroupLink}
-                              disabled={isWhatsappGroupValidating}
-                            >
-                              {isWhatsappGroupValidating ? 'Validando...' : isWhatsappGroupValidated ? 'Validado' : 'Validar'}
-                            </Button>
-                          </div>
-                          {whatsappGroupValidationError && (
-                            <p className="text-sm text-red-600">{whatsappGroupValidationError}</p>
-                          )}
-                          {!whatsappGroupValidationError && whatsappGroupValidationSuccess && (
-                            <p className="text-sm text-emerald-700">{whatsappGroupValidationSuccess}</p>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="leads-volume" className="text-xs font-semibold tracking-wider text-slate-500">VOLUME DE LEADS/MÊS</Label>
-                            <Input
-                              id="leads-volume"
-                              type="number"
-                              min={1}
-                              placeholder="Ex.: 100"
-                              {...registerForm.register('leads_volume', { valueAsNumber: true })}
-                              required
-                              className={inputClassName(!!registerForm.formState.errors.leads_volume)}
-                            />
-                            {registerForm.formState.errors.leads_volume && (
-                              <p className="text-sm text-red-600">{registerForm.formState.errors.leads_volume.message as string}</p>
-                            )}
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <Label htmlFor="valor-plano" className="text-xs font-semibold tracking-wider text-slate-500">VALOR DO PLANO</Label>
-                            <div className="relative">
-                              <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                              <Input
-                                id="valor-plano"
-                                type="text"
-                                inputMode="numeric"
-                                placeholder="Ex.: 297,00"
-                                {...valorPlanoField}
-                                value={registerForm.watch('valor_plano')}
-                                onChange={(e) => {
-                                  registerForm.setValue('valor_plano', formatCurrencyValue(e.target.value), {
-                                    shouldDirty: true,
-                                    shouldValidate: true,
-                                  });
-                                }}
-                                onBlur={() => registerForm.trigger('valor_plano')}
-                                required
-                                className={`pl-11 ${inputClassName(!!registerForm.formState.errors.valor_plano)}`}
-                              />
-                            </div>
-                            {registerForm.formState.errors.valor_plano && (
-                              <p className="text-sm text-red-600">{registerForm.formState.errors.valor_plano.message as string}</p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label htmlFor="register-password" className="text-xs font-semibold tracking-wider text-slate-500">SENHA DE ACESSO</Label>
-                          <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                            <Input
-                              id="register-password"
-                              type={showRegisterPassword ? 'text' : 'password'}
-                              placeholder="Crie uma senha segura"
-                              {...registerForm.register('password')}
-                              required
-                              className={`pl-11 pr-12 ${inputClassName(!!registerForm.formState.errors.password)}`}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                            >
-                              {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                          {registerForm.formState.errors.password && (
-                            <p className="text-sm text-red-600">{registerForm.formState.errors.password.message}</p>
-                          )}
-                        </div>
-
-                        <Button
-                          type="button"
-                          className="w-full h-14 rounded-2xl bg-black hover:bg-black/90 active:bg-black text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 active:scale-[0.99] active:translate-y-px"
-                          onClick={handleAdvanceStep}
-                        >
-                          <span>Avançar</span>
-                          <ArrowRight className="h-5 w-5 ml-2" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="plano-usuario" className="text-xs font-semibold tracking-wider text-slate-500">PLANO DO USUÁRIO</Label>
-                            <Select
-                              value={registerForm.watch('plano_usuario')}
-                              onValueChange={(v) => registerForm.setValue('plano_usuario', v as RegisterFormData['plano_usuario'])}
-                            >
-                              <SelectTrigger id="plano-usuario" className={`w-full ${inputClassName(!!registerForm.formState.errors.plano_usuario)}`}>
-                                <SelectValue placeholder="Selecione o plano" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Growth" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Growth</SelectItem>
-                                <SelectItem value="Essencial" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Essencial</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            {registerForm.formState.errors.plano_usuario && (
-                              <p className="text-sm text-red-600">{registerForm.formState.errors.plano_usuario.message as string}</p>
-                            )}
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <Label htmlFor="ciclo-plano" className="text-xs font-semibold tracking-wider text-slate-500">CICLO DO PLANO</Label>
-                            <Select
-                              value={registerForm.watch('ciclo_plano')}
-                              onValueChange={(v) => registerForm.setValue('ciclo_plano', v as RegisterFormData['ciclo_plano'])}
-                            >
-                              <SelectTrigger id="ciclo-plano" className={`w-full ${inputClassName(!!registerForm.formState.errors.ciclo_plano)}`}>
-                                <SelectValue placeholder="Selecione o ciclo" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Mensal" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Mensal</SelectItem>
-                                <SelectItem value="Trimestral" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Trimestral</SelectItem>
-                                <SelectItem value="Anual" className="focus:bg-[#EBF57D] focus:text-black data-[state=checked]:bg-[#EBF57D] data-[state=checked]:text-black">Anual</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            {registerForm.formState.errors.ciclo_plano && (
-                              <p className="text-sm text-red-600">{registerForm.formState.errors.ciclo_plano.message as string}</p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label htmlFor="prompt-cliente" className="text-xs font-semibold tracking-wider text-slate-500">PROMPT DO CLIENTE</Label>
-                          <Textarea
-                            id="prompt-cliente"
-                            placeholder="Digite o prompt do cliente"
-                            {...registerForm.register('prompt_cliente')}
-                            className={`min-h-[140px] rounded-xl bg-slate-50 border-slate-200 focus:border-primary focus:ring-primary/20 focus:bg-white text-slate-900 placeholder:text-slate-400 transition-colors ${registerForm.formState.errors.prompt_cliente ? 'border-red-500' : ''}`}
-                          />
-                          {registerForm.formState.errors.prompt_cliente && (
-                            <p className="text-sm text-red-600">{registerForm.formState.errors.prompt_cliente.message}</p>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                          <Button
-                            type="button"
-                            className="w-full h-14 rounded-2xl bg-white text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 shadow-sm transition-all duration-200 active:scale-[0.99] active:translate-y-px"
-                            onClick={() => setRegisterStep(1)}
-                          >
-                            Voltar
-                          </Button>
-
-                          <Button
-                            type="submit"
-                            className="w-full h-14 rounded-2xl bg-black hover:bg-black/90 active:bg-black text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200 active:scale-[0.99] active:translate-y-px"
-                            disabled={isLoading}
-                          >
-                            {isLoading ? (
-                              <div className="flex items-center gap-2">
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                Criando conta...
-                              </div>
-                            ) : (
-                              <>
-                                <span>Finalizar Cadastro</span>
-                                <ArrowRight className="h-5 w-5 ml-2" />
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </>
+                  <div className="wl-field">
+                    <label htmlFor="whatsapp-group-link" className="wl-label">ID do grupo do WhatsApp</label>
+                    <div className="wl-input-row">
+                      <input
+                        id="whatsapp-group-link"
+                        type="text"
+                        placeholder="Cole o link do convite do grupo"
+                        {...whatsappGroupField}
+                        onChange={(e) => {
+                          whatsappGroupField.onChange(e);
+                          setIsWhatsappGroupValidated(false);
+                          setWhatsappGroupValidationError(null);
+                          setWhatsappGroupValidationSuccess(null);
+                        }}
+                        className={inputClass(!!whatsappGroupValidationError)}
+                      />
+                      <button
+                        type="button"
+                        className="wl-btn wl-btn--glass-ink"
+                        onClick={validateWhatsappGroupLink}
+                        disabled={isWhatsappGroupValidating}
+                      >
+                        {isWhatsappGroupValidating ? 'Validando...' : isWhatsappGroupValidated ? 'Validado' : 'Validar'}
+                      </button>
+                    </div>
+                    {whatsappGroupValidationError && <p className="wl-error">{whatsappGroupValidationError}</p>}
+                    {!whatsappGroupValidationError && whatsappGroupValidationSuccess && (
+                      <p className="wl-hint">{whatsappGroupValidationSuccess}</p>
                     )}
+                  </div>
 
-                  </form>
-              </CardContent>
-            </>
-          )}
-        </Card>
-      </div>
+                  <div className="wl-grid">
+                    <div className="wl-field">
+                      <label htmlFor="leads-volume" className="wl-label">Volume de leads/mês</label>
+                      <input
+                        id="leads-volume"
+                        type="number"
+                        min={1}
+                        placeholder="Ex.: 100"
+                        {...registerForm.register('leads_volume', { valueAsNumber: true })}
+                        required
+                        className={inputClass(!!errors.leads_volume)}
+                      />
+                      {errors.leads_volume && <p className="wl-error">{errors.leads_volume.message as string}</p>}
+                    </div>
+
+                    <div className="wl-field">
+                      <label htmlFor="valor-plano" className="wl-label">Valor do plano</label>
+                      <div className="wl-control">
+                        <DollarSign className="wl-control__icon" aria-hidden="true" />
+                        <input
+                          id="valor-plano"
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Ex.: 297,00"
+                          {...valorPlanoField}
+                          value={registerForm.watch('valor_plano')}
+                          onChange={(e) => {
+                            registerForm.setValue('valor_plano', formatCurrencyValue(e.target.value), {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                          }}
+                          onBlur={() => registerForm.trigger('valor_plano')}
+                          required
+                          className={inputClass(!!errors.valor_plano, 'wl-input--icon')}
+                        />
+                      </div>
+                      {errors.valor_plano && <p className="wl-error">{errors.valor_plano.message as string}</p>}
+                    </div>
+                  </div>
+
+                  <div className="wl-field">
+                    <label htmlFor="register-password" className="wl-label">Senha de acesso</label>
+                    <div className="wl-control">
+                      <Lock className="wl-control__icon" aria-hidden="true" />
+                      <input
+                        id="register-password"
+                        type={showRegisterPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        placeholder="Crie uma senha segura"
+                        {...registerForm.register('password')}
+                        required
+                        className={inputClass(!!errors.password, 'wl-input--icon wl-input--action')}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                        className="wl-control__action"
+                        aria-label={showRegisterPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      >
+                        {showRegisterPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                      </button>
+                    </div>
+                    {errors.password && <p className="wl-error">{errors.password.message}</p>}
+                  </div>
+
+                  <button type="button" className="wl-btn wl-btn--lime wl-btn--block" onClick={handleAdvanceStep}>
+                    Avançar
+                    <ArrowRight className="wl-btn__arrow" aria-hidden="true" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="wl-grid">
+                    <div className="wl-field">
+                      <label htmlFor="plano-usuario" className="wl-label">Plano do usuário</label>
+                      <Select
+                        value={registerForm.watch('plano_usuario')}
+                        onValueChange={(v) => registerForm.setValue('plano_usuario', v as RegisterFormData['plano_usuario'])}
+                      >
+                        <SelectTrigger id="plano-usuario" className={inputClass(!!errors.plano_usuario)}>
+                          <SelectValue placeholder="Selecione o plano" />
+                        </SelectTrigger>
+                        <SelectContent className="wl-scope wl-menu">
+                          <SelectItem value="Growth" className="wl-menu__item">Growth</SelectItem>
+                          <SelectItem value="Essencial" className="wl-menu__item">Essencial</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errors.plano_usuario && <p className="wl-error">{errors.plano_usuario.message as string}</p>}
+                    </div>
+
+                    <div className="wl-field">
+                      <label htmlFor="ciclo-plano" className="wl-label">Ciclo do plano</label>
+                      <Select
+                        value={registerForm.watch('ciclo_plano')}
+                        onValueChange={(v) => registerForm.setValue('ciclo_plano', v as RegisterFormData['ciclo_plano'])}
+                      >
+                        <SelectTrigger id="ciclo-plano" className={inputClass(!!errors.ciclo_plano)}>
+                          <SelectValue placeholder="Selecione o ciclo" />
+                        </SelectTrigger>
+                        <SelectContent className="wl-scope wl-menu">
+                          <SelectItem value="Mensal" className="wl-menu__item">Mensal</SelectItem>
+                          <SelectItem value="Trimestral" className="wl-menu__item">Trimestral</SelectItem>
+                          <SelectItem value="Anual" className="wl-menu__item">Anual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errors.ciclo_plano && <p className="wl-error">{errors.ciclo_plano.message as string}</p>}
+                    </div>
+                  </div>
+
+                  <div className="wl-field">
+                    <label htmlFor="prompt-cliente" className="wl-label">Prompt do cliente</label>
+                    <textarea
+                      id="prompt-cliente"
+                      placeholder="Digite o prompt do cliente"
+                      {...registerForm.register('prompt_cliente')}
+                      className={inputClass(!!errors.prompt_cliente)}
+                    />
+                    {errors.prompt_cliente && <p className="wl-error">{errors.prompt_cliente.message}</p>}
+                  </div>
+
+                  <div className="wl-btn-row">
+                    <button type="button" className="wl-btn wl-btn--glass-ink" onClick={() => setRegisterStep(1)}>
+                      Voltar
+                    </button>
+
+                    <button type="submit" className="wl-btn wl-btn--lime" disabled={isLoading}>
+                      {isLoading ? (
+                        <>
+                          <span className="wl-spinner" aria-hidden="true" />
+                          Criando conta...
+                        </>
+                      ) : (
+                        <>
+                          Finalizar cadastro
+                          <ArrowRight className="wl-btn__arrow" aria-hidden="true" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+            </form>
+          </>
+        )}
+      </main>
 
       {isProgressOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/10">
-            <div className="text-lg font-semibold text-slate-900">Finalizando Cadastro</div>
-            <div className="mt-1 text-sm text-slate-600">{progressStatus}</div>
+        <div className="wl-scope wl-progress" role="dialog" aria-modal="true" aria-label="Finalizando cadastro">
+          <div className="wl-progress__card">
+            <h2 className="wl-title wl-title--sm">Finalizando cadastro</h2>
+            <p className="wl-lede">{progressStatus}</p>
 
-            <div className="mt-4 h-3 w-full rounded-full bg-slate-200 overflow-hidden">
-              <div
-                className="h-full bg-black transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
+            <div className="wl-progress__track">
+              <div className="wl-progress__fill" style={{ width: `${progressPercent}%` }} />
             </div>
-            <div className="mt-2 text-xs text-slate-500">{progressPercent}%</div>
+            <div className="wl-progress__pct">{progressPercent}%</div>
+
+            {progressError && <p className="wl-alert wl-progress__gap" role="alert">{progressError}</p>}
 
             {progressError && (
-              <div className="mt-3 text-sm text-red-600">{progressError}</div>
-            )}
-
-            {progressError && (
-              <Button
+              <button
                 type="button"
-                className="mt-5 w-full h-12 rounded-xl bg-black hover:bg-black/90 active:bg-black text-white font-semibold"
+                className="wl-btn wl-btn--lime wl-btn--block wl-progress__gap"
                 onClick={() => setIsProgressOpen(false)}
               >
                 Fechar
-              </Button>
+              </button>
             )}
           </div>
         </div>

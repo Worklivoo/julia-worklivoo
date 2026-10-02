@@ -59,7 +59,7 @@ type LeadsV2Row = {
   lead_nome_oportunidade?: string | null;
   ativo_fluxo_cadencia?: string | null;
   etapa_fluxo_followup?: string | null;
-  ativo_followup?: string | null;
+  ativo_followup?: string | boolean | null;
   ativo_ia?: string | null;
   membro_id?: string | null;
   TRIAL?: string | null;
@@ -665,7 +665,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               ativo_ia: normalizeString(lead?.ativo_ia),
               ativo_fluxo_cadencia: normalizeString(lead?.ativo_fluxo_cadencia) || null,
               etapa_fluxo_followup: normalizeString(lead?.etapa_fluxo_followup) || null,
-              ativo_followup: normalizeString(lead?.ativo_followup) || null,
+              // No banco é boolean; normalizeString só aceita string e zerava o valor.
+              ativo_followup: typeof lead?.ativo_followup === 'boolean'
+                ? (lead.ativo_followup ? 'TRUE' : 'FALSE')
+                : (normalizeString(lead?.ativo_followup) || null),
               membro_id: lead?.membro_id ?? null,
               conversa: normalizeString(lead?.conversa),
               followup_dinamico: Boolean(lead?.followup_dinamico),
@@ -1145,7 +1148,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // Adicionar no Supabase
-      const { data, error } = await addLeadToSupabase(supabaseLeadData);
+      const { error } = await addLeadToSupabase(supabaseLeadData);
       
       if (error) {
         return { success: false, error: error.message };
@@ -1200,24 +1203,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const enriched = await enrichLeadsWithTarefaStats(mappedLeads, userIdForLead, cid);
       setLeads(enriched);
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Erro interno ao adicionar lead.' };
     }
   };
-
-  // Função auxiliar para mapear status do frontend para Supabase
-  function mapStatusToLeadStatus(status: Lead['status']): string {
-    switch (status) {
-      case 'active':
-        return 'Aberto';
-      case 'lost':
-        return 'Perdido';
-      case 'won':
-        return 'Vendido';
-      default:
-        return 'Aberto';
-    }
-  }
 
   const updateLead = async (id: string, updates: Partial<Lead>) => {
     const normalizedUpdates: Partial<Lead> = { ...updates };

@@ -26,7 +26,7 @@ export type LeadInput = {
 };
 
 // Tipagem para inserção de anotação no histórico
-export type HistoricoInput = {
+type HistoricoInput = {
   lead_id: number;
   historico_lead: string;
 };

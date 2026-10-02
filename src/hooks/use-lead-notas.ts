@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/types';
 
-export interface LeadNota {
+interface LeadNota {
   anotacao_id: string;
   anotacao_conteudo: string;
   lead_id: number;
@@ -15,7 +15,7 @@ export interface LeadNota {
   membro_nome: string | null;
 }
 
-export interface LeadNotaInput {
+interface LeadNotaInput {
   anotacao_conteudo: string;
   anotacao_fixada?: boolean;
 }

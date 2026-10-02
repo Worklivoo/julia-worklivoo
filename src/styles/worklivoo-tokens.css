@@ -1,0 +1,59 @@
+/* ==========================================================================
+   Worklivoo — tokens do sistema (compartilhados)
+   Cópia de design-worklivoo/tokens.css com duas diferenças, ambas para não colidir
+   com o shadcn do app:
+   1) o seletor é `.wl-scope` em vez de `:root`;
+   2) `--muted` virou `--wl-muted`. No shadcn, `--muted` guarda um triplo HSL
+      ("220 13% 15%") consumido por `hsl(var(--muted))`; um hex ali invalidaria todo
+      componente shadcn (bg-muted etc.) dentro de `.wl-scope`.
+   Assim, telas ainda não migradas convivem com as migradas.
+
+   Diálogos e menus do Radix renderizam num portal fora da página; por isso
+   eles também recebem a classe `wl-scope`.
+   ========================================================================== */
+
+.wl-scope{
+  /* --- tokens.css ------------------------------------------------------- */
+  --ink:        #141414;
+  --ink-soft:   #1e1e1e;
+  --paper:      #f1f1f1;
+  --stone:      #e6e6e6;
+  --stone-deep: #d8d8d8;
+  --white:      #fbfbfb;
+  --wl-muted:   #6e6e6e;   /* texto secundário (no tokens.css original: --muted) */
+  --muted-soft: #909090;
+
+  --line:       rgba(20,20,20,.10);
+  --line-soft:  rgba(20,20,20,.06);
+
+  --lime:       #ebf57d;
+  --lime-deep:  #dbe665;
+
+  --font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ease: cubic-bezier(.22,1,.36,1);
+
+  --shell-max:   1280px;
+  --shell-pad:   56px;
+  --nav-inset:   34px;
+  --radius-card: 48px;
+  --section-y:   104px;
+
+  /* --- derivados de design.md (raios, vidro, sombra) --------------------- */
+  --radius-block:   32px;   /* bloco de seção / cartão de formulário */
+  --radius-panel:   22px;   /* painel dentro de um card */
+  --radius-tile:    14px;   /* tile, item de lista */
+  --radius-control: 10px;   /* campo */
+  --radius-button:  9px;    /* botão */
+  --control-h:      47px;   /* altura de botão e campo */
+
+  --shadow-card:  0 34px 64px -34px rgba(20,20,20,.45);
+  --shadow-glass: 0 12px 30px -12px rgba(20,20,20,.30);
+  --glass-ink:    rgba(20,20,20,.82);
+
+  /* Erro: o sistema não define cor de erro (a paleta é só cinza + limão).
+     Mantido o mais discreto possível; registrado em design.md. */
+  --danger: #b42318;
+
+  font-family: var(--font);
+  color: var(--ink);
+}

@@ -4,18 +4,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { CRMProvider, useCRM } from "@/contexts/CRMContext";
-import { useState, useEffect } from "react";
 import Auth from "./pages/Auth";
 import Registrar from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Pipeline from "./pages/Pipeline";
 import LeadDetail from "./pages/LeadDetail";
-import WhatsApp from "./pages/WhatsApp";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import ResetPassword from "./pages/ResetPassword";
-import Membros from "./pages/Membros";
-import BaseDeConhecimento from "./pages/BaseDeConhecimento";
 
 import Conversas from "./pages/Conversas";
 import IndiqueGanhe from "./pages/IndiqueGanhe";
@@ -94,9 +90,6 @@ const AppRoutes = () => {
       />
       <Route path="/leads" element={<ProtectedRoute><Layout><Pipeline /></Layout></ProtectedRoute>} />
       <Route path="/lead/:id" element={<ProtectedRoute><Layout><LeadDetail /></Layout></ProtectedRoute>} />
-      <Route path="/whatsapp" element={<ProtectedRoute><Layout><WhatsApp /></Layout></ProtectedRoute>} />
-      <Route path="/membros" element={<ProtectedRoute><Layout><Membros /></Layout></ProtectedRoute>} />
-      <Route path="/base-de-conhecimento" element={<ProtectedRoute><Layout><BaseDeConhecimento /></Layout></ProtectedRoute>} />
       <Route path="/configuracoes" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
       <Route path="/conversas" element={<ProtectedRoute><Layout><Conversas /></Layout></ProtectedRoute>} />
       <Route path="/indique-ganhe" element={<ProtectedRoute><Layout><IndiqueGanhe /></Layout></ProtectedRoute>} />

@@ -60,32 +60,6 @@ export const getAsaasApiKey = () => {
   return cleanApiKey;
 };
 
-export const getAsaasUrl = (path: string) => {
-  // Em desenvolvimento (localhost), usa o proxy do Vite configurado no vite.config.ts
-  if (import.meta.env.DEV) {
-    const cleanPath = path.startsWith('/') ? path : `/${path}`;
-    return `/api/asaas${cleanPath}`;
-  }
-
-  const cleanPathWithSlash = path.startsWith('/') ? path : `/${path}`;
-  const cleanPathWithoutSlash = cleanPathWithSlash.substring(1);
-
-  const proxyStrategy = String(import.meta.env.VITE_ASAAS_PROXY || '').trim().toLowerCase();
-  if (proxyStrategy === 'api') {
-    return `/api/asaas${cleanPathWithSlash}`;
-  }
-  if (proxyStrategy === 'php') {
-    return `/asaas-proxy.php?path=${encodeURIComponent(cleanPathWithoutSlash)}`;
-  }
-
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-  if (hostname.endsWith('.vercel.app')) {
-    return `/api/asaas${cleanPathWithSlash}`;
-  }
-
-  return `/asaas-proxy.php?path=${encodeURIComponent(cleanPathWithoutSlash)}`;
-};
-
 const isJsonLikeText = (text: string) => {
   const trimmed = text.trimStart();
   return trimmed.startsWith('{') || trimmed.startsWith('[');

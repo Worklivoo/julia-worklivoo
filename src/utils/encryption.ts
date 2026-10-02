@@ -49,14 +49,6 @@ export const decryptData = (encryptedData: string): string => {
 }
 
 /**
- * Gera uma chave aleatória para criptografia
- * @returns Chave aleatória de 32 caracteres
- */
-export const generateEncryptionKey = (): string => {
-  return CryptoJS.lib.WordArray.random(32).toString()
-}
-
-/**
  * Verifica se os dados estão criptografados
  * @param data - Dados a serem verificados
  * @returns true se os dados parecem estar criptografados

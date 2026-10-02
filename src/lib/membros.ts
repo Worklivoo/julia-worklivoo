@@ -35,32 +35,6 @@ export const getMembrosByUser = async (userId: string) => {
   }
 };
 
-// Função para adicionar um novo membro
-export const addMembro = async (membro: Omit<Membro, 'membro_id' | 'created_at'>) => {
-  try {
-    const normalizedMembro = {
-      ...membro,
-      membro_email: String(membro.membro_email || '').trim().toLowerCase(),
-      membro_telefone: normalizePhone(membro.membro_telefone),
-    };
-    console.log('Enviando para Supabase:', normalizedMembro);
-    const { data, error } = await supabase
-      .from('membros_v2')
-      .insert(normalizedMembro)
-      .select();
-
-    console.log('Resposta do Supabase:', { data, error });
-    if (error) {
-      console.error('Erro do Supabase:', error);
-      return { data: null, error };
-    }
-    return { data, error: null };
-  } catch (error) {
-    console.error('Exceção ao adicionar membro:', error);
-    return { data: null, error };
-  }
-};
-
 // Função para criar um novo usuário no Supabase Auth e adicionar como membro
 export const createUserAndAddMembro = async (
   email: string,
@@ -220,22 +194,6 @@ export const getMembroByEmail = async (email: string) => {
   } catch (error) {
     console.error('Exceção ao buscar membro por email:', error);
     return { data: null, error };
-  }
-};
-
-// Função para excluir um membro
-export const deleteMembro = async (membroId: string) => {
-  try {
-    const { error } = await supabase
-      .from('membros_v2')
-      .delete()
-      .eq('membro_id', membroId);
-
-    if (error) throw error;
-    return { success: true, error: null };
-  } catch (error) {
-    console.error('Erro ao excluir membro:', error);
-    return { success: false, error };
   }
 };
 
